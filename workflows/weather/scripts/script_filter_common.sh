@@ -5,50 +5,39 @@ DEFAULT_CITY_FALLBACK="Tokyo"
 DEFAULT_LOCALE_FALLBACK="en"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-
-resolve_helper() {
-  local helper_name="$1"
-  local candidate
-  local cwd_repo_root
-
-  for candidate in \
-    "$script_dir/lib/$helper_name" \
-    "$script_dir/../../../scripts/lib/$helper_name"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  if command -v git >/dev/null 2>&1; then
-    cwd_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-    if [[ -n "$cwd_repo_root" ]]; then
-      candidate="$cwd_repo_root/scripts/lib/$helper_name"
-      if [[ -f "$candidate" ]]; then
-        printf '%s\n' "$candidate"
-        return 0
-      fi
-    fi
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
   fi
+done
 
-  return 1
-}
+if [[ -z "$helper_loader" ]]; then
+  cwd_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$cwd_repo_root" && -f "$cwd_repo_root/scripts/lib/workflow_helper_loader.sh" ]]; then
+    helper_loader="$cwd_repo_root/scripts/lib/workflow_helper_loader.sh"
+  fi
+fi
 
-error_json_helper="$(resolve_helper "script_filter_error_json.sh" || true)"
-if [[ -z "$error_json_helper" ]]; then
+if [[ -z "$helper_loader" ]]; then
+  printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate workflow_helper_loader.sh runtime helper.","valid":false}]}\n'
+  exit 0
+fi
+# shellcheck disable=SC1090
+source "$helper_loader"
+
+if ! wfhl_source_helper "$script_dir" "script_filter_error_json.sh" auto; then
   printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate script_filter_error_json.sh runtime helper.","valid":false}]}\n'
   exit 0
 fi
-# shellcheck disable=SC1090
-source "$error_json_helper"
 
-cli_resolver_helper="$(resolve_helper "workflow_cli_resolver.sh" || true)"
-if [[ -z "$cli_resolver_helper" ]]; then
+if ! wfhl_source_helper "$script_dir" "workflow_cli_resolver.sh" auto; then
   sfej_emit_error_item_json "Workflow helper missing" "Cannot locate workflow_cli_resolver.sh runtime helper."
   exit 0
 fi
-# shellcheck disable=SC1090
-source "$cli_resolver_helper"
 
 trim_query() {
   local value="${1-}"

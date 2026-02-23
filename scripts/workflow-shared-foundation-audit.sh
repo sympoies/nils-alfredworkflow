@@ -75,14 +75,39 @@ declare -ar migrated_non_search_filters=(
   "workflows/epoch-converter/scripts/script_filter.sh"
   "workflows/imdb-search/scripts/script_filter.sh"
   "workflows/market-expression/scripts/script_filter.sh"
+  "workflows/memo-add/scripts/script_filter.sh"
   "workflows/multi-timezone/scripts/script_filter.sh"
+  "workflows/open-project/scripts/script_filter.sh"
   "workflows/quote-feed/scripts/script_filter.sh"
+  "workflows/randomer/scripts/script_filter.sh"
+  "workflows/randomer/scripts/script_filter_expand.sh"
+  "workflows/randomer/scripts/script_filter_types.sh"
+)
+
+declare -ar migrated_additional_foundation_files=(
+  "workflows/bangumi-search/scripts/action_clear_cache.sh"
+  "workflows/bangumi-search/scripts/action_clear_cache_dir.sh"
+  "workflows/codex-cli/scripts/action_open.sh"
+  "workflows/codex-cli/scripts/script_filter.sh"
+  "workflows/codex-cli/scripts/script_filter_auth_current.sh"
+  "workflows/google-search/scripts/script_filter_direct.sh"
+  "workflows/memo-add/scripts/action_run.sh"
+  "workflows/memo-add/scripts/script_filter_copy.sh"
+  "workflows/memo-add/scripts/script_filter_delete.sh"
+  "workflows/memo-add/scripts/script_filter_recent.sh"
+  "workflows/memo-add/scripts/script_filter_search.sh"
+  "workflows/memo-add/scripts/script_filter_update.sh"
+  "workflows/open-project/scripts/action_open.sh"
+  "workflows/open-project/scripts/action_open_github.sh"
+  "workflows/open-project/scripts/action_record_usage.sh"
+  "workflows/weather/scripts/script_filter_common.sh"
 )
 
 declare -a migrated_files=(
   "${migrated_action_wrappers[@]}"
   "${migrated_search_filters[@]}"
   "${migrated_non_search_filters[@]}"
+  "${migrated_additional_foundation_files[@]}"
 )
 
 declare -ir total_migrated_files="${#migrated_files[@]}"

@@ -6,33 +6,28 @@ if [[ $# -lt 1 || -z "${1:-}" ]]; then
   exit 2
 fi
 
-resolve_helper() {
-  local helper_name="$1"
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
 
-  local candidates=(
-    "$script_dir/lib/$helper_name"
-    "$script_dir/../../../scripts/lib/$helper_name"
-  )
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-workflow_cli_resolver_helper="$(resolve_helper "workflow_cli_resolver.sh" || true)"
-if [[ -z "$workflow_cli_resolver_helper" ]]; then
-  echo "memo-workflow helper missing: workflow_cli_resolver.sh" >&2
+if [[ -z "$helper_loader" ]]; then
+  echo "memo-workflow helper missing: workflow_helper_loader.sh" >&2
   exit 1
 fi
 # shellcheck disable=SC1090
-source "$workflow_cli_resolver_helper"
+source "$helper_loader"
+
+if ! wfhl_source_helper "$script_dir" "workflow_cli_resolver.sh" off; then
+  echo "memo-workflow helper missing: workflow_cli_resolver.sh" >&2
+  exit 1
+fi
 
 notify() {
   local message="$1"
@@ -45,7 +40,6 @@ notify() {
 }
 
 action_token="$1"
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 memo_workflow_cli="$(
   wfcr_resolve_binary \

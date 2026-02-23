@@ -1,40 +1,33 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-resolve_helper() {
-  helper_name="$1"
+script_dir=$(
+  CDPATH=
+  cd -- "$(dirname -- "$0")" && pwd
+)
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [ -f "$candidate" ]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
 
-  script_dir=$(
-    CDPATH=
-    cd -- "$(dirname -- "$0")" && pwd
-  )
-
-  for candidate in \
-    "$script_dir/lib/$helper_name" \
-    "$script_dir/../../../scripts/lib/$helper_name"; do
-    if [ -f "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-workflow_cli_resolver_helper="$(resolve_helper "workflow_cli_resolver.sh" || true)"
-if [ -z "$workflow_cli_resolver_helper" ]; then
-  echo "error: workflow helper missing: workflow_cli_resolver.sh" >&2
+if [ -z "$helper_loader" ]; then
+  echo "error: workflow helper missing: workflow_helper_loader.sh" >&2
   exit 1
 fi
 # shellcheck disable=SC1090
-. "$workflow_cli_resolver_helper"
+source "$helper_loader"
+
+if ! wfhl_source_helper "$script_dir" "workflow_cli_resolver.sh" off; then
+  echo "error: workflow helper missing: workflow_cli_resolver.sh" >&2
+  exit 1
+fi
 
 resolve_workflow_cli() {
-  script_dir=$(
-    CDPATH=
-    cd -- "$(dirname -- "$0")" && pwd
-  )
-
   repo_root=$(
     CDPATH=
     cd -- "$script_dir/../../.." && pwd

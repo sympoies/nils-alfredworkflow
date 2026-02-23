@@ -14,46 +14,21 @@ codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
 # shellcheck disable=SC2153
 codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
-resolve_workflow_cli_resolver_helper() {
-  local candidates=(
-    "$workflow_script_dir/lib/workflow_cli_resolver.sh"
-    "$workflow_script_dir/../../../scripts/lib/workflow_cli_resolver.sh"
-  )
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
+helper_loader=""
+for candidate in \
+  "$workflow_script_dir/lib/workflow_helper_loader.sh" \
+  "$workflow_script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
 
-workflow_cli_resolver_helper="$(resolve_workflow_cli_resolver_helper || true)"
-if [[ -n "$workflow_cli_resolver_helper" ]]; then
+if [[ -n "$helper_loader" ]]; then
   # shellcheck disable=SC1090
-  source "$workflow_cli_resolver_helper"
-fi
-
-resolve_query_policy_helper() {
-  local candidates=(
-    "$workflow_script_dir/lib/script_filter_query_policy.sh"
-    "$workflow_script_dir/../../../scripts/lib/script_filter_query_policy.sh"
-  )
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
-query_policy_helper="$(resolve_query_policy_helper || true)"
-if [[ -n "$query_policy_helper" ]]; then
-  # shellcheck disable=SC1090
-  source "$query_policy_helper"
+  source "$helper_loader"
+  wfhl_source_helper "$workflow_script_dir" "workflow_cli_resolver.sh" off || true
+  wfhl_source_helper "$workflow_script_dir" "script_filter_query_policy.sh" off || true
 fi
 
 if ! declare -F sfqp_trim >/dev/null 2>&1; then
