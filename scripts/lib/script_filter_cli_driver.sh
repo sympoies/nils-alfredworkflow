@@ -28,6 +28,18 @@ sfcd_emit_fallback_error_row_json() {
     "$(sfcd_json_escape "$message")"
 }
 
+sfcd_json_has_items_array() {
+  local payload="${1-}"
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -e '.items | type == "array"' >/dev/null <<<"$payload"
+    return $?
+  fi
+
+  # Keep a minimal structural guard when jq is unavailable.
+  printf '%s' "$payload" | grep -Eq '"items"[[:space:]]*:[[:space:]]*\['
+}
+
 sfcd_emit_mapped_error_json() {
   local map_error_fn="${1-}"
   local raw_message="${2-}"
@@ -39,12 +51,7 @@ sfcd_emit_mapped_error_json() {
 
   if [[ -n "$map_error_fn" ]] && declare -F "$map_error_fn" >/dev/null 2>&1; then
     if mapped_json="$("$map_error_fn" "$raw_message")" && [[ -n "$mapped_json" ]]; then
-      if command -v jq >/dev/null 2>&1; then
-        if jq -e '.items | type == "array"' >/dev/null <<<"$mapped_json"; then
-          printf '%s\n' "$mapped_json"
-          return 0
-        fi
-      else
+      if sfcd_json_has_items_array "$mapped_json"; then
         printf '%s\n' "$mapped_json"
         return 0
       fi
@@ -82,12 +89,10 @@ sfcd_run_cli_flow() {
       return 0
     fi
 
-    if command -v jq >/dev/null 2>&1; then
-      if ! jq -e '.items | type == "array"' >/dev/null <<<"$json_output"; then
-        rm -f "$err_file"
-        sfcd_emit_mapped_error_json "$map_error_fn" "$malformed_json_message"
-        return 0
-      fi
+    if ! sfcd_json_has_items_array "$json_output"; then
+      rm -f "$err_file"
+      sfcd_emit_mapped_error_json "$map_error_fn" "$malformed_json_message"
+      return 0
     fi
 
     rm -f "$err_file"

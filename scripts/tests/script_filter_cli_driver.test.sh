@@ -9,8 +9,9 @@ source "$repo_root/scripts/lib/script_filter_cli_driver.sh"
 
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/script-filter-cli-driver.test.XXXXXX")"
 fake_bin_dir="$test_root/bin"
+no_jq_bin_dir="$test_root/no-jq-bin"
 test_tmpdir="$test_root/tmp"
-mkdir -p "$fake_bin_dir" "$test_tmpdir"
+mkdir -p "$fake_bin_dir" "$no_jq_bin_dir" "$test_tmpdir"
 
 cleanup() {
   rm -rf "$test_root"
@@ -37,6 +38,15 @@ fi
 exit 1
 EOF
 chmod +x "$fake_bin_dir/jq"
+
+for required_cmd in cat grep mktemp rm sed tr; do
+  required_path="$(command -v "$required_cmd")"
+  if [[ -z "$required_path" ]]; then
+    printf 'missing required command for no-jq test path: %s\n' "$required_cmd" >&2
+    exit 1
+  fi
+  ln -s "$required_path" "$no_jq_bin_dir/$required_cmd"
+done
 
 export PATH="$fake_bin_dir:$PATH"
 export TMPDIR="$test_tmpdir"
@@ -148,12 +158,22 @@ mapper_last_input() {
   cat "$MAPPER_INPUT_FILE"
 }
 
-run_driver() {
+run_driver_with_path() {
+  local run_path="$1"
+  shift
   local output_file
-  output_file="$(mktemp "$TMPDIR/driver-output.XXXXXX")"
-  sfcd_run_cli_flow "$@" >"$output_file"
-  TEST_DRIVER_OUTPUT="$(cat "$output_file")"
-  rm -f "$output_file"
+  output_file="$(PATH="$run_path" mktemp "$TMPDIR/driver-output.XXXXXX")"
+  PATH="$run_path" sfcd_run_cli_flow "$@" >"$output_file"
+  TEST_DRIVER_OUTPUT="$(PATH="$run_path" cat "$output_file")"
+  PATH="$run_path" rm -f "$output_file"
+}
+
+run_driver() {
+  run_driver_with_path "$PATH" "$@"
+}
+
+run_driver_no_jq() {
+  run_driver_with_path "$no_jq_bin_dir" "$@"
 }
 
 test_success_passthrough() {
@@ -210,6 +230,20 @@ test_malformed_json_guard() {
   assert_no_driver_err_files "malformed-json err-file cleanup"
 }
 
+test_malformed_json_guard_without_jq() {
+  reset_state
+  TEST_EXEC_MODE="malformed"
+  TEST_EXEC_STDOUT='{"not_items":[]}'
+  TEST_MAPPER_MODE="ok"
+
+  run_driver_no_jq test_exec_callback test_error_mapper "$EMPTY_SENTINEL" "$MALFORMED_SENTINEL"
+
+  assert_eq "1" "$(mapper_call_count)" "mapper called on malformed JSON without jq"
+  assert_eq "$MALFORMED_SENTINEL" "$(mapper_last_input)" "malformed guard message passed without jq"
+  assert_contains "$TEST_DRIVER_OUTPUT" '"Mapped error"' "mapped malformed-json error emitted without jq"
+  assert_no_driver_err_files "malformed-json without-jq err-file cleanup"
+}
+
 test_fallback_error_row_when_mapper_invalid() {
   reset_state
   TEST_EXEC_MODE="fail"
@@ -222,6 +256,20 @@ test_fallback_error_row_when_mapper_invalid() {
   assert_contains "$TEST_DRIVER_OUTPUT" '"Workflow runtime error"' "fallback title emitted"
   assert_contains "$TEST_DRIVER_OUTPUT" 'hard failure' "fallback row includes raw message"
   assert_no_driver_err_files "fallback err-file cleanup"
+}
+
+test_fallback_error_row_when_mapper_invalid_without_jq() {
+  reset_state
+  TEST_EXEC_MODE="fail"
+  TEST_EXEC_STDERR="hard failure"
+  TEST_MAPPER_MODE="malformed"
+
+  run_driver_no_jq test_exec_callback test_error_mapper "$EMPTY_SENTINEL" "$MALFORMED_SENTINEL"
+
+  assert_eq "1" "$(mapper_call_count)" "mapper attempted before fallback without jq"
+  assert_contains "$TEST_DRIVER_OUTPUT" '"Workflow runtime error"' "fallback title emitted without jq"
+  assert_contains "$TEST_DRIVER_OUTPUT" 'hard failure' "fallback row includes raw message without jq"
+  assert_no_driver_err_files "fallback without-jq err-file cleanup"
 }
 
 test_fallback_error_row_normalizes_control_chars() {
@@ -257,7 +305,9 @@ main() {
   test_exec_failure_maps_stderr
   test_empty_output_guard
   test_malformed_json_guard
+  test_malformed_json_guard_without_jq
   test_fallback_error_row_when_mapper_invalid
+  test_fallback_error_row_when_mapper_invalid_without_jq
   test_fallback_error_row_normalizes_control_chars
   test_missing_execute_callback_guard
   printf 'ok: script_filter_cli_driver tests passed\n'
