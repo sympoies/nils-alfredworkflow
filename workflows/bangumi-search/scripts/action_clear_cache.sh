@@ -1,39 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-resolve_helper() {
-  local helper_name="$1"
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local git_repo_root=""
-  git_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-
-  local candidates=(
-    "$script_dir/lib/$helper_name"
-    "$script_dir/../../../scripts/lib/$helper_name"
-  )
-  if [[ -n "$git_repo_root" ]]; then
-    candidates+=("$git_repo_root/scripts/lib/$helper_name")
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
   fi
+done
 
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
+if [[ -z "$helper_loader" ]]; then
+  git_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$git_repo_root" && -f "$git_repo_root/scripts/lib/workflow_helper_loader.sh" ]]; then
+    helper_loader="$git_repo_root/scripts/lib/workflow_helper_loader.sh"
+  fi
+fi
 
-  return 1
-}
-
-async_coalesce_helper="$(resolve_helper "script_filter_async_coalesce.sh" || true)"
-if [[ -z "$async_coalesce_helper" ]]; then
-  echo "script_filter_async_coalesce.sh helper not found" >&2
+if [[ -z "$helper_loader" ]]; then
+  echo "workflow_helper_loader.sh helper not found" >&2
   exit 1
 fi
 # shellcheck disable=SC1090
-source "$async_coalesce_helper"
+source "$helper_loader"
+
+if ! wfhl_source_helper "$script_dir" "script_filter_async_coalesce.sh" auto; then
+  echo "script_filter_async_coalesce.sh helper not found" >&2
+  exit 1
+fi
 
 workflow_key="$(sfac_sanitize_component "bangumi-search")"
 cache_dir="$(sfac_resolve_workflow_cache_dir "nils-bangumi-search-workflow")"

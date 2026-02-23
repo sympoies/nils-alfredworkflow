@@ -1,41 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-resolve_helper() {
-  local helper_name="$1"
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
 
-  local candidates=(
-    "$script_dir/lib/$helper_name"
-    "$script_dir/../../../scripts/lib/$helper_name"
-  )
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-error_json_helper="$(resolve_helper "script_filter_error_json.sh" || true)"
-if [[ -z "$error_json_helper" ]]; then
-  printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate script_filter_error_json.sh runtime helper.","valid":false}]}\n'
+if [[ -z "$helper_loader" ]]; then
+  printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate workflow_helper_loader.sh runtime helper.","valid":false}]}\n'
   exit 0
 fi
 # shellcheck disable=SC1090
-source "$error_json_helper"
+source "$helper_loader"
 
-cli_resolver_helper="$(resolve_helper "workflow_cli_resolver.sh" || true)"
-if [[ -z "$cli_resolver_helper" ]]; then
+if ! wfhl_source_helper "$script_dir" "script_filter_error_json.sh" off; then
+  wfhl_emit_missing_helper_item_json "script_filter_error_json.sh"
+  exit 0
+fi
+
+if ! wfhl_source_helper "$script_dir" "workflow_cli_resolver.sh" off; then
   sfej_emit_error_item_json "Workflow helper missing" "Cannot locate workflow_cli_resolver.sh runtime helper."
   exit 0
 fi
-# shellcheck disable=SC1090
-source "$cli_resolver_helper"
+
+if ! wfhl_source_helper "$script_dir" "script_filter_cli_driver.sh" off; then
+  sfej_emit_error_item_json "Workflow helper missing" "Cannot locate script_filter_cli_driver.sh runtime helper."
+  exit 0
+fi
 
 normalize_error_message() {
   sfej_normalize_error_message "${1-}"
@@ -93,33 +90,17 @@ resolve_randomer_cli() {
     "randomer-cli binary not found (checked RANDOMER_CLI_BIN/package/release/debug paths)"
 }
 
+execute_list_types() {
+  local query="${1:-}"
+  local randomer_cli
+  randomer_cli="$(resolve_randomer_cli)"
+  "$randomer_cli" list-types --query "$query" --mode alfred
+}
+
 query="${1:-}"
-err_file="${TMPDIR:-/tmp}/randomer-types-script-filter.err.$$"
-trap 'rm -f "$err_file"' EXIT
-
-randomer_cli=""
-if ! randomer_cli="$(resolve_randomer_cli 2>"$err_file")"; then
-  err_msg="$(cat "$err_file")"
-  print_error_item "$err_msg"
-  exit 0
-fi
-
-if json_output="$("$randomer_cli" list-types --query "$query" --mode alfred 2>"$err_file")"; then
-  if [[ -z "$json_output" ]]; then
-    print_error_item "randomer-cli returned empty response"
-    exit 0
-  fi
-
-  if command -v jq >/dev/null 2>&1; then
-    if ! jq -e '.items | type == "array"' >/dev/null <<<"$json_output"; then
-      print_error_item "randomer-cli returned malformed Alfred JSON"
-      exit 0
-    fi
-  fi
-
-  printf '%s\n' "$json_output"
-  exit 0
-fi
-
-err_msg="$(cat "$err_file")"
-print_error_item "$err_msg"
+sfcd_run_cli_flow \
+  "execute_list_types" \
+  "print_error_item" \
+  "randomer-cli returned empty response" \
+  "randomer-cli returned malformed Alfred JSON" \
+  "$query"

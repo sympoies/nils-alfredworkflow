@@ -14,26 +14,20 @@ codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
 # shellcheck disable=SC2153
 codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
-resolve_helper() {
-  local helper_name="$1"
-  local candidate=""
+helper_loader=""
+for candidate in \
+  "$workflow_script_dir/lib/workflow_helper_loader.sh" \
+  "$workflow_script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
 
-  for candidate in \
-    "$workflow_script_dir/lib/$helper_name" \
-    "$workflow_script_dir/../../../scripts/lib/$helper_name"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-workflow_cli_resolver_helper="$(resolve_helper "workflow_cli_resolver.sh" || true)"
-if [[ -n "$workflow_cli_resolver_helper" ]]; then
+if [[ -n "$helper_loader" ]]; then
   # shellcheck disable=SC1090
-  source "$workflow_cli_resolver_helper"
+  source "$helper_loader"
+  wfhl_source_helper "$workflow_script_dir" "workflow_cli_resolver.sh" off || true
 fi
 
 if [[ "$#" -lt 1 || -z "${1:-}" ]]; then
