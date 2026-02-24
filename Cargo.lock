@@ -923,6 +923,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nils-common"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60d55ae4a6b3f3f92ee6fe0c851734b03079c3c9ff5a18ad20a350da80fd8556"
+dependencies = [
+ "base64",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "nils-epoch-cli"
 version = "1.1.8"
 dependencies = [
@@ -950,15 +961,16 @@ dependencies = [
 
 [[package]]
 name = "nils-memo-cli"
-version = "0.4.7"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ff1a67a363eb12428f17ae3d10face8965714cbd3c43d4d3f2e5350648d42ac"
+checksum = "0c12b3f5cf9df0072b310a08536fcc3b9a8f4143a22fd4095e9eb321ef5368d7"
 dependencies = [
  "anyhow",
  "chrono",
  "chrono-tz",
  "clap",
  "clap_complete",
+ "nils-common",
  "rusqlite",
  "serde",
  "serde_json",
