@@ -17,7 +17,9 @@ path = "src/main.rs"
 [dependencies]
 alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
 workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3" }
+base64 = "0.22"
 clap.workspace = true
+prost = "0.14"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

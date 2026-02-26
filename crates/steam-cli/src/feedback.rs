@@ -1,6 +1,6 @@
 use alfred_core::{Feedback, Item};
 
-use crate::steam_store_api::{SteamPlatforms, SteamSearchResult};
+use crate::steam_store_api::{SteamItemType, SteamSearchResult};
 
 const NO_RESULTS_TITLE: &str = "No games found";
 const NO_RESULTS_SUBTITLE: &str = "Try broader keywords or switch STEAM_REGION.";
@@ -11,7 +11,6 @@ const REGION_SWITCH_ARG_PREFIX: &str = "steam-requery:";
 const ERROR_TITLE: &str = "Steam search failed";
 const UNKNOWN_PRICE_LABEL: &str = "Price unavailable";
 const FREE_TO_PLAY_LABEL: &str = "Free to play";
-const UNKNOWN_PLATFORM_LABEL: &str = "Platforms: Unknown";
 const SUBTITLE_MAX_CHARS: usize = 120;
 
 pub fn search_results_to_feedback(
@@ -58,8 +57,8 @@ fn result_to_item(region: &str, language: &str, result: &SteamSearchResult) -> I
     };
 
     let price = format_price(result);
-    let platforms = format_platforms(&result.platforms);
-    let subtitle = single_line_subtitle(&format!("{price} | {platforms}"), SUBTITLE_MAX_CHARS);
+    let item_type = format_item_type(result.item_type);
+    let subtitle = single_line_subtitle(&format!("{price} | {item_type}"), SUBTITLE_MAX_CHARS);
 
     Item::new(normalized_title)
         .with_subtitle(subtitle)
@@ -98,23 +97,8 @@ fn format_price(result: &SteamSearchResult) -> String {
     }
 }
 
-fn format_platforms(platforms: &SteamPlatforms) -> String {
-    let mut labels = Vec::with_capacity(3);
-    if platforms.windows {
-        labels.push("Windows");
-    }
-    if platforms.mac {
-        labels.push("macOS");
-    }
-    if platforms.linux {
-        labels.push("Linux");
-    }
-
-    if labels.is_empty() {
-        UNKNOWN_PLATFORM_LABEL.to_string()
-    } else {
-        format!("Platforms: {}", labels.join(", "))
-    }
+fn format_item_type(item_type: SteamItemType) -> &'static str {
+    item_type.label()
 }
 
 fn no_results_item() -> Item {
@@ -185,17 +169,15 @@ fn single_line_subtitle(input: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::steam_store_api::{SteamPlatforms, SteamPrice};
+    use crate::steam_store_api::{SteamItemType, SteamPlatforms, SteamPrice};
 
-    fn fixture_result(
-        price: Option<SteamPrice>,
-        subtitle_platforms: SteamPlatforms,
-    ) -> SteamSearchResult {
+    fn fixture_result(price: Option<SteamPrice>, item_type: SteamItemType) -> SteamSearchResult {
         SteamSearchResult {
             app_id: 730,
             name: "Counter-Strike 2".to_string(),
             price,
-            platforms: subtitle_platforms,
+            item_type,
+            platforms: SteamPlatforms::default(),
         }
     }
 
@@ -212,21 +194,14 @@ mod tests {
                     final_price_cents: Some(0),
                     final_formatted: Some("Free".to_string()),
                 }),
-                SteamPlatforms {
-                    windows: true,
-                    mac: false,
-                    linux: true,
-                },
+                SteamItemType::Game,
             )],
         );
 
         let item = feedback.items.first().expect("expected one result row");
 
         assert_eq!(item.title, "Counter-Strike 2");
-        assert_eq!(
-            item.subtitle.as_deref(),
-            Some("Free | Platforms: Windows, Linux")
-        );
+        assert_eq!(item.subtitle.as_deref(), Some("Free | Game"));
         assert_eq!(
             item.arg.as_deref(),
             Some("https://store.steampowered.com/app/730/?cc=us&l=english")
@@ -288,11 +263,7 @@ mod tests {
                     final_price_cents: None,
                     final_formatted: Some(long_price.clone()),
                 }),
-                SteamPlatforms {
-                    windows: true,
-                    mac: true,
-                    linux: true,
-                },
+                SteamItemType::Soundtrack,
             )],
         );
         let subtitle = feedback.items[0]
@@ -312,11 +283,7 @@ mod tests {
                     final_price_cents: None,
                     final_formatted: Some(long_price),
                 }),
-                SteamPlatforms {
-                    windows: true,
-                    mac: true,
-                    linux: true,
-                },
+                SteamItemType::Soundtrack,
             )],
         );
         let subtitle_again = feedback_again.items[0]
@@ -343,19 +310,19 @@ mod tests {
     }
 
     #[test]
-    fn feedback_uses_fallback_labels_for_missing_price_and_platforms() {
+    fn feedback_uses_fallback_labels_for_missing_price_and_type() {
         let feedback = search_results_to_feedback(
             "us",
             "dota",
             &[],
             false,
             "english",
-            &[fixture_result(None, SteamPlatforms::default())],
+            &[fixture_result(None, SteamItemType::Unknown)],
         );
 
         assert_eq!(
             feedback.items[0].subtitle.as_deref(),
-            Some("Price unavailable | Platforms: Unknown")
+            Some("Price unavailable | Unknown")
         );
     }
 
@@ -368,7 +335,7 @@ mod tests {
             &options,
             false,
             "english",
-            &[fixture_result(None, SteamPlatforms::default())],
+            &[fixture_result(None, SteamItemType::Unknown)],
         );
 
         assert_eq!(feedback.items.len(), 1);

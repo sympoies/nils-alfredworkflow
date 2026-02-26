@@ -19,7 +19,7 @@ Alfred workflows for macOS users.
 | [Netflix Search](workflows/netflix-search/README.md) | `nf`, `netflix` | Search Netflix title pages (`site:netflix.com/title`) and open selected links. | `BRAVE_API_KEY` |
 | [Spotify Search](workflows/spotify-search/README.md) | `sp`, `spotify` | Search Spotify tracks and open selected results in Spotify app. | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` |
 | [Wiki Search](workflows/wiki-search/README.md) | `wk`, `wiki` | Search Wikipedia articles and open selected page links. | No |
-| [Steam Search](workflows/steam-search/README.md) | `st`, `steam` | Search Steam Store games, switch region rows, and open selected app pages. | Optional tuning: `STEAM_REGION`, `STEAM_REGION_OPTIONS`, `STEAM_MAX_RESULTS` |
+| [Steam Search](workflows/steam-search/README.md) | `st`, `steam` | Search Steam Store games, switch region rows, and open selected app pages. | Optional tuning: `STEAM_REGION`, `STEAM_REGION_OPTIONS`, `STEAM_SHOW_REGION_OPTIONS`, `STEAM_LANGUAGE`, `STEAM_MAX_RESULTS`, `STEAM_SEARCH_API` |
 | [IMDb Search](workflows/imdb-search/README.md) | `im`, `imdb` | Search IMDb and open result pages in browser. | Optional: `IMDB_SEARCH_SECTION` |
 | [Bilibili Search](workflows/bilibili-search/README.md) | `bl`, `bilibili` | Search bilibili suggestions and open selected search links in browser. | Optional: `BILIBILI_UID` |
 | [Bangumi Search](workflows/bangumi-search/README.md) | `bgm`, `bangumi` | Search Bangumi subjects and open selected subject pages in browser. | Optional: `BANGUMI_API_KEY` |

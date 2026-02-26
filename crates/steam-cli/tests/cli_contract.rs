@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use prost::Message;
 use serde_json::Value;
 
 fn run_cli(args: &[&str], envs: &[(&str, &str)]) -> Output {
@@ -37,16 +38,15 @@ fn cli_contract_invalid_config_returns_user_error() {
 
 #[test]
 fn cli_contract_api_failure_returns_runtime_error_message() {
-    let server = MockServer::spawn(MockResponse::json(
-        503,
-        "Service Unavailable",
-        r#"{"message":"upstream unavailable"}"#,
-    ));
+    let server = MockServer::spawn(
+        MockResponse::json(503, "Service Unavailable", r#"{"message":"upstream unavailable"}"#),
+        "/IStoreQueryService/SearchSuggestions/v1",
+    );
 
-    let endpoint = format!("{}/api/storesearch", server.base_url());
+    let endpoint = format!("{}{}", server.base_url(), "/IStoreQueryService/SearchSuggestions/v1");
     let output = run_cli(
         &["search", "--query", "dota"],
-        &[("STEAM_STORE_SEARCH_ENDPOINT", &endpoint)],
+        &[("STEAM_SEARCH_SUGGESTIONS_ENDPOINT", &endpoint)],
     );
 
     assert_eq!(output.status.code(), Some(1));
@@ -58,26 +58,25 @@ fn cli_contract_api_failure_returns_runtime_error_message() {
 
 #[test]
 fn cli_contract_success_returns_alfred_json_items() {
-    let server = MockServer::spawn(MockResponse::json(
-        200,
-        "OK",
-        r#"{
-            "items": [
-                {
-                    "id": 730,
-                    "name": "Counter-Strike 2",
-                    "price": {"final": 0, "final_formatted": "Free"},
-                    "platforms": {"windows": true, "mac": false, "linux": true}
-                }
-            ]
-        }"#,
-    ));
+    let response_body = encode_suggestions_response(vec![SearchSuggestionFixture {
+        app_id: Some(730),
+        name: "Counter-Strike 2".to_string(),
+        prices: vec![SearchSuggestionPriceFixture {
+            final_price_cents: Some(0),
+            final_formatted: Some("Free".to_string()),
+        }],
+    }]);
 
-    let endpoint = format!("{}/api/storesearch", server.base_url());
+    let server = MockServer::spawn(
+        MockResponse::octet_stream(200, "OK", response_body),
+        "/IStoreQueryService/SearchSuggestions/v1",
+    );
+
+    let endpoint = format!("{}{}", server.base_url(), "/IStoreQueryService/SearchSuggestions/v1");
     let output = run_cli(
         &["search", "--query", "counter strike"],
         &[
-            ("STEAM_STORE_SEARCH_ENDPOINT", &endpoint),
+            ("STEAM_SEARCH_SUGGESTIONS_ENDPOINT", &endpoint),
             ("STEAM_REGION", "us"),
             ("STEAM_REGION_OPTIONS", "jp,us"),
             ("STEAM_SHOW_REGION_OPTIONS", "1"),
@@ -112,26 +111,25 @@ fn cli_contract_success_returns_alfred_json_items() {
 
 #[test]
 fn cli_contract_hides_region_switch_rows_by_default() {
-    let server = MockServer::spawn(MockResponse::json(
-        200,
-        "OK",
-        r#"{
-            "items": [
-                {
-                    "id": 730,
-                    "name": "Counter-Strike 2",
-                    "price": {"final": 0, "final_formatted": "Free"},
-                    "platforms": {"windows": true, "mac": false, "linux": true}
-                }
-            ]
-        }"#,
-    ));
+    let response_body = encode_suggestions_response(vec![SearchSuggestionFixture {
+        app_id: Some(730),
+        name: "Counter-Strike 2".to_string(),
+        prices: vec![SearchSuggestionPriceFixture {
+            final_price_cents: Some(0),
+            final_formatted: Some("Free".to_string()),
+        }],
+    }]);
 
-    let endpoint = format!("{}/api/storesearch", server.base_url());
+    let server = MockServer::spawn(
+        MockResponse::octet_stream(200, "OK", response_body),
+        "/IStoreQueryService/SearchSuggestions/v1",
+    );
+
+    let endpoint = format!("{}{}", server.base_url(), "/IStoreQueryService/SearchSuggestions/v1");
     let output = run_cli(
         &["search", "--query", "counter strike"],
         &[
-            ("STEAM_STORE_SEARCH_ENDPOINT", &endpoint),
+            ("STEAM_SEARCH_SUGGESTIONS_ENDPOINT", &endpoint),
             ("STEAM_REGION", "us"),
             ("STEAM_REGION_OPTIONS", "jp,us"),
         ],
@@ -159,12 +157,59 @@ fn cli_contract_hides_region_switch_rows_by_default() {
     server.join();
 }
 
+#[test]
+fn cli_contract_legacy_mode_uses_store_search_api() {
+    let server = MockServer::spawn(
+        MockResponse::json(
+            200,
+            "OK",
+            r#"{
+                "items": [
+                    {
+                        "id": 730,
+                        "name": "Counter-Strike 2",
+                        "price": {"final": 0, "final_formatted": "Free"},
+                        "platforms": {"windows": true, "mac": false, "linux": true}
+                    }
+                ]
+            }"#,
+        ),
+        "/api/storesearch",
+    );
+
+    let endpoint = format!("{}{}", server.base_url(), "/api/storesearch");
+    let output = run_cli(
+        &["search", "--query", "counter strike"],
+        &[
+            ("STEAM_SEARCH_API", "storesearch"),
+            ("STEAM_STORE_SEARCH_ENDPOINT", &endpoint),
+            ("STEAM_REGION", "us"),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: Value = serde_json::from_str(&stdout).expect("stdout should be json");
+    let items = json
+        .get("items")
+        .and_then(Value::as_array)
+        .expect("items should be array");
+
+    assert_eq!(
+        items[0].get("arg").and_then(Value::as_str),
+        Some("https://store.steampowered.com/app/730/?cc=us")
+    );
+
+    server.join();
+}
+
 #[derive(Debug)]
 struct MockResponse {
     status: u16,
     reason: &'static str,
     content_type: &'static str,
-    body: String,
+    body: Vec<u8>,
 }
 
 impl MockResponse {
@@ -173,7 +218,16 @@ impl MockResponse {
             status,
             reason,
             content_type: "application/json",
-            body: body.to_string(),
+            body: body.as_bytes().to_vec(),
+        }
+    }
+
+    fn octet_stream(status: u16, reason: &'static str, body: Vec<u8>) -> Self {
+        Self {
+            status,
+            reason,
+            content_type: "application/octet-stream",
+            body,
         }
     }
 }
@@ -182,10 +236,11 @@ struct MockServer {
     base_url: String,
     handle: Option<thread::JoinHandle<()>>,
     request_path: Arc<Mutex<Option<String>>>,
+    expected_path_prefix: String,
 }
 
 impl MockServer {
-    fn spawn(response: MockResponse) -> Self {
+    fn spawn(response: MockResponse, expected_path_prefix: &str) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock server");
         listener
             .set_nonblocking(true)
@@ -238,7 +293,7 @@ impl MockServer {
 
             stream
                 .write_all(response_head.as_bytes())
-                .and_then(|_| stream.write_all(response.body.as_bytes()))
+                .and_then(|_| stream.write_all(response.body.as_slice()))
                 .expect("write response");
         });
 
@@ -246,6 +301,7 @@ impl MockServer {
             base_url,
             handle: Some(handle),
             request_path,
+            expected_path_prefix: expected_path_prefix.to_string(),
         }
     }
 
@@ -265,8 +321,36 @@ impl MockServer {
             .clone()
             .unwrap_or_default();
         assert!(
-            path.starts_with("/api/storesearch"),
+            path.starts_with(&self.expected_path_prefix),
             "unexpected request path: {path}"
         );
     }
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct SearchSuggestionsResponseFixture {
+    #[prost(message, repeated, tag = "3")]
+    results: Vec<SearchSuggestionFixture>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct SearchSuggestionFixture {
+    #[prost(optional, uint32, tag = "2")]
+    app_id: Option<u32>,
+    #[prost(string, tag = "6")]
+    name: String,
+    #[prost(message, repeated, tag = "40")]
+    prices: Vec<SearchSuggestionPriceFixture>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct SearchSuggestionPriceFixture {
+    #[prost(optional, uint32, tag = "5")]
+    final_price_cents: Option<u32>,
+    #[prost(optional, string, tag = "8")]
+    final_formatted: Option<String>,
+}
+
+fn encode_suggestions_response(results: Vec<SearchSuggestionFixture>) -> Vec<u8> {
+    SearchSuggestionsResponseFixture { results }.encode_to_vec()
 }
