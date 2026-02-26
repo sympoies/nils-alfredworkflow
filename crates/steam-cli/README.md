@@ -14,8 +14,10 @@ CLI backend for the `steam-search` workflow.
 - Optional: `STEAM_REGION_OPTIONS` (default: current `STEAM_REGION`)
 - Optional: `STEAM_SHOW_REGION_OPTIONS` (default: `false`, accepts `1/0`, `true/false`, `yes/no`, `on/off`)
 - Optional: `STEAM_MAX_RESULTS` (default: `10`, clamped to `1..50`)
-- Optional: `STEAM_LANGUAGE` (default: unset/empty; when set, includes `l` query parameter)
-- Optional test override: `STEAM_STORE_SEARCH_ENDPOINT`
+- Optional: `STEAM_LANGUAGE` (default: unset/empty; used as Steam search locale language)
+- Optional: `STEAM_SEARCH_API` (default: `search-suggestions`; allowed: `search-suggestions`, `storesearch`)
+- Optional test override for `search-suggestions`: `STEAM_SEARCH_SUGGESTIONS_ENDPOINT`
+- Optional test override for `storesearch`: `STEAM_STORE_SEARCH_ENDPOINT`
 
 ## Output Contract
 

@@ -15,11 +15,14 @@ STEAM_REGION_OPTIONS = "US,JP"
 # Optional: UI switch for showing region switch rows in Script Filter output.
 # Default off to keep result rows focused.
 STEAM_SHOW_REGION_OPTIONS = "0"
-# Optional: Steam language parameter mapped to storesearch `l` (for example english, schinese, japanese).
-# Default empty means no `l` parameter is sent.
+# Optional: Steam query locale language (for example english, schinese, japanese).
+# Default empty means no explicit language is sent.
 STEAM_LANGUAGE = ""
 # Optional: maximum number of results to return. Parsed as integer and clamped by steam-cli.
 STEAM_MAX_RESULTS = "10"
+# Optional: backend selector for steam-cli search.
+# Allowed: search-suggestions (new default) or storesearch (legacy JSON endpoint).
+STEAM_SEARCH_API = "search-suggestions"
 
 [alfred]
 min_alfred = "5"

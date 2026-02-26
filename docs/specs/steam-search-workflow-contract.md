@@ -7,14 +7,15 @@
 
 ## Source Contract (Steam Store)
 
-- Primary search source: `https://store.steampowered.com/api/storesearch`.
-- Detail enrichment source (optional, per result): `https://store.steampowered.com/api/appdetails`.
+- Default search source: `https://api.steampowered.com/IStoreQueryService/SearchSuggestions/v1`.
+- Optional legacy search source: `https://store.steampowered.com/api/storesearch`.
+- Backend selector: `STEAM_SEARCH_API` (`search-suggestions` default, `storesearch` legacy).
 - Request contract:
-  - `q`: user query string.
-  - `cc`: region/country code used for store availability and pricing context.
-  - `l`: Steam language parameter used for localized titles/subtitles when configured.
+  - Always preserve query, region/country, language, and max-results semantics across backends.
+  - `search-suggestions` sends these via protobuf payload.
+  - `storesearch` sends these via query params (`term`, `cc`, optional `l`, `max_results`).
 - Response parsing contract:
-  - Parse only documented/observed JSON fields needed for Alfred rows (app id, title, URL, price/platform text).
+  - Parse only fields needed for Alfred rows (app id, title, URL, price/platform text when available).
   - Treat missing optional fields as partial-success rows, not fatal parser errors.
 
 ## Region Semantics
@@ -49,7 +50,7 @@
 | Query normalization | Must use `scripts/lib/script_filter_query_policy.sh` for input/query guards. | Shared helper |
 | Action requery parse/persist/trigger | Must use `scripts/lib/workflow_action_requery.sh`. | Shared helper |
 | URL open action | Must use `scripts/lib/workflow_action_open_url.sh`. | Shared helper |
-| Steam endpoint choice/params | API URL selection, `storesearch` request params, and Steam-specific response mapping. | Must stay local |
+| Steam endpoint choice/params | API URL selection (`search-suggestions`/`storesearch`) and Steam-specific response mapping. | Must stay local |
 | Steam error interpretation text | Steam-specific row titles/subtitles and user guidance copy. | Must stay local |
 | Steam ranking/selection rules | Ordering and domain-specific display choices. | Must stay local |
 

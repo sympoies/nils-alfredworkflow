@@ -202,7 +202,7 @@
         <true/>
       </dict>
       <key>description</key>
-      <string>Optional Steam language parameter used for store `l` (for example english, schinese, japanese). Leave empty to omit `l`.</string>
+      <string>Optional Steam locale language (for example english, schinese, japanese). Leave empty for endpoint default locale behavior.</string>
       <key>label</key>
       <string>STEAM_LANGUAGE</string>
       <key>type</key>
@@ -230,6 +230,27 @@
       <string>textfield</string>
       <key>variable</key>
       <string>STEAM_MAX_RESULTS</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
+        <string>search-suggestions</string>
+        <key>placeholder</key>
+        <string>search-suggestions or storesearch</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional Steam search backend: search-suggestions (default) or storesearch.</string>
+      <key>label</key>
+      <string>STEAM_SEARCH_API</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>STEAM_SEARCH_API</string>
     </dict>
   </array>
   <key>variablesdontexport</key>

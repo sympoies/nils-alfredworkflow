@@ -244,7 +244,8 @@ mod tests {
     use serde_json::Value;
 
     use super::*;
-    use steam_cli::steam_store_api::{SteamPlatforms, SteamPrice};
+    use steam_cli::config::SteamSearchApi;
+    use steam_cli::steam_store_api::{SteamItemType, SteamPlatforms, SteamPrice};
 
     fn fixture_config() -> RuntimeConfig {
         RuntimeConfig {
@@ -253,6 +254,7 @@ mod tests {
             show_region_options: true,
             max_results: 5,
             language: "english".to_string(),
+            search_api: SteamSearchApi::SearchSuggestions,
         }
     }
 
@@ -263,6 +265,7 @@ mod tests {
             show_region_options: true,
             max_results: 5,
             language: String::new(),
+            search_api: SteamSearchApi::SearchSuggestions,
         }
     }
 
@@ -281,6 +284,7 @@ mod tests {
                         final_price_cents: Some(0),
                         final_formatted: Some("Free".to_string()),
                     }),
+                    item_type: SteamItemType::Game,
                     platforms: SteamPlatforms {
                         windows: true,
                         mac: false,
@@ -326,6 +330,7 @@ mod tests {
                         final_price_cents: Some(0),
                         final_formatted: Some("Free".to_string()),
                     }),
+                    item_type: SteamItemType::Game,
                     platforms: SteamPlatforms {
                         windows: true,
                         mac: false,

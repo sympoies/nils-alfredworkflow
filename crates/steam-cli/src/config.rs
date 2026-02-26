@@ -8,6 +8,7 @@ const REGION_OPTIONS_ENV: &str = "STEAM_REGION_OPTIONS";
 const SHOW_REGION_OPTIONS_ENV: &str = "STEAM_SHOW_REGION_OPTIONS";
 const MAX_RESULTS_ENV: &str = "STEAM_MAX_RESULTS";
 const LANGUAGE_ENV: &str = "STEAM_LANGUAGE";
+const SEARCH_API_ENV: &str = "STEAM_SEARCH_API";
 
 const MIN_RESULTS: i32 = 1;
 const MAX_RESULTS: i32 = 50;
@@ -15,6 +16,13 @@ pub const DEFAULT_MAX_RESULTS: u8 = 10;
 pub const DEFAULT_REGION: &str = "us";
 pub const DEFAULT_LANGUAGE: &str = "";
 pub const DEFAULT_SHOW_REGION_OPTIONS: bool = false;
+pub const DEFAULT_SEARCH_API: SteamSearchApi = SteamSearchApi::SearchSuggestions;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SteamSearchApi {
+    SearchSuggestions,
+    StoreSearch,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeConfig {
@@ -23,6 +31,7 @@ pub struct RuntimeConfig {
     pub show_region_options: bool,
     pub max_results: u8,
     pub language: String,
+    pub search_api: SteamSearchApi,
 }
 
 impl RuntimeConfig {
@@ -48,6 +57,7 @@ impl RuntimeConfig {
             parse_show_region_options(env_map.get(SHOW_REGION_OPTIONS_ENV).map(String::as_str))?;
         let max_results = parse_max_results(env_map.get(MAX_RESULTS_ENV).map(String::as_str))?;
         let language = parse_language(env_map.get(LANGUAGE_ENV).map(String::as_str))?;
+        let search_api = parse_search_api(env_map.get(SEARCH_API_ENV).map(String::as_str))?;
 
         Ok(Self {
             region,
@@ -55,6 +65,7 @@ impl RuntimeConfig {
             show_region_options,
             max_results,
             language,
+            search_api,
         })
     }
 }
@@ -159,6 +170,19 @@ fn parse_bool(raw: &str) -> Option<bool> {
     }
 }
 
+fn parse_search_api(raw: Option<&str>) -> Result<SteamSearchApi, ConfigError> {
+    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(DEFAULT_SEARCH_API);
+    };
+
+    let normalized = value.to_ascii_lowercase();
+    match normalized.as_str() {
+        "search-suggestions" | "searchsuggestions" => Ok(SteamSearchApi::SearchSuggestions),
+        "storesearch" | "store-search" => Ok(SteamSearchApi::StoreSearch),
+        _ => Err(ConfigError::InvalidSearchApi(value.to_string())),
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ConfigError {
     #[error("invalid STEAM_REGION: {0} (expected 2-letter country code)")]
@@ -175,6 +199,8 @@ pub enum ConfigError {
     InvalidMaxResults(String),
     #[error("invalid STEAM_LANGUAGE: {0} (expected lowercase letters/hyphen, length 2..24)")]
     InvalidLanguage(String),
+    #[error("invalid STEAM_SEARCH_API: {0} (expected one of: search-suggestions, storesearch)")]
+    InvalidSearchApi(String),
 }
 
 #[cfg(test)]
@@ -191,6 +217,7 @@ mod tests {
         assert_eq!(config.show_region_options, DEFAULT_SHOW_REGION_OPTIONS);
         assert_eq!(config.max_results, DEFAULT_MAX_RESULTS);
         assert_eq!(config.language, DEFAULT_LANGUAGE);
+        assert_eq!(config.search_api, DEFAULT_SEARCH_API);
     }
 
     #[test]
@@ -307,5 +334,36 @@ mod tests {
             .expect_err("invalid language should fail");
 
         assert_eq!(err, ConfigError::InvalidLanguage("en_US".to_string()));
+    }
+
+    #[test]
+    fn config_defaults_search_api_to_new_endpoint() {
+        let config = RuntimeConfig::from_pairs(vec![(REGION_ENV, "us")])
+            .expect("search api should use default");
+        assert_eq!(config.search_api, SteamSearchApi::SearchSuggestions);
+    }
+
+    #[test]
+    fn config_parses_search_api_aliases() {
+        let new_aliases = ["search-suggestions", "searchsuggestions"];
+        for alias in new_aliases {
+            let config = RuntimeConfig::from_pairs(vec![(SEARCH_API_ENV, alias)])
+                .expect("new alias should parse");
+            assert_eq!(config.search_api, SteamSearchApi::SearchSuggestions);
+        }
+
+        let legacy_aliases = ["storesearch", "store-search"];
+        for alias in legacy_aliases {
+            let config = RuntimeConfig::from_pairs(vec![(SEARCH_API_ENV, alias)])
+                .expect("legacy alias should parse");
+            assert_eq!(config.search_api, SteamSearchApi::StoreSearch);
+        }
+    }
+
+    #[test]
+    fn config_rejects_invalid_search_api() {
+        let err = RuntimeConfig::from_pairs(vec![(SEARCH_API_ENV, "beta")])
+            .expect_err("invalid search api should fail");
+        assert_eq!(err, ConfigError::InvalidSearchApi("beta".to_string()));
     }
 }

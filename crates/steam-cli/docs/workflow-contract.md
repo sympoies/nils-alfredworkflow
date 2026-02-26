@@ -38,25 +38,38 @@ args, and deterministic error behavior.
   - Optional, default empty (unset).
   - Normalized to lowercase.
   - Allowed pattern: lowercase letters and `-`, length `2..24`.
-  - Empty means language parameter `l` is omitted from Steam requests and result URLs.
+- `STEAM_SEARCH_API`:
+  - Optional, default `search-suggestions`.
+  - Allowed values: `search-suggestions`, `searchsuggestions`, `storesearch`, `store-search`.
+  - `search-suggestions` uses `IStoreQueryService/SearchSuggestions`.
+  - `storesearch` uses legacy `storesearch` JSON endpoint.
+
+Language behavior by backend:
+- `search-suggestions`: language is sent as locale context (not query param `l`).
+- `storesearch`: empty language omits query param `l`.
 
 Invalid config produces user error text and exit code `2`.
 
 ## Steam Store API Contract
 
-- Endpoint: `https://store.steampowered.com/api/storesearch`
-  - Test override: `STEAM_STORE_SEARCH_ENDPOINT`.
-- Query parameters must always include:
-  - `term=<query>`
-  - `cc=<steam_region>`
-- Additional parameters:
-  - `json=1`
-  - `max_results=<effective max>`
-- Optional parameter:
-  - `l=<steam_language>` only when `STEAM_LANGUAGE` is configured.
+- `search-suggestions` endpoint: `https://api.steampowered.com/IStoreQueryService/SearchSuggestions/v1`
+  - Test override: `STEAM_SEARCH_SUGGESTIONS_ENDPOINT`
+  - Query parameters:
+    - `origin=https://store.steampowered.com`
+    - `input_protobuf_encoded=<base64 protobuf payload>`
+  - Payload includes query, region, language, and max_results.
+- `storesearch` endpoint: `https://store.steampowered.com/api/storesearch`
+  - Test override: `STEAM_STORE_SEARCH_ENDPOINT`
+  - Query parameters:
+    - `term=<query>`
+    - `cc=<steam_region>`
+    - `json=1`
+    - `max_results=<effective max>`
+    - Optional `l=<steam_language>`
 - Non-2xx responses surface status + message (when present) as runtime errors.
 - Malformed success payloads return typed runtime parse errors.
 - Empty and partial item arrays are handled deterministically; invalid items are skipped.
+- Platform flags are guaranteed only for `storesearch`; `search-suggestions` may emit unknown platform labels.
 
 ## Alfred Item JSON Contract
 
@@ -94,7 +107,7 @@ Result row:
 ```json
 {
   "title": "Counter-Strike 2",
-  "subtitle": "Free | Platforms: Windows, Linux",
+  "subtitle": "Free | Game",
   "arg": "https://store.steampowered.com/app/730/?cc=us&l=english"
 }
 ```
