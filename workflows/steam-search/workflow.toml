@@ -4,7 +4,6 @@ bundle_id = "com.graysurf.steam-search"
 version = "0.1.0"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
-rust_binary = "steam-cli"
 assets = ["src/assets/icon.png"]
 
 [env]

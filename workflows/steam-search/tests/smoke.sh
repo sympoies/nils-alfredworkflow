@@ -36,7 +36,6 @@ require_bin rg
 
 manifest="$workflow_dir/workflow.toml"
 [[ "$(toml_string "$manifest" id)" == "steam-search" ]] || fail "workflow id mismatch"
-[[ "$(toml_string "$manifest" rust_binary)" == "steam-cli" ]] || fail "rust_binary must be steam-cli"
 [[ "$(toml_string "$manifest" script_filter)" == "script_filter.sh" ]] || fail "script_filter mismatch"
 [[ "$(toml_string "$manifest" action)" == "action_open.sh" ]] || fail "action mismatch"
 
