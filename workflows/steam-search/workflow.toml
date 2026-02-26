@@ -11,7 +11,7 @@ assets = ["src/assets/icon.png"]
 # Optional: two-letter Steam region code used for cc parameter (for example US, JP, TW). Defaults to US.
 STEAM_REGION = "US"
 # Optional: comma/newline separated Steam region options used by switch rows, preserving configured order.
-STEAM_REGION_OPTIONS = "US,JP,TW"
+STEAM_REGION_OPTIONS = "US,JP"
 # Optional: UI switch for showing region switch rows in Script Filter output.
 # Default off to keep result rows focused.
 STEAM_SHOW_REGION_OPTIONS = "0"

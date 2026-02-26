@@ -8,7 +8,7 @@ Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md
    - `scripts/workflow-pack.sh --id steam-search --install`
 2. Confirm Alfred workflow variables are set:
    - `STEAM_REGION` (optional, default `US`)
-   - `STEAM_REGION_OPTIONS` (optional, default `US,JP,TW`)
+   - `STEAM_REGION_OPTIONS` (optional, default `US,JP`)
    - `STEAM_SHOW_REGION_OPTIONS` (optional, default `0`; set `1` to show switch rows)
    - `STEAM_LANGUAGE` (optional, default empty; set to enable `l` parameter)
    - `STEAM_MAX_RESULTS` (optional, default `10`)

@@ -339,7 +339,7 @@ assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$action_uid\")
 assert_jq_file "$packaged_json_file" ".connections[\"$script_filter_uid\"] | any(.destinationuid == \"$action_uid\" and .modifiers == 0)" "packaged connection graph mismatch"
 assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["STEAM_LANGUAGE","STEAM_MAX_RESULTS","STEAM_REGION","STEAM_REGION_OPTIONS","STEAM_SHOW_REGION_OPTIONS"]' "packaged user configuration variables mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_REGION") | .config.default == "US"' "packaged STEAM_REGION default mismatch"
-assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_REGION_OPTIONS") | .config.default == "US,JP,TW"' "packaged STEAM_REGION_OPTIONS default mismatch"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_REGION_OPTIONS") | .config.default == "US,JP"' "packaged STEAM_REGION_OPTIONS default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_SHOW_REGION_OPTIONS") | .config.default == "0"' "packaged STEAM_SHOW_REGION_OPTIONS default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_LANGUAGE") | .config.default == ""' "packaged STEAM_LANGUAGE default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_MAX_RESULTS") | .config.default == "10"' "packaged STEAM_MAX_RESULTS default mismatch"

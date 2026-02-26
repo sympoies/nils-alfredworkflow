@@ -23,7 +23,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `STEAM_REGION` | No | `US` | Optional two-letter region code used for Steam Store `cc` parameter. |
-| `STEAM_REGION_OPTIONS` | No | `US,JP,TW` | Optional comma/newline list of switch-row regions. Order is preserved exactly. |
+| `STEAM_REGION_OPTIONS` | No | `US,JP` | Optional comma/newline list of switch-row regions. Order is preserved exactly. |
 | `STEAM_SHOW_REGION_OPTIONS` | No | `0` | Show region switch rows (`1/true/yes/on` to enable). |
 | `STEAM_LANGUAGE` | No | `(empty)` | Steam Store language parameter (`l`) for localized titles/subtitles; leave empty to omit `l`. |
 | `STEAM_MAX_RESULTS` | No | `10` | Max results per query. Effective range is clamped by `steam-cli`. |

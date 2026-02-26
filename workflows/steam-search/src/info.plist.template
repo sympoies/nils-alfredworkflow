@@ -151,9 +151,9 @@
       <key>config</key>
       <dict>
         <key>default</key>
-        <string>US,JP,TW</string>
+        <string>US,JP</string>
         <key>placeholder</key>
-        <string>US,JP,TW</string>
+        <string>US,JP</string>
         <key>required</key>
         <false/>
         <key>trim</key>
