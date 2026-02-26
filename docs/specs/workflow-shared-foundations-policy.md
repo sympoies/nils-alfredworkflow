@@ -28,6 +28,24 @@
 - Do not move provider-specific query semantics into shared helpers.
 - If a helper requires workflow/provider branching to function, keep that logic local and expose only a narrow shared primitive.
 
+## Steam Search Adoption Contract
+
+### Shared helper requirements (`steam-search`)
+
+| Area | Requirement |
+| --- | --- |
+| helper loader | Must use `workflow_helper_loader.sh` and `wfhl_source_helper` in Script Filter and action wrappers. |
+| search flow | Must use `script_filter_search_driver.sh` (`sfsd_run_search_flow`) for async/coalesce/cache mechanics. |
+| query policy | Must use `script_filter_query_policy.sh` for Script Filter input normalization and short-query guardrails. |
+| action requery | Must use `workflow_action_requery.sh` for requery payload parsing, state persistence, and Alfred requery trigger fallback. |
+| action open | Must use `workflow_action_open_url.sh` for normal URL-open execution path. |
+
+### Steam domain mechanics that must stay local
+
+- Steam `storesearch` and `appdetails` endpoint selection/parameter mapping.
+- Steam region and language semantics (for example `cc` behavior) and user-facing domain copy.
+- Steam-specific ranking, subtitle wording, and provider error interpretation.
+
 ## Migration constraints
 
 1. Extract only the allowed shared foundation domains listed above; do not broaden scope during migration.

@@ -89,6 +89,13 @@
           "search_driver"
         ]
       },
+      "steam-search": {
+        "script_filter": "workflows/steam-search/scripts/script_filter.sh",
+        "requires": [
+          "helper_loader",
+          "search_driver"
+        ]
+      },
       "epoch-converter": {
         "script_filter": "workflows/epoch-converter/scripts/script_filter.sh",
         "requires": [
@@ -158,6 +165,12 @@
       "template": "workflows/wiki-search/src/info.plist.template",
       "object_uids": [
         "70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10"
+      ]
+    },
+    "steam-search": {
+      "template": "workflows/steam-search/src/info.plist.template",
+      "object_uids": [
+        "6B7F46DF-B4AB-4D24-89FD-C90A15469E65"
       ]
     },
     "codex-cli": {

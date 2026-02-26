@@ -55,6 +55,7 @@ declare -ar migrated_action_wrappers=(
   "workflows/market-expression/scripts/action_copy.sh"
   "workflows/multi-timezone/scripts/action_copy.sh"
   "workflows/netflix-search/scripts/action_open.sh"
+  "workflows/steam-search/scripts/action_open.sh"
   "workflows/weather/scripts/action_copy.sh"
   "workflows/wiki-search/scripts/action_open.sh"
   "workflows/youtube-search/scripts/action_open.sh"
@@ -66,6 +67,7 @@ declare -ar migrated_search_filters=(
   "workflows/google-search/scripts/script_filter.sh"
   "workflows/netflix-search/scripts/script_filter.sh"
   "workflows/spotify-search/scripts/script_filter.sh"
+  "workflows/steam-search/scripts/script_filter.sh"
   "workflows/wiki-search/scripts/script_filter.sh"
   "workflows/youtube-search/scripts/script_filter.sh"
 )
