@@ -1,0 +1,24 @@
+[package]
+name = "nils-steam-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Steam Store search CLI for Alfred workflow output."
+
+[lib]
+name = "steam_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "steam-cli"
+path = "src/main.rs"
+
+[dependencies]
+alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
+workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3" }
+clap.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

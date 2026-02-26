@@ -1026,6 +1026,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nils-steam-cli"
+version = "1.1.8"
+dependencies = [
+ "clap",
+ "nils-alfred-core",
+ "nils-workflow-common",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "nils-timezone-cli"
 version = "1.1.8"
 dependencies = [

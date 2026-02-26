@@ -11,6 +11,7 @@ members = [
   "crates/timezone-cli",
   "crates/weather-cli",
   "crates/spotify-cli",
+  "crates/steam-cli",
   "crates/workflow-common",
   "crates/workflow-cli",
   "crates/workflow-readme-cli",
