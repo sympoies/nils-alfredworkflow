@@ -18,10 +18,14 @@ pub fn search_results_to_feedback(
     region: &str,
     query: &str,
     region_options: &[String],
+    show_region_options: bool,
     language: &str,
     results: &[SteamSearchResult],
 ) -> Feedback {
-    let mut items = region_switch_items(region, query, region_options, language);
+    let mut items = Vec::new();
+    if show_region_options {
+        items.extend(region_switch_items(region, query, region_options, language));
+    }
 
     if results.is_empty() {
         items.push(no_results_item());
@@ -64,6 +68,10 @@ fn result_to_item(region: &str, language: &str, result: &SteamSearchResult) -> I
 
 #[cfg_attr(not(test), allow(dead_code))]
 fn canonical_app_url(app_id: u32, region: &str, language: &str) -> String {
+    if language.is_empty() {
+        return format!("https://store.steampowered.com/app/{app_id}/?cc={region}");
+    }
+
     format!("https://store.steampowered.com/app/{app_id}/?cc={region}&l={language}")
 }
 
@@ -122,14 +130,17 @@ fn region_switch_items(
     language: &str,
 ) -> Vec<Item> {
     let current_region_upper = current_region.to_ascii_uppercase();
+    let current_region_subtitle = if language.is_empty() {
+        format!("Searching Steam Store in {current_region_upper}.")
+    } else {
+        format!("Searching Steam Store in {current_region_upper} ({language}).")
+    };
     let mut items = Vec::with_capacity(options.len() + 1);
     items.push(
         Item::new(format!(
             "{REGION_CURRENT_TITLE_PREFIX} {current_region_upper}"
         ))
-        .with_subtitle(format!(
-            "Searching Steam Store in {current_region_upper} ({language})."
-        ))
+        .with_subtitle(current_region_subtitle)
         .with_valid(false),
     );
 
@@ -194,6 +205,7 @@ mod tests {
             "us",
             "counter strike",
             &[],
+            false,
             "english",
             &[fixture_result(
                 Some(SteamPrice {
@@ -208,10 +220,7 @@ mod tests {
             )],
         );
 
-        let item = feedback
-            .items
-            .get(1)
-            .expect("expected current-region row and one result");
+        let item = feedback.items.first().expect("expected one result row");
 
         assert_eq!(item.title, "Counter-Strike 2");
         assert_eq!(
@@ -227,7 +236,7 @@ mod tests {
     #[test]
     fn feedback_switch_rows_follow_configured_order() {
         let options = vec!["jp".to_string(), "us".to_string(), "kr".to_string()];
-        let feedback = search_results_to_feedback("us", "dota", &options, "english", &[]);
+        let feedback = search_results_to_feedback("us", "dota", &options, true, "english", &[]);
 
         assert_eq!(feedback.items[0].title, "Current region: US");
         assert_eq!(feedback.items[1].title, "Search in JP region");
@@ -242,7 +251,7 @@ mod tests {
     #[test]
     fn feedback_switch_rows_use_requery_arg_contract() {
         let options = vec!["jp".to_string(), "us".to_string()];
-        let feedback = search_results_to_feedback("us", "dota 2", &options, "english", &[]);
+        let feedback = search_results_to_feedback("us", "dota 2", &options, true, "english", &[]);
 
         assert_eq!(
             feedback.items[1].arg.as_deref(),
@@ -255,12 +264,24 @@ mod tests {
     }
 
     #[test]
+    fn feedback_current_region_subtitle_omits_language_when_not_configured() {
+        let options = vec!["jp".to_string(), "us".to_string()];
+        let feedback = search_results_to_feedback("us", "dota 2", &options, true, "", &[]);
+
+        assert_eq!(
+            feedback.items[0].subtitle.as_deref(),
+            Some("Searching Steam Store in US.")
+        );
+    }
+
+    #[test]
     fn feedback_subtitle_truncation_is_deterministic_and_single_line() {
         let long_price = " very long price segment\n\t".repeat(30);
         let feedback = search_results_to_feedback(
             "us",
             "rust",
             &[],
+            false,
             "english",
             &[fixture_result(
                 Some(SteamPrice {
@@ -274,7 +295,7 @@ mod tests {
                 },
             )],
         );
-        let subtitle = feedback.items[1]
+        let subtitle = feedback.items[0]
             .subtitle
             .as_deref()
             .expect("subtitle should exist")
@@ -284,6 +305,7 @@ mod tests {
             "us",
             "rust",
             &[],
+            false,
             "english",
             &[fixture_result(
                 Some(SteamPrice {
@@ -297,7 +319,7 @@ mod tests {
                 },
             )],
         );
-        let subtitle_again = feedback_again.items[1]
+        let subtitle_again = feedback_again.items[0]
             .subtitle
             .as_deref()
             .expect("subtitle should exist")
@@ -311,11 +333,8 @@ mod tests {
 
     #[test]
     fn feedback_no_results_item_is_invalid_and_has_expected_title() {
-        let feedback = search_results_to_feedback("us", "dota", &[], "english", &[]);
-        let item = feedback
-            .items
-            .get(1)
-            .expect("fallback item should exist after current-region row");
+        let feedback = search_results_to_feedback("us", "dota", &[], false, "english", &[]);
+        let item = feedback.items.first().expect("fallback item should exist");
 
         assert_eq!(item.title, NO_RESULTS_TITLE);
         assert_eq!(item.subtitle.as_deref(), Some(NO_RESULTS_SUBTITLE));
@@ -329,14 +348,32 @@ mod tests {
             "us",
             "dota",
             &[],
+            false,
             "english",
             &[fixture_result(None, SteamPlatforms::default())],
         );
 
         assert_eq!(
-            feedback.items[1].subtitle.as_deref(),
+            feedback.items[0].subtitle.as_deref(),
             Some("Price unavailable | Platforms: Unknown")
         );
+    }
+
+    #[test]
+    fn feedback_hides_region_rows_when_switch_is_disabled() {
+        let options = vec!["jp".to_string(), "us".to_string(), "kr".to_string()];
+        let feedback = search_results_to_feedback(
+            "us",
+            "dota",
+            &options,
+            false,
+            "english",
+            &[fixture_result(None, SteamPlatforms::default())],
+        );
+
+        assert_eq!(feedback.items.len(), 1);
+        assert_eq!(feedback.items[0].title, "Counter-Strike 2");
+        assert!(feedback.items[0].arg.is_some());
     }
 
     #[test]
@@ -359,6 +396,14 @@ mod tests {
         assert_eq!(
             canonical_app_url(570, "jp", "schinese"),
             "https://store.steampowered.com/app/570/?cc=jp&l=schinese"
+        );
+    }
+
+    #[test]
+    fn url_omits_language_parameter_when_not_configured() {
+        assert_eq!(
+            canonical_app_url(570, "jp", ""),
+            "https://store.steampowered.com/app/570/?cc=jp"
         );
     }
 }

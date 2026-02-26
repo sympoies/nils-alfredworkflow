@@ -26,14 +26,19 @@ args, and deterministic error behavior.
   - Optional comma/newline list of regions for switch rows.
   - Default `[STEAM_REGION]`.
   - Tokens normalized to lowercase, deduplicated by first appearance, and order preserved.
+- `STEAM_SHOW_REGION_OPTIONS`:
+  - Optional bool-like switch controlling whether region rows are emitted.
+  - Default `false` (region rows hidden).
+  - Accepted values: `1/0`, `true/false`, `yes/no`, `on/off` (case-insensitive).
 - `STEAM_MAX_RESULTS`:
   - Optional integer, default `10`.
   - Effective value clamped to `1..50`.
   - Non-integer values are config errors.
 - `STEAM_LANGUAGE`:
-  - Optional, default `english`.
+  - Optional, default empty (unset).
   - Normalized to lowercase.
   - Allowed pattern: lowercase letters and `-`, length `2..24`.
+  - Empty means language parameter `l` is omitted from Steam requests and result URLs.
 
 Invalid config produces user error text and exit code `2`.
 
@@ -44,10 +49,11 @@ Invalid config produces user error text and exit code `2`.
 - Query parameters must always include:
   - `term=<query>`
   - `cc=<steam_region>`
-  - `l=<steam_language>`
 - Additional parameters:
   - `json=1`
   - `max_results=<effective max>`
+- Optional parameter:
+  - `l=<steam_language>` only when `STEAM_LANGUAGE` is configured.
 - Non-2xx responses surface status + message (when present) as runtime errors.
 - Malformed success payloads return typed runtime parse errors.
 - Empty and partial item arrays are handled deterministically; invalid items are skipped.
@@ -62,7 +68,7 @@ Top-level output is always valid Alfred JSON:
 }
 ```
 
-Current-region row (always first):
+Current-region row (when `STEAM_SHOW_REGION_OPTIONS=true`):
 
 ```json
 {
@@ -95,8 +101,10 @@ Result row:
 
 Rules:
 
-- Region-switch rows follow `STEAM_REGION_OPTIONS` order exactly.
-- Result URLs must include both region (`cc`) and language (`l`) query parameters.
+- When `STEAM_SHOW_REGION_OPTIONS=true`, current-region row appears first and region-switch rows follow `STEAM_REGION_OPTIONS` order exactly.
+- Current-region subtitle includes language suffix only when `STEAM_LANGUAGE` is configured.
+- When `STEAM_SHOW_REGION_OPTIONS=false` (default), output omits region rows and begins with result/no-result rows.
+- Result URLs always include region (`cc`) and include language (`l`) only when configured.
 - Subtitles are single-line, whitespace-normalized, and deterministically truncated to `<= 120`
   chars.
 

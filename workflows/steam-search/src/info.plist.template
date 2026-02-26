@@ -172,6 +172,48 @@
       <key>config</key>
       <dict>
         <key>default</key>
+        <string>0</string>
+        <key>placeholder</key>
+        <string>0 or 1</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Show region switch rows in Alfred list. Default is 0 (hidden). Set 1/true/yes/on to enable.</string>
+      <key>label</key>
+      <string>STEAM_SHOW_REGION_OPTIONS</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>STEAM_SHOW_REGION_OPTIONS</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
+        <string></string>
+        <key>placeholder</key>
+        <string>english (optional)</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional Steam language parameter used for store `l` (for example english, schinese, japanese). Leave empty to omit `l`.</string>
+      <key>label</key>
+      <string>STEAM_LANGUAGE</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>STEAM_LANGUAGE</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
         <string>10</string>
         <key>placeholder</key>
         <string>1-20</string>

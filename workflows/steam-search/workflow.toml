@@ -12,6 +12,12 @@ assets = ["src/assets/icon.png"]
 STEAM_REGION = "US"
 # Optional: comma/newline separated Steam region options used by switch rows, preserving configured order.
 STEAM_REGION_OPTIONS = "US,JP,TW"
+# Optional: UI switch for showing region switch rows in Script Filter output.
+# Default off to keep result rows focused.
+STEAM_SHOW_REGION_OPTIONS = "0"
+# Optional: Steam language parameter mapped to storesearch `l` (for example english, schinese, japanese).
+# Default empty means no `l` parameter is sent.
+STEAM_LANGUAGE = ""
 # Optional: maximum number of results to return. Parsed as integer and clamped by steam-cli.
 STEAM_MAX_RESULTS = "10"
 

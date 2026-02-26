@@ -159,6 +159,7 @@ where
                 &config.region,
                 query,
                 &config.region_options,
+                config.show_region_options,
                 &config.language,
                 &results,
             );
@@ -249,8 +250,19 @@ mod tests {
         RuntimeConfig {
             region: "us".to_string(),
             region_options: vec!["jp".to_string(), "us".to_string()],
+            show_region_options: true,
             max_results: 5,
             language: "english".to_string(),
+        }
+    }
+
+    fn fixture_config_without_language() -> RuntimeConfig {
+        RuntimeConfig {
+            region: "us".to_string(),
+            region_options: vec!["jp".to_string(), "us".to_string()],
+            show_region_options: true,
+            max_results: 5,
+            language: String::new(),
         }
     }
 
@@ -296,6 +308,43 @@ mod tests {
         assert_eq!(
             items[3].get("arg").and_then(Value::as_str),
             Some("https://store.steampowered.com/app/730/?cc=us&l=english")
+        );
+    }
+
+    #[test]
+    fn main_search_command_omits_language_param_when_not_configured() {
+        let cli = Cli::parse_from(["steam-cli", "search", "--query", "counter strike"]);
+
+        let output = run_with(
+            cli,
+            || Ok(fixture_config_without_language()),
+            |_, _| {
+                Ok(vec![SteamSearchResult {
+                    app_id: 730,
+                    name: "Counter-Strike 2".to_string(),
+                    price: Some(SteamPrice {
+                        final_price_cents: Some(0),
+                        final_formatted: Some("Free".to_string()),
+                    }),
+                    platforms: SteamPlatforms {
+                        windows: true,
+                        mac: false,
+                        linux: true,
+                    },
+                }])
+            },
+        )
+        .expect("search should succeed");
+
+        let json: Value = serde_json::from_str(&output).expect("output must be JSON");
+        let items = json
+            .get("items")
+            .and_then(Value::as_array)
+            .expect("items should be array");
+
+        assert_eq!(
+            items[3].get("arg").and_then(Value::as_str),
+            Some("https://store.steampowered.com/app/730/?cc=us")
         );
     }
 

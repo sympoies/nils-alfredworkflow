@@ -58,9 +58,9 @@ print_error_item() {
   if [[ "$lower" == *"empty query"* || "$lower" == *"query must not be empty"* ]]; then
     title="Enter a search query"
     subtitle="Type keywords after st to search Steam."
-  elif [[ "$lower" == *"invalid steam_region"* || "$lower" == *"invalid steam_region_options"* || "$lower" == *"invalid steam_max_results"* ]]; then
+  elif [[ "$lower" == *"invalid steam_region"* || "$lower" == *"invalid steam_region_options"* || "$lower" == *"invalid steam_show_region_options"* || "$lower" == *"invalid steam_language"* || "$lower" == *"invalid steam_max_results"* ]]; then
     title="Invalid Steam workflow config"
-    subtitle="Check STEAM_REGION, STEAM_REGION_OPTIONS, and STEAM_MAX_RESULTS."
+    subtitle="Check STEAM_REGION, STEAM_REGION_OPTIONS, STEAM_SHOW_REGION_OPTIONS, STEAM_LANGUAGE, and STEAM_MAX_RESULTS."
   elif [[ "$lower" == *"binary not found"* ]]; then
     title="steam-cli binary not found"
     subtitle="Package workflow or set STEAM_CLI_BIN to a steam-cli executable."

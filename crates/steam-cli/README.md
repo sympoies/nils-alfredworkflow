@@ -12,8 +12,9 @@ CLI backend for the `steam-search` workflow.
 
 - Optional: `STEAM_REGION` (default: `us`)
 - Optional: `STEAM_REGION_OPTIONS` (default: current `STEAM_REGION`)
+- Optional: `STEAM_SHOW_REGION_OPTIONS` (default: `false`, accepts `1/0`, `true/false`, `yes/no`, `on/off`)
 - Optional: `STEAM_MAX_RESULTS` (default: `10`, clamped to `1..50`)
-- Optional: `STEAM_LANGUAGE` (default: `english`)
+- Optional: `STEAM_LANGUAGE` (default: unset/empty; when set, includes `l` query parameter)
 - Optional test override: `STEAM_STORE_SEARCH_ENDPOINT`
 
 ## Output Contract
@@ -24,10 +25,10 @@ CLI backend for the `steam-search` workflow.
 
 ## Region Requery Contract
 
-- First row is always `Current region: <REGION>`.
-- Region switch rows follow `STEAM_REGION_OPTIONS` order exactly.
+- When `STEAM_SHOW_REGION_OPTIONS=true`, first row is `Current region: <REGION>`.
+- When `STEAM_SHOW_REGION_OPTIONS=true`, region switch rows follow `STEAM_REGION_OPTIONS` order exactly.
 - Switch row `arg` format is `steam-requery:<region>:<query>`.
-- Result rows always use canonical URLs: `https://store.steampowered.com/app/<appid>/?cc=<region>&l=<language>`.
+- Result rows always include `cc=<region>`; include `l=<language>` only when `STEAM_LANGUAGE` is configured.
 
 ## Standards Status
 

@@ -5,6 +5,7 @@ use workflow_common::parse_ordered_list_with;
 
 const REGION_ENV: &str = "STEAM_REGION";
 const REGION_OPTIONS_ENV: &str = "STEAM_REGION_OPTIONS";
+const SHOW_REGION_OPTIONS_ENV: &str = "STEAM_SHOW_REGION_OPTIONS";
 const MAX_RESULTS_ENV: &str = "STEAM_MAX_RESULTS";
 const LANGUAGE_ENV: &str = "STEAM_LANGUAGE";
 
@@ -12,12 +13,14 @@ const MIN_RESULTS: i32 = 1;
 const MAX_RESULTS: i32 = 50;
 pub const DEFAULT_MAX_RESULTS: u8 = 10;
 pub const DEFAULT_REGION: &str = "us";
-pub const DEFAULT_LANGUAGE: &str = "english";
+pub const DEFAULT_LANGUAGE: &str = "";
+pub const DEFAULT_SHOW_REGION_OPTIONS: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeConfig {
     pub region: String,
     pub region_options: Vec<String>,
+    pub show_region_options: bool,
     pub max_results: u8,
     pub language: String,
 }
@@ -41,12 +44,15 @@ impl RuntimeConfig {
         let region = parse_region(env_map.get(REGION_ENV).map(String::as_str))?;
         let region_options =
             parse_region_options(env_map.get(REGION_OPTIONS_ENV).map(String::as_str), &region)?;
+        let show_region_options =
+            parse_show_region_options(env_map.get(SHOW_REGION_OPTIONS_ENV).map(String::as_str))?;
         let max_results = parse_max_results(env_map.get(MAX_RESULTS_ENV).map(String::as_str))?;
         let language = parse_language(env_map.get(LANGUAGE_ENV).map(String::as_str))?;
 
         Ok(Self {
             region,
             region_options,
+            show_region_options,
             max_results,
             language,
         })
@@ -114,6 +120,14 @@ fn parse_max_results(raw: Option<&str>) -> Result<u8, ConfigError> {
     Ok(parsed.clamp(MIN_RESULTS, MAX_RESULTS) as u8)
 }
 
+fn parse_show_region_options(raw: Option<&str>) -> Result<bool, ConfigError> {
+    let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(DEFAULT_SHOW_REGION_OPTIONS);
+    };
+
+    parse_bool(value).ok_or_else(|| ConfigError::InvalidShowRegionOptions(value.to_string()))
+}
+
 fn parse_language(raw: Option<&str>) -> Result<String, ConfigError> {
     let Some(value) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(DEFAULT_LANGUAGE.to_string());
@@ -136,6 +150,15 @@ fn parse_language_code(raw: &str) -> Option<String> {
     Some(normalized)
 }
 
+fn parse_bool(raw: &str) -> Option<bool> {
+    let normalized = raw.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "1" | "true" | "t" | "yes" | "y" | "on" => Some(true),
+        "0" | "false" | "f" | "no" | "n" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ConfigError {
     #[error("invalid STEAM_REGION: {0} (expected 2-letter country code)")]
@@ -144,6 +167,10 @@ pub enum ConfigError {
         "invalid STEAM_REGION_OPTIONS token: {0} (expected comma/newline list of 2-letter country codes)"
     )]
     InvalidRegionOptions(String),
+    #[error(
+        "invalid STEAM_SHOW_REGION_OPTIONS: {0} (expected one of: true/false, yes/no, on/off, 1/0)"
+    )]
+    InvalidShowRegionOptions(String),
     #[error("invalid STEAM_MAX_RESULTS: {0}")]
     InvalidMaxResults(String),
     #[error("invalid STEAM_LANGUAGE: {0} (expected lowercase letters/hyphen, length 2..24)")]
@@ -161,6 +188,7 @@ mod tests {
 
         assert_eq!(config.region, DEFAULT_REGION);
         assert_eq!(config.region_options, vec![DEFAULT_REGION.to_string()]);
+        assert_eq!(config.show_region_options, DEFAULT_SHOW_REGION_OPTIONS);
         assert_eq!(config.max_results, DEFAULT_MAX_RESULTS);
         assert_eq!(config.language, DEFAULT_LANGUAGE);
     }
@@ -232,11 +260,45 @@ mod tests {
     }
 
     #[test]
+    fn config_parses_show_region_options_bool_values() {
+        for raw in ["1", "true", "YES", "On", "t"] {
+            let config = RuntimeConfig::from_pairs(vec![(SHOW_REGION_OPTIONS_ENV, raw)])
+                .expect("truthy show switch should parse");
+            assert!(config.show_region_options, "{raw} should parse as true");
+        }
+
+        for raw in ["0", "false", "NO", "off", "F"] {
+            let config = RuntimeConfig::from_pairs(vec![(SHOW_REGION_OPTIONS_ENV, raw)])
+                .expect("falsey show switch should parse");
+            assert!(!config.show_region_options, "{raw} should parse as false");
+        }
+    }
+
+    #[test]
+    fn config_rejects_invalid_show_region_options_value() {
+        let err = RuntimeConfig::from_pairs(vec![(SHOW_REGION_OPTIONS_ENV, "maybe")])
+            .expect_err("invalid bool should fail");
+
+        assert_eq!(
+            err,
+            ConfigError::InvalidShowRegionOptions("maybe".to_string())
+        );
+    }
+
+    #[test]
     fn config_normalizes_language_to_lowercase() {
         let config = RuntimeConfig::from_pairs(vec![(LANGUAGE_ENV, " ENGLISH ")])
             .expect("language should parse");
 
         assert_eq!(config.language, "english");
+    }
+
+    #[test]
+    fn config_allows_empty_language_to_skip_l_param() {
+        let config = RuntimeConfig::from_pairs(vec![(LANGUAGE_ENV, "   ")])
+            .expect("empty language should parse");
+
+        assert_eq!(config.language, "");
     }
 
     #[test]

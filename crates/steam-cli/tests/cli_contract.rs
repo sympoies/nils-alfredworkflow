@@ -80,6 +80,7 @@ fn cli_contract_success_returns_alfred_json_items() {
             ("STEAM_STORE_SEARCH_ENDPOINT", &endpoint),
             ("STEAM_REGION", "us"),
             ("STEAM_REGION_OPTIONS", "jp,us"),
+            ("STEAM_SHOW_REGION_OPTIONS", "1"),
             ("STEAM_LANGUAGE", "english"),
         ],
     );
@@ -105,6 +106,55 @@ fn cli_contract_success_returns_alfred_json_items() {
         items[3].get("arg").and_then(Value::as_str),
         Some("https://store.steampowered.com/app/730/?cc=us&l=english")
     );
+
+    server.join();
+}
+
+#[test]
+fn cli_contract_hides_region_switch_rows_by_default() {
+    let server = MockServer::spawn(MockResponse::json(
+        200,
+        "OK",
+        r#"{
+            "items": [
+                {
+                    "id": 730,
+                    "name": "Counter-Strike 2",
+                    "price": {"final": 0, "final_formatted": "Free"},
+                    "platforms": {"windows": true, "mac": false, "linux": true}
+                }
+            ]
+        }"#,
+    ));
+
+    let endpoint = format!("{}/api/storesearch", server.base_url());
+    let output = run_cli(
+        &["search", "--query", "counter strike"],
+        &[
+            ("STEAM_STORE_SEARCH_ENDPOINT", &endpoint),
+            ("STEAM_REGION", "us"),
+            ("STEAM_REGION_OPTIONS", "jp,us"),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: Value = serde_json::from_str(&stdout).expect("stdout should be json");
+    let items = json
+        .get("items")
+        .and_then(Value::as_array)
+        .expect("items should be array");
+
+    assert_eq!(
+        items[0].get("title").and_then(Value::as_str),
+        Some("Counter-Strike 2")
+    );
+    assert_eq!(
+        items[0].get("arg").and_then(Value::as_str),
+        Some("https://store.steampowered.com/app/730/?cc=us")
+    );
+    assert_eq!(items.len(), 1);
 
     server.join();
 }

@@ -52,13 +52,18 @@ pub fn search_apps(
 }
 
 pub fn build_query_params(config: &RuntimeConfig, query: &str) -> Vec<(String, String)> {
-    vec![
+    let mut params = vec![
         ("term".to_string(), query.to_string()),
         ("cc".to_string(), config.region.clone()),
-        ("l".to_string(), config.language.clone()),
         ("json".to_string(), "1".to_string()),
         ("max_results".to_string(), config.max_results.to_string()),
-    ]
+    ];
+
+    if !config.language.is_empty() {
+        params.push(("l".to_string(), config.language.clone()));
+    }
+
+    params
 }
 
 pub fn parse_search_response(
@@ -208,20 +213,32 @@ mod tests {
         RuntimeConfig {
             region: region.to_string(),
             region_options: vec![region.to_string()],
+            show_region_options: false,
             max_results,
             language: language.to_string(),
         }
     }
 
     #[test]
-    fn steam_store_api_build_query_params_includes_query_region_and_language() {
+    fn steam_store_api_build_query_params_includes_query_region_and_language_when_configured() {
         let params = build_query_params(&fixture_config("jp", "schinese", 7), "persona");
 
         assert!(params.contains(&("term".to_string(), "persona".to_string())));
         assert!(params.contains(&("cc".to_string(), "jp".to_string())));
-        assert!(params.contains(&("l".to_string(), "schinese".to_string())));
         assert!(params.contains(&("json".to_string(), "1".to_string())));
         assert!(params.contains(&("max_results".to_string(), "7".to_string())));
+        assert!(params.contains(&("l".to_string(), "schinese".to_string())));
+    }
+
+    #[test]
+    fn steam_store_api_build_query_params_omits_language_when_not_configured() {
+        let params = build_query_params(&fixture_config("jp", "", 7), "persona");
+
+        assert!(params.contains(&("term".to_string(), "persona".to_string())));
+        assert!(params.contains(&("cc".to_string(), "jp".to_string())));
+        assert!(params.contains(&("json".to_string(), "1".to_string())));
+        assert!(params.contains(&("max_results".to_string(), "7".to_string())));
+        assert!(!params.iter().any(|(k, _)| k == "l"));
     }
 
     #[test]

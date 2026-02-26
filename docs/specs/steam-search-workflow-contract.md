@@ -22,6 +22,7 @@
 - Region values are two-letter country codes used for Steam `cc`.
 - `STEAM_REGION` defines the default region for search calls.
 - `STEAM_REGION_OPTIONS` defines switchable region rows and preserves configured order.
+- `STEAM_SHOW_REGION_OPTIONS` controls whether region rows are shown; default is off (`0`).
 - Action requery rows use the `steam-requery:<region>:<query>` argument contract.
 - Region switching persists override state in workflow cache/data and re-runs the current keyword query.
 
@@ -37,7 +38,7 @@
   - do not crash script adapters.
 - If results are empty:
   - emit a deterministic no-results row;
-  - still include region-switch rows when configured.
+  - include region-switch rows only when `STEAM_SHOW_REGION_OPTIONS` is enabled.
 
 ## Shared Helper Adoption Matrix
 

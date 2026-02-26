@@ -40,11 +40,19 @@ manifest="$workflow_dir/workflow.toml"
 [[ "$(toml_string "$manifest" script_filter)" == "script_filter.sh" ]] || fail "script_filter mismatch"
 [[ "$(toml_string "$manifest" action)" == "action_open.sh" ]] || fail "action mismatch"
 
-for variable in STEAM_REGION STEAM_REGION_OPTIONS STEAM_MAX_RESULTS; do
+for variable in STEAM_REGION STEAM_REGION_OPTIONS STEAM_SHOW_REGION_OPTIONS STEAM_LANGUAGE STEAM_MAX_RESULTS; do
   if ! rg -n "^${variable}[[:space:]]*=" "$manifest" >/dev/null; then
     fail "missing env var in workflow.toml: $variable"
   fi
 done
+
+if ! rg -n '^STEAM_SHOW_REGION_OPTIONS[[:space:]]*=[[:space:]]*"0"' "$manifest" >/dev/null; then
+  fail "STEAM_SHOW_REGION_OPTIONS default must be 0"
+fi
+
+if ! rg -n '^STEAM_LANGUAGE[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "STEAM_LANGUAGE default must be empty"
+fi
 
 plist_json="$(plist_to_json "$workflow_dir/src/info.plist.template")"
 script_filter_uid="6B7F46DF-B4AB-4D24-89FD-C90A15469E65"
@@ -57,7 +65,9 @@ assert_jq_json "$plist_json" '.objects[] | select(.type == "alfred.workflow.inpu
 assert_jq_json "$plist_json" '.objects[] | select(.type == "alfred.workflow.input.scriptfilter") | .config.queuedelaymode == 0' "queue delay mode mismatch"
 assert_jq_json "$plist_json" '.objects[] | select(.type == "alfred.workflow.input.scriptfilter") | .config.queuedelayimmediatelyinitially == false' "queue immediate policy mismatch"
 assert_jq_json "$plist_json" ".connections[\"$script_filter_uid\"] | any(.destinationuid == \"$action_uid\" and .modifiers == 0)" "script_filter connection graph mismatch"
-assert_jq_json "$plist_json" '[.userconfigurationconfig[] | .variable] | sort == ["STEAM_MAX_RESULTS","STEAM_REGION","STEAM_REGION_OPTIONS"]' "user configuration variables mismatch"
+assert_jq_json "$plist_json" '[.userconfigurationconfig[] | .variable] | sort == ["STEAM_LANGUAGE","STEAM_MAX_RESULTS","STEAM_REGION","STEAM_REGION_OPTIONS","STEAM_SHOW_REGION_OPTIONS"]' "user configuration variables mismatch"
+assert_jq_json "$plist_json" '.userconfigurationconfig[] | select(.variable=="STEAM_SHOW_REGION_OPTIONS") | .config.default == "0"' "STEAM_SHOW_REGION_OPTIONS default mismatch"
+assert_jq_json "$plist_json" '.userconfigurationconfig[] | select(.variable=="STEAM_LANGUAGE") | .config.default == ""' "STEAM_LANGUAGE default mismatch"
 
 tmp_dir="$(mktemp -d)"
 export ALFRED_WORKFLOW_CACHE="$tmp_dir/cache"
@@ -188,7 +198,7 @@ assert_jq_json "$short_query_json" '.items[0].title == "Keep typing (2+ chars)"'
 
 invalid_config_json="$({ STEAM_CLI_BIN="$tmp_dir/stubs/steam-cli-invalid-config" "$workflow_dir/scripts/script_filter.sh" "portal"; })"
 assert_jq_json "$invalid_config_json" '.items[0].title == "Invalid Steam workflow config"' "invalid config title mismatch"
-assert_jq_json "$invalid_config_json" '.items[0].subtitle | contains("STEAM_REGION_OPTIONS")' "invalid config subtitle mismatch"
+assert_jq_json "$invalid_config_json" '.items[0].subtitle | contains("STEAM_LANGUAGE")' "invalid config subtitle mismatch"
 
 override_region_log="$tmp_dir/steam-override-region.log"
 {
@@ -327,9 +337,11 @@ assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter
 assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelayimmediatelyinitially == false" "packaged immediate queue policy mismatch"
 assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$action_uid\") | .config.scriptfile == \"./scripts/action_open.sh\"" "packaged action scriptfile mismatch"
 assert_jq_file "$packaged_json_file" ".connections[\"$script_filter_uid\"] | any(.destinationuid == \"$action_uid\" and .modifiers == 0)" "packaged connection graph mismatch"
-assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["STEAM_MAX_RESULTS","STEAM_REGION","STEAM_REGION_OPTIONS"]' "packaged user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["STEAM_LANGUAGE","STEAM_MAX_RESULTS","STEAM_REGION","STEAM_REGION_OPTIONS","STEAM_SHOW_REGION_OPTIONS"]' "packaged user configuration variables mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_REGION") | .config.default == "US"' "packaged STEAM_REGION default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_REGION_OPTIONS") | .config.default == "US,JP,TW"' "packaged STEAM_REGION_OPTIONS default mismatch"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_SHOW_REGION_OPTIONS") | .config.default == "0"' "packaged STEAM_SHOW_REGION_OPTIONS default mismatch"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_LANGUAGE") | .config.default == ""' "packaged STEAM_LANGUAGE default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="STEAM_MAX_RESULTS") | .config.default == "10"' "packaged STEAM_MAX_RESULTS default mismatch"
 
 echo "ok: steam-search smoke test passed"
