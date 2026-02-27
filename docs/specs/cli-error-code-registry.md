@@ -30,6 +30,7 @@ Provides stable machine error codes shared by all CLI crates using JSON envelope
 | `brave-cli` (`nils-brave-cli`) | `NILS_BRAVE_` | `001-099` |
 | `cambridge-cli` (`nils-cambridge-cli`) | `NILS_CAMBRIDGE_` | `001-099` |
 | `epoch-cli` (`nils-epoch-cli`) | `NILS_EPOCH_` | `001-099` |
+| `google-cli` (`google-cli`) | `NILS_GOOGLE_` | `001-099` |
 | `market-cli` (`nils-market-cli`) | `NILS_MARKET_` | `001-099` |
 | `quote-cli` (`nils-quote-cli`) | `NILS_QUOTE_` | `001-099` |
 | `randomer-cli` (`nils-randomer-cli`) | `NILS_RANDOMER_` | `001-099` |
@@ -52,6 +53,10 @@ Provides stable machine error codes shared by all CLI crates using JSON envelope
 | `NILS_CAMBRIDGE_003` | cambridge | scraper runtime process failure |
 | `NILS_EPOCH_001` | epoch | unsupported query format |
 | `NILS_EPOCH_002` | epoch | out-of-range datetime/epoch |
+| `NILS_GOOGLE_001` | google | invalid wrapper input / conflicting output flags |
+| `NILS_GOOGLE_002` | google | missing wrapped `gog` binary |
+| `NILS_GOOGLE_003` | google | wrapped `gog` process launch/exit failure |
+| `NILS_GOOGLE_004` | google | wrapped `gog` invalid JSON output |
 | `NILS_MARKET_001` | market | invalid symbol/amount expression |
 | `NILS_MARKET_002` | market | provider unavailable/rate-limited |
 | `NILS_QUOTE_001` | quote | invalid quote config value |

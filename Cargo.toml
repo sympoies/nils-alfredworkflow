@@ -7,6 +7,7 @@ members = [
   "crates/bangumi-cli",
   "crates/cambridge-cli",
   "crates/epoch-cli",
+  "crates/google-cli",
   "crates/market-cli",
   "crates/timezone-cli",
   "crates/weather-cli",

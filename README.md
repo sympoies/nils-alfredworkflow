@@ -34,6 +34,11 @@ Alfred workflows for macOS users.
 | [Randomer](workflows/randomer/README.md) | `rr`, `rrv`, `random` | Generate random values by format and copy results. | No |
 | [Codex CLI](workflows/codex-cli/README.md) | `cx`, `codex` | Run Codex auth (`login`, `use`, `save`) and diagnostics (`diag rate-limits`) commands from Alfred. | No |
 
+## Developer crates
+
+- `google-cli`: `gog` wrapper for `auth/gmail/drive`, intended for direct terminal use and contract-tested runtime integration.
+- Current non-goals for `google-cli`: Alfred workflow wiring, workflow packaging, and non-scoped `gog` domains.
+
 ## macOS Gatekeeper standalone script
 
 - Script asset: `workflow-clear-quarantine-standalone.sh` from [Releases](https://github.com/graysurf/nils-alfredworkflow/releases)
