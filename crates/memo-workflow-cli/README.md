@@ -4,16 +4,32 @@ Workflow adapter CLI for Alfred memo capture actions backed by `nils-memo-cli@0.
 
 ## Commands
 
-| Command | Options | Description |
-| --- | --- | --- |
-| `memo-workflow-cli script-filter` | `--query <TEXT>` | Render Alfred script-filter JSON items for add/db-init/recent-list rows. |
-| `memo-workflow-cli action` | `--token <TOKEN> [--mode <text|json>]` | Execute an Alfred action token (`db-init`, `add::<text>`, `update::<item_id>::<text>`, `delete::<item_id>`, `copy::<item_id>`, `copy-json::<item_id>`). |
-| `memo-workflow-cli add` | `--text <TEXT> [--db <PATH>] [--source <LABEL>] [--mode <text|json>]` | Add one memo row directly. |
-| `memo-workflow-cli update` | `--item-id <ID> --text <TEXT> [--db <PATH>] [--mode <text|json>]` | Update one memo row directly. |
-| `memo-workflow-cli delete` | `--item-id <ID> [--db <PATH>] [--mode <text|json>]` | Hard-delete one memo row directly. |
-| `memo-workflow-cli list` | `[--db <PATH>] [--limit <N>] [--offset <N>] [--mode <text|json>]` | List memo rows in newest-first order. |
-| `memo-workflow-cli search` | `--query <TEXT> [--match <fts|prefix|contains>] [--limit <N>] [--offset <N>] [--db <PATH>] [--mode <text|json>]` | Search memo rows by query text (`fts` default, `prefix`, or `contains`). |
-| `memo-workflow-cli db-init` | `[--db <PATH>] [--mode <text|json>]` | Initialize sqlite storage and migrations. |
+- `memo-workflow-cli script-filter`
+  - Options: `--query <TEXT>`
+  - Description: Render Alfred script-filter JSON items for add/db-init/recent-list rows.
+- `memo-workflow-cli action`
+  - Options: `--token <TOKEN> [--mode <text|json>]`
+  - Description: Execute an Alfred action token (`db-init`, `add::<text>`, `update::<item_id>::<text>`,
+    `delete::<item_id>`, `copy::<item_id>`, `copy-json::<item_id>`).
+- `memo-workflow-cli add`
+  - Options: `--text <TEXT> [--db <PATH>] [--source <LABEL>] [--mode <text|json>]`
+  - Description: Add one memo row directly.
+- `memo-workflow-cli update`
+  - Options: `--item-id <ID> --text <TEXT> [--db <PATH>] [--mode <text|json>]`
+  - Description: Update one memo row directly.
+- `memo-workflow-cli delete`
+  - Options: `--item-id <ID> [--db <PATH>] [--mode <text|json>]`
+  - Description: Hard-delete one memo row directly.
+- `memo-workflow-cli list`
+  - Options: `[--db <PATH>] [--limit <N>] [--offset <N>] [--mode <text|json>]`
+  - Description: List memo rows in newest-first order.
+- `memo-workflow-cli search`
+  - Options:
+    `--query <TEXT> [--match <fts|prefix|contains>] [--limit <N>] [--offset <N>] [--db <PATH>] [--mode <text|json>]`
+  - Description: Search memo rows by query text (`fts` default, `prefix`, or `contains`).
+- `memo-workflow-cli db-init`
+  - Options: `[--db <PATH>] [--mode <text|json>]`
+  - Description: Initialize sqlite storage and migrations.
 
 ## Environment Variables
 

@@ -9,7 +9,8 @@ Capture memo text quickly into SQLite-backed `nils-memo-cli@0.5.5` storage.
 ## Features
 
 - Keyword `mm` as command entry.
-- Extra keywords: `mmr` (latest rows / full item menu), `mma` (add), `mmu` (update), `mmd` (delete), `mmc` (copy), `mmq` (search).
+- Extra keywords: `mmr` (latest rows / full item menu), `mma` (add), `mmu` (update), `mmd` (delete), `mmc` (copy), `mmq`
+  (search).
 - Primary flow supports `add`, `update`, and `delete`.
 - Search flow supports `search` via dedicated `mmq` keyword and item-management routing.
 - Latest-list view (`mmr`) shows `db init` only when db is missing; otherwise shows db path + latest memo rows.
@@ -22,27 +23,27 @@ Capture memo text quickly into SQLite-backed `nils-memo-cli@0.5.5` storage.
 
 Set these via Alfred's `Configure Workflow...` UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `MEMO_DB_PATH` | No | `(empty)` | SQLite path override. Empty uses Alfred workflow data dir, then memo-cli default path. |
-| `MEMO_SOURCE` | No | `alfred` | Source label saved with each memo item. |
-| `MEMO_REQUIRE_CONFIRM` | No | `0` | `1/true/yes/on` adds an explicit confirm row before add action. |
-| `MEMO_MAX_INPUT_BYTES` | No | `4096` | Max bytes allowed for one memo input. |
-| `MEMO_RECENT_LIMIT` | No | `8` | Number of recent rows shown when query is empty (`1..50`). |
-| `MEMO_SEARCH_MATCH` | No | `fts` | Default search match mode for `mmq`/`search` (`fts`, `prefix`, `contains`). |
-| `MEMO_WORKFLOW_CLI_BIN` | No | `(empty)` | Optional executable path override for `memo-workflow-cli`. |
+| Variable                | Required | Default   | Description                                                                            |
+| ----------------------- | -------- | --------- | -------------------------------------------------------------------------------------- |
+| `MEMO_DB_PATH`          | No       | `(empty)` | SQLite path override. Empty uses Alfred workflow data dir, then memo-cli default path. |
+| `MEMO_SOURCE`           | No       | `alfred`  | Source label saved with each memo item.                                                |
+| `MEMO_REQUIRE_CONFIRM`  | No       | `0`       | `1/true/yes/on` adds an explicit confirm row before add action.                        |
+| `MEMO_MAX_INPUT_BYTES`  | No       | `4096`    | Max bytes allowed for one memo input.                                                  |
+| `MEMO_RECENT_LIMIT`     | No       | `8`       | Number of recent rows shown when query is empty (`1..50`).                             |
+| `MEMO_SEARCH_MATCH`     | No       | `fts`     | Default search match mode for `mmq`/`search` (`fts`, `prefix`, `contains`).            |
+| `MEMO_WORKFLOW_CLI_BIN` | No       | `(empty)` | Optional executable path override for `memo-workflow-cli`.                             |
 
 ## Keyword
 
-| Keyword | Behavior |
-|---|---|
-| `mm` | Command entry menu (Enter on row appends suffix and switches directly to `mmr` / `mma` / `mmu` / `mmd` / `mmc` / `mmq`). |
-| `mmr` | Show latest memo rows (newest first); `mmr <number>` opens memo item menu by id. |
-| `mma <text>` | Add intent keyword for `add::<text>`. |
-| `mmu` | Show latest memo rows (same as `mmr`); `mmu <number>` routes to update flow for that id; `mmu <item_id> <text>` routes update intent. |
-| `mmd` | Show latest memo rows (same as `mmr`); `mmd <number>` routes to delete action for that id; `mmd <item_id>` routes delete intent. |
-| `mmc` | Show latest memo rows (same as `mmr`); `mmc <number>` or `mmc <item_id>` routes copy action for that id. |
-| `mmq` | Search memos; `mmq <query>` routes to search intent (default mode from `MEMO_SEARCH_MATCH`) and always returns selectable search rows. |
+| Keyword      | Behavior                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `mm`         | Command entry menu (Enter on row appends suffix and switches directly to `mmr` / `mma` / `mmu` / `mmd` / `mmc` / `mmq`).               |
+| `mmr`        | Show latest memo rows (newest first); `mmr <number>` opens memo item menu by id.                                                       |
+| `mma <text>` | Add intent keyword for `add::<text>`.                                                                                                  |
+| `mmu`        | Show latest memo rows (same as `mmr`); `mmu <number>` routes to update flow for that id; `mmu <item_id> <text>` routes update intent.  |
+| `mmd`        | Show latest memo rows (same as `mmr`); `mmd <number>` routes to delete action for that id; `mmd <item_id>` routes delete intent.       |
+| `mmc`        | Show latest memo rows (same as `mmr`); `mmc <number>` or `mmc <item_id>` routes copy action for that id.                               |
+| `mmq`        | Search memos; `mmq <query>` routes to search intent (default mode from `MEMO_SEARCH_MATCH`) and always returns selectable search rows. |
 
 ## Query intents
 
@@ -61,7 +62,8 @@ Set these via Alfred's `Configure Workflow...` UI:
 - Keyword mutation shortcuts: `mmu <item_id> <text>`, `mmd <item_id>`, `mmc <item_id>`.
 - `search <query>` always keeps non-actionable rows with `autocomplete: item <number>` for safe follow-up actions.
 - `search` (without query text) returns a guidance row and no executable action.
-- Copy actions: `copy::<item_id>` copies memo text (copy row title shows preview; overflow moves to subtitle), `copy-json::<item_id>` copies raw item JSON (via Cmd modifier on copy row).
+- Copy actions: `copy::<item_id>` copies memo text (copy row title shows preview; overflow moves to subtitle),
+  `copy-json::<item_id>` copies raw item JSON (via Cmd modifier on copy row).
 - `update <item_id>` without text shows guidance row and keeps autocomplete for second-step typing.
 - Invalid mutation syntax (for example missing `item_id` or missing update text) returns non-actionable guidance rows.
 

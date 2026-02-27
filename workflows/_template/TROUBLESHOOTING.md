@@ -1,4 +1,4 @@
-# <Workflow Name> Troubleshooting
+# Workflow Name Troubleshooting (Template)
 
 Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md)
 
@@ -37,12 +37,12 @@ cat workflows/<WORKFLOW_ID>/workflow.toml
 
 Document at least these rows for each new workflow:
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `<runtime binary not found message>` | `<binary missing or wrong path>` | `Re-package workflow and/or set <RUNTIME_OVERRIDE_ENV> to executable absolute path.` |
-| `<invalid input message>` | `<bad query/argument format>` | `Provide one valid example query and expected format.` |
-| `<provider/network failure message>` | `<upstream transient>` | `Retry later first; do not assume local script defect immediately.` |
-| `<output format error message>` | `<malformed Alfred JSON from runtime>` | `Use pinned packaged runtime or update override binary.` |
+| Symptom                              | Likely cause                           | Action                                                                               |
+| ------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `<runtime binary not found message>` | `<binary missing or wrong path>`       | `Re-package workflow and/or set <RUNTIME_OVERRIDE_ENV> to executable absolute path.` |
+| `<invalid input message>`            | `<bad query/argument format>`          | `Provide one valid example query and expected format.`                               |
+| `<provider/network failure message>` | `<upstream transient>`                 | `Retry later first; do not assume local script defect immediately.`                  |
+| `<output format error message>`      | `<malformed Alfred JSON from runtime>` | `Use pinned packaged runtime or update override binary.`                             |
 
 ## Validation
 

@@ -1,6 +1,7 @@
 # Open Project Port Parity Contract
 
 ## Target
+
 - Reference workflow: `/Users/terry/Project/graysurf/alfred-open-project-in-vscode/src/info.plist`
 - Port target in this repo:
   - `crates/alfred-core`
@@ -29,11 +30,13 @@
 | CLI command contract | `script-filter` prints Alfred JSON only; `record-usage` and `github-url` print plain output only. | `crates/workflow-cli/src/main.rs` |
 
 ## Optional Improvements (Not Required For Parity)
+
 - Add richer Alfred fields (`mods`, `variables`) when useful, but avoid behavior changes for default Enter action.
 - Add extra remote format support beyond GitHub canonical formats.
 - Add extra workflow metadata fields not required by runtime behavior.
 
 ## Validation Checklist
+
 - [x] `crates/workflow-cli/docs/open-project-port-parity.md` exists and maps parity rules to repository files.
 - [x] `PROJECT_DIRS`, `USAGE_FILE`, `VSCODE_PATH` defaults documented and implemented.
 - [x] Query filtering, subtitle formatting, and usage-based sort behavior covered by unit tests.

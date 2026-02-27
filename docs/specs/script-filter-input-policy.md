@@ -24,9 +24,13 @@ This means:
 
 ## Evidence Notes
 
-- Alfred Script Filter UI exposes queue delay and immediate-run behavior as separate controls; plist stores both controls via `queuedelay*` keys.
-- Local Alfred-exported workflows under `~/Library/Application Support/Alfred/Alfred.alfredpreferences/workflows/*/info.plist` use the same key family (`queuedelaycustom`, `queuedelaymode`, `queuedelayimmediatelyinitially`) with integer delay values (`1`, `2`, `3`).
-- Repository target templates currently use `queuedelaycustom=3` and `queuedelayimmediatelyinitially=true`; this policy standardizes them to 1-second delay + no immediate first run.
+- Alfred Script Filter UI exposes queue delay and immediate-run behavior as separate controls; plist stores both
+  controls via `queuedelay*` keys.
+- Local Alfred-exported workflows under
+  `~/Library/Application Support/Alfred/Alfred.alfredpreferences/workflows/*/info.plist` use the same key family
+  (`queuedelaycustom`, `queuedelaymode`, `queuedelayimmediatelyinitially`) with integer delay values (`1`, `2`, `3`).
+- Repository target templates currently use `queuedelaycustom=3` and `queuedelayimmediatelyinitially=true`; this policy
+  standardizes them to 1-second delay + no immediate first run.
 
 ## Target Scope
 
@@ -52,7 +56,8 @@ Shared foundation policy checks enforce that designated script filters include:
 - search-driver wiring (`script_filter_search_driver.sh` + `sfsd_run_search_flow`) for search-family targets;
 - CLI-driver safety wiring (`script_filter_cli_driver.sh` + `sfcd_run_cli_flow`) for non-search and hybrid targets.
 
-The same check also rejects prohibited placeholder markers so incomplete migration scaffolding fails fast in CI/local lint.
+The same check also rejects prohibited placeholder markers so incomplete migration scaffolding fails fast in CI/local
+lint.
 
 ## Auto-Syncable Vs Manual Fields
 
@@ -68,4 +73,5 @@ Manual-by-design (validated by policy check, not auto-rewritten):
 - `shared_foundation.targets.*.requires`
 - `shared_foundation.profiles.*.required_markers`
 
-Reason: these fields describe code-level shared foundation boundaries (helper loader + guard contracts) and must be updated together with script changes during migration PRs.
+Reason: these fields describe code-level shared foundation boundaries (helper loader + guard contracts) and must be
+updated together with script changes during migration PRs.

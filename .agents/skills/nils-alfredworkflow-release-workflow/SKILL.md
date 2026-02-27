@@ -64,7 +64,8 @@ Failure modes:
 
 1. Validate repository state (`git` repo, clean tree, remote exists, upstream branch ready).
 2. Validate version format and tag uniqueness (local + remote).
-3. Sync versions (`Cargo.toml` + workflow manifests + root `package*.json` + Bangumi User-Agent placeholder) to input semver and commit/push when needed.
+3. Sync versions (`Cargo.toml` + workflow manifests + root `package*.json` + Bangumi User-Agent placeholder) to input
+   semver and commit/push when needed.
 4. Create annotated tag `Release <version>`.
 5. Push tag to remote.
 6. Print success summary and release URL.

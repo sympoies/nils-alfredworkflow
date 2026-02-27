@@ -26,12 +26,12 @@ bash workflows/randomer/scripts/script_filter_expand.sh "uuid" | jq -e '.items |
 
 ## Common failures and actions
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `randomer-cli binary not found` row | Runtime binary absent in all lookup paths | Re-package workflow or set `RANDOMER_CLI_BIN` to executable absolute path. |
-| `Select a format first` row | Expand stage triggered without format | Use `rrv <type>` first, then open expanded list; or run expand with explicit format query. |
-| `Unknown format` row | Unsupported key passed to `generate --format` | Retry with supported keys shown by `rr`/`rrv`. |
-| `Randomer output format error` | Non-conforming JSON from custom binary | Use packaged pinned runtime, or update override binary. |
+| Symptom                             | Likely cause                                  | Action                                                                                     |
+| ----------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `randomer-cli binary not found` row | Runtime binary absent in all lookup paths     | Re-package workflow or set `RANDOMER_CLI_BIN` to executable absolute path.                 |
+| `Select a format first` row         | Expand stage triggered without format         | Use `rrv <type>` first, then open expanded list; or run expand with explicit format query. |
+| `Unknown format` row                | Unsupported key passed to `generate --format` | Retry with supported keys shown by `rr`/`rrv`.                                             |
+| `Randomer output format error`      | Non-conforming JSON from custom binary        | Use packaged pinned runtime, or update override binary.                                    |
 
 For environment-driven expand triage:
 

@@ -1,6 +1,7 @@
 # Open Project - Alfred Workflow
 
-Fuzzy-find local Git projects from one or more base directories, open them in your editor, and jump to GitHub remotes from Alfred.
+Fuzzy-find local Git projects from one or more base directories, open them in your editor, and jump to GitHub remotes
+from Alfred.
 
 ## Screenshot
 
@@ -18,25 +19,25 @@ Fuzzy-find local Git projects from one or more base directories, open them in yo
 
 Set these via Alfred's "Configure Workflow..." UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `PROJECT_DIRS` | No | `$HOME/Project,$HOME/.config` | Comma-separated base directories to scan for Git repositories. |
-| `OPEN_PROJECT_MAX_RESULTS` | No | `30` | Maximum rows shown per query. Parsed as base-10 integer and clamped to `1..200`. |
-| `USAGE_FILE` | No | `$HOME/.config/zsh/cache/.alfred_project_usage.log` | Path to usage log used for recency sorting. |
-| `VSCODE_PATH` | No | `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code` | Editor executable path or command used to open a project. |
+| Variable                   | Required | Default                                                                | Description                                                                      |
+| -------------------------- | -------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `PROJECT_DIRS`             | No       | `$HOME/Project,$HOME/.config`                                          | Comma-separated base directories to scan for Git repositories.                   |
+| `OPEN_PROJECT_MAX_RESULTS` | No       | `30`                                                                   | Maximum rows shown per query. Parsed as base-10 integer and clamped to `1..200`. |
+| `USAGE_FILE`               | No       | `$HOME/.config/zsh/cache/.alfred_project_usage.log`                    | Path to usage log used for recency sorting.                                      |
+| `VSCODE_PATH`              | No       | `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code` | Editor executable path or command used to open a project.                        |
 
 ## Keywords
 
-| Keyword | Behavior |
-|---|---|
-| `c <query>` | Search and open matching project in editor. |
-| `code <query>` | Same behavior as `c`. |
+| Keyword          | Behavior                                     |
+| ---------------- | -------------------------------------------- |
+| `c <query>`      | Search and open matching project in editor.  |
+| `code <query>`   | Same behavior as `c`.                        |
 | `github <query>` | Search and open matching project GitHub URL. |
 
 ## Advanced Runtime Parameters
 
-| Parameter | Description |
-|---|---|
+| Parameter          | Description                                                             |
+| ------------------ | ----------------------------------------------------------------------- |
 | `WORKFLOW_CLI_BIN` | Optional override path for `workflow-cli` (useful for local debugging). |
 
 ## Troubleshooting

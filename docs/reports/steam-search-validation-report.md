@@ -8,16 +8,16 @@
 
 ## Validation Commands
 
-| Command | Result | Notes |
-| --- | --- | --- |
-| `shellcheck workflows/steam-search/scripts/script_filter.sh workflows/steam-search/scripts/action_open.sh` | PASS | No shellcheck findings. |
-| `bash scripts/workflow-sync-script-filter-policy.sh --check --workflows steam-search` | PASS | Queue/shared-foundation policy matched. |
-| `bash workflows/steam-search/tests/smoke.sh` | PASS | Covered plist wiring, requery round-trip, cache/coalesce behavior, layout resolution, and package artifact checks. |
-| `rg -n "steam-search\|STEAM_REGION\|steam-requery" workflows/steam-search/README.md workflows/steam-search/TROUBLESHOOTING.md README.md` | PASS | Steam docs/catalog entries verified. |
-| `cargo run -p xtask -- workflow lint --id steam-search` | PASS | Lint/audits passed; non-blocking standards warning remains in `steam-cli` contract tests. |
-| `cargo run -p xtask -- workflow test --id steam-search` | PASS | Workspace tests + steam workflow smoke passed. |
-| `cargo run -p xtask -- workflow pack --id steam-search` | PASS | Produced packaged workflow artifact successfully. |
-| `bash scripts/workflow-shared-foundation-audit.sh --check` | PASS | Shared foundation audit passed with zero failures. |
+| Command                                                                                                                                  | Result | Notes                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ |
+| `shellcheck workflows/steam-search/scripts/script_filter.sh workflows/steam-search/scripts/action_open.sh`                               | PASS   | No shellcheck findings.                                                                                            |
+| `bash scripts/workflow-sync-script-filter-policy.sh --check --workflows steam-search`                                                    | PASS   | Queue/shared-foundation policy matched.                                                                            |
+| `bash workflows/steam-search/tests/smoke.sh`                                                                                             | PASS   | Covered plist wiring, requery round-trip, cache/coalesce behavior, layout resolution, and package artifact checks. |
+| `rg -n "steam-search\|STEAM_REGION\|steam-requery" workflows/steam-search/README.md workflows/steam-search/TROUBLESHOOTING.md README.md` | PASS   | Steam docs/catalog entries verified.                                                                               |
+| `cargo run -p xtask -- workflow lint --id steam-search`                                                                                  | PASS   | Lint/audits passed; non-blocking standards warning remains in `steam-cli` contract tests.                          |
+| `cargo run -p xtask -- workflow test --id steam-search`                                                                                  | PASS   | Workspace tests + steam workflow smoke passed.                                                                     |
+| `cargo run -p xtask -- workflow pack --id steam-search`                                                                                  | PASS   | Produced packaged workflow artifact successfully.                                                                  |
+| `bash scripts/workflow-shared-foundation-audit.sh --check`                                                                               | PASS   | Shared foundation audit passed with zero failures.                                                                 |
 
 ## Packaging Artifact
 
@@ -37,5 +37,7 @@
 
 ## Residual Risk
 
-1. Steam Store endpoint/schema behavior can change upstream; runtime error mapping remains defensive but cannot prevent upstream contract drift.
-2. `workflow lint` surfaced one non-blocking standards warning in `steam-cli` (`tests/cli_contract.rs` missing explicit assertions for envelope keys `schema_version`, `command`, `ok`).
+1. Steam Store endpoint/schema behavior can change upstream; runtime error mapping remains defensive but cannot prevent
+   upstream contract drift.
+2. `workflow lint` surfaced one non-blocking standards warning in `steam-cli` (`tests/cli_contract.rs` missing explicit
+   assertions for envelope keys `schema_version`, `command`, `ok`).

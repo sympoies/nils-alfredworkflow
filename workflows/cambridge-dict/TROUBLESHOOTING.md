@@ -19,19 +19,20 @@ Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md
 
 ## Common failures and actions
 
-| Symptom in Alfred | Likely cause | Action |
-| --- | --- | --- |
-| `cambridge-cli binary not found` | Packaged binary missing or runtime path mismatch. | Re-pack workflow, or set `CAMBRIDGE_CLI_BIN` to executable path. |
-| `Node/Playwright runtime unavailable` | `node` missing, workflow-local `playwright` package missing, or Chromium browser not installed for live scraping. | Run `scripts/setup-cambridge-workflow-runtime.sh` and retry. |
-| `Cambridge anti-bot challenge` | Cambridge returned Cloudflare/anti-bot page. | Retry later, reduce query frequency, or open Cambridge page directly in browser. |
-| `Cambridge cookie consent required` | Cookie wall rendered instead of dictionary content. | Open Cambridge Dictionary in browser once, accept cookies, then retry Alfred query. |
-| `Cambridge request timed out` | Timeout too low for current network/page latency. | Increase `CAMBRIDGE_TIMEOUT_MS` and retry. |
-| `Invalid Cambridge workflow config` | Invalid mode/max-results/timeout/headless values. | Correct `CAMBRIDGE_*` variables in Alfred config. |
+| Symptom in Alfred                     | Likely cause                                                                                                      | Action                                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `cambridge-cli binary not found`      | Packaged binary missing or runtime path mismatch.                                                                 | Re-pack workflow, or set `CAMBRIDGE_CLI_BIN` to executable path.                    |
+| `Node/Playwright runtime unavailable` | `node` missing, workflow-local `playwright` package missing, or Chromium browser not installed for live scraping. | Run `scripts/setup-cambridge-workflow-runtime.sh` and retry.                        |
+| `Cambridge anti-bot challenge`        | Cambridge returned Cloudflare/anti-bot page.                                                                      | Retry later, reduce query frequency, or open Cambridge page directly in browser.    |
+| `Cambridge cookie consent required`   | Cookie wall rendered instead of dictionary content.                                                               | Open Cambridge Dictionary in browser once, accept cookies, then retry Alfred query. |
+| `Cambridge request timed out`         | Timeout too low for current network/page latency.                                                                 | Increase `CAMBRIDGE_TIMEOUT_MS` and retry.                                          |
+| `Invalid Cambridge workflow config`   | Invalid mode/max-results/timeout/headless values.                                                                 | Correct `CAMBRIDGE_*` variables in Alfred config.                                   |
 
 ## Validation
 
 - Default smoke/test commands are fixture/stub based and do not require live Cambridge network calls.
-- If you need to validate live scraping behavior, run manual checks separately and treat failures as external-site noise unless reproduced with fixtures.
+- If you need to validate live scraping behavior, run manual checks separately and treat failures as external-site noise
+  unless reproduced with fixtures.
 
 Run these checks:
 

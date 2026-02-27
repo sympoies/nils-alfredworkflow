@@ -13,8 +13,10 @@ Search YouTube videos from Alfred and open selected videos in your browser.
 - Open selected YouTube watch URL in your default browser with `Enter`.
 - Short query guard: `<2` characters shows `Keep typing (2+ chars)` and skips API calls.
 - Script Filter queue policy: 1 second delay with initial immediate run disabled.
-- Script-level guardrails: async query coalescing (final query priority) and short TTL cache reduce duplicate API calls while typing.
-- Runtime orchestration is shared via `scripts/lib/script_filter_search_driver.sh`; YouTube-specific fetch/error mapping remains local.
+- Script-level guardrails: async query coalescing (final query priority) and short TTL cache reduce duplicate API calls
+  while typing.
+- Runtime orchestration is shared via `scripts/lib/script_filter_search_driver.sh`; YouTube-specific fetch/error mapping
+  remains local.
 - Map common failures (missing API key, quota exceeded, API unavailable, invalid config) to actionable Alfred messages.
 - Tune result count and region targeting through workflow variables.
 
@@ -22,26 +24,26 @@ Search YouTube videos from Alfred and open selected videos in your browser.
 
 Set these via Alfred's "Configure Workflow..." UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `YOUTUBE_API_KEY` | Yes | (empty) | YouTube Data API v3 key. |
-| `YOUTUBE_MAX_RESULTS` | No | `10` | Max results per query. Effective range is clamped to `1..25`. |
-| `YOUTUBE_REGION_CODE` | No | (empty) | Optional ISO 3166-1 alpha-2 region code (for example `US`, `TW`, `JP`). |
+| Variable              | Required | Default | Description                                                             |
+| --------------------- | -------- | ------- | ----------------------------------------------------------------------- |
+| `YOUTUBE_API_KEY`     | Yes      | (empty) | YouTube Data API v3 key.                                                |
+| `YOUTUBE_MAX_RESULTS` | No       | `10`    | Max results per query. Effective range is clamped to `1..25`.           |
+| `YOUTUBE_REGION_CODE` | No       | (empty) | Optional ISO 3166-1 alpha-2 region code (for example `US`, `TW`, `JP`). |
 
 ## Keyword
 
-| Keyword | Behavior |
-|---|---|
+| Keyword      | Behavior                                                |
+| ------------ | ------------------------------------------------------- |
 | `yt <query>` | Search and list videos, then open selected YouTube URL. |
 
 ## Advanced Runtime Parameters
 
-| Parameter | Description |
-|---|---|
-| `YOUTUBE_CLI_BIN` | Optional override path for `youtube-cli` (useful for local debugging). |
-| `YOUTUBE_QUERY_CACHE_TTL_SECONDS` | Optional same-query cache TTL (seconds). Default `0` (disabled to avoid stale mid-typing hits). |
-| `YOUTUBE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `2`. |
-| `YOUTUBE_QUERY_COALESCE_RERUN_SECONDS` | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`. |
+| Parameter                               | Description                                                                                     |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `YOUTUBE_CLI_BIN`                       | Optional override path for `youtube-cli` (useful for local debugging).                          |
+| `YOUTUBE_QUERY_CACHE_TTL_SECONDS`       | Optional same-query cache TTL (seconds). Default `0` (disabled to avoid stale mid-typing hits). |
+| `YOUTUBE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `2`.                                         |
+| `YOUTUBE_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.               |
 
 ## macOS Gatekeeper acceptance (optional manual)
 

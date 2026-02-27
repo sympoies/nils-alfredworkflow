@@ -6,7 +6,8 @@ This document lists required local tools for development, linting, testing, and 
 
 - Alfred runtime/interactive acceptance is macOS-only.
 - Linux dependencies are intentionally kept for CI and headless test/lint/package flows.
-- This repository's CI runs on Ubuntu (`.github/workflows/ci.yml`), and `scripts/setup-rust-tooling.sh` includes Debian/Ubuntu handling.
+- This repository's CI runs on Ubuntu (`.github/workflows/ci.yml`), and `scripts/setup-rust-tooling.sh` includes
+  Debian/Ubuntu handling.
 
 ## Required tools
 
@@ -17,7 +18,8 @@ This document lists required local tools for development, linting, testing, and 
 - Shell tooling: `shellcheck`, `shfmt`
 - Node runtime: `node`, `npm`
 - Node dependency: `playwright` package (managed via root `package.json`)
-- Packaging/runtime helpers: `zip`, `unzip`, `open` (macOS install/runtime), `xdg-open` (Linux CI/local smoke compatibility)
+- Packaging/runtime helpers: `zip`, `unzip`, `open` (macOS install/runtime), `xdg-open` (Linux CI/local smoke
+  compatibility)
 - Optional live scraper runtime: Playwright Chromium browser (`npx playwright install chromium`)
 
 ## Crates.io pinned binary packaging policy
@@ -25,8 +27,10 @@ This document lists required local tools for development, linting, testing, and 
 - For workflows that bundle a crates.io runtime binary, packaging must use pinned-version resolution:
   1. Prefer explicit local override (`*_PACK_BIN`) when provided.
   2. Then try local PATH binary.
-  3. If missing or version-mismatched, auto-install the pinned crate version from crates.io (with `cargo install --locked`) into a workflow-local cache root and use that binary for packaging.
-- Packaging must fail only when pinned auto-install cannot run (for example missing `cargo`, network failure, or invalid pinned version).
+  3. If missing or version-mismatched, auto-install the pinned crate version from crates.io (with
+     `cargo install --locked`) into a workflow-local cache root and use that binary for packaging.
+- Packaging must fail only when pinned auto-install cannot run (for example missing `cargo`, network failure, or invalid
+  pinned version).
 
 ## Install (macOS)
 

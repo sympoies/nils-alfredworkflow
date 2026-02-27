@@ -46,7 +46,8 @@ Behavior summary:
 
 - `0`: success
 - `1`: runtime failure (I/O, file write/copy/create-dir errors)
-- `2`: user/input failure (invalid paths, missing README/image/plist, malformed markdown image syntax, remote image URL, missing plist readme key)
+- `2`: user/input failure (invalid paths, missing README/image/plist, malformed markdown image syntax, remote image URL,
+  missing plist readme key)
 
 ## Output Contract
 
@@ -60,8 +61,10 @@ Behavior summary:
 ## Troubleshooting
 
 - `error[user.readme_not_found]`: ensure `--readme-source` exists under `--workflow-root`.
-- `error[user.remote_image_not_allowed]`: replace image URL with a local relative path and include the file in the workflow root.
-- `error[user.plist_readme_key_missing]`: ensure plist contains `<key>readme</key>` followed by a `<string>...</string>`.
+- `error[user.remote_image_not_allowed]`: replace image URL with a local relative path and include the file in the
+  workflow root.
+- `error[user.plist_readme_key_missing]`: ensure plist contains `<key>readme</key>` followed by a
+  `<string>...</string>`.
 - `error[runtime.copy_failed]`: verify write permissions for `--stage-dir`.
 
 ## Standards Status

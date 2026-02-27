@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Define the input and calculation rules for Alfred FX/crypto expressions. This document is the implementation and testing contract for the upcoming workflow.
+Define the input and calculation rules for Alfred FX/crypto expressions. This document is the implementation and testing
+contract for the upcoming workflow.
 
 ## Operators and Syntax
 
@@ -31,15 +32,18 @@ number          = signed_decimal ;
 ## Mode Resolution
 
 1. If all terms are numeric only (for example `1+5`):
+
 - Use numeric mode.
 - Return exactly one output line (final result only).
 
-2. If all terms are asset terms (for example `1 btc + 3 eth`):
+1. If all terms are asset terms (for example `1 btc + 3 eth`):
+
 - Use asset conversion mode.
 - Show per-asset unit price lines first, then the final total line.
 - Compact form without spaces is accepted (for example `1btc + 3eth`).
 
-3. If numeric terms and asset terms are mixed (for example `2 btc + 5`):
+1. If numeric terms and asset terms are mixed (for example `2 btc + 5`):
+
 - Treat as syntax error (no calculation).
 
 ## Calculation Rules

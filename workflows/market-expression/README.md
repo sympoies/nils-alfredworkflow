@@ -10,7 +10,8 @@ Evaluate market expressions and copy the formatted result.
 
 - Trigger with `mx <expression>`.
 - Calls `market-cli expr --query <query> --default-fiat <MARKET_DEFAULT_FIAT>`.
-- Supports `+ - * /` for numeric-only expressions and `+ -` for asset expressions, with target fiat syntax `to <FIAT>` (default `USD`).
+- Supports `+ - * /` for numeric-only expressions and `+ -` for asset expressions, with target fiat syntax `to <FIAT>`
+  (default `USD`).
 - Accepts compact asset terms like `1btc` and `3eth` (auto-normalized).
 - Enter on a row copies the selected payload via `pbcopy`.
 - Supports local binary override via `MARKET_CLI_BIN` for debugging.
@@ -20,17 +21,17 @@ Evaluate market expressions and copy the formatted result.
 
 Set these via Alfred's "Configure Workflow..." UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `MARKET_CLI_BIN` | No | (empty) | Optional absolute path override for `market-cli`. |
-| `MARKET_DEFAULT_FIAT` | No | `USD` | Default fiat passed to `market-cli expr --default-fiat` when query omits fiat target. |
+| Variable              | Required | Default | Description                                                                           |
+| --------------------- | -------- | ------- | ------------------------------------------------------------------------------------- |
+| `MARKET_CLI_BIN`      | No       | (empty) | Optional absolute path override for `market-cli`.                                     |
+| `MARKET_DEFAULT_FIAT` | No       | `USD`   | Default fiat passed to `market-cli expr --default-fiat` when query omits fiat target. |
 
 ## Keyword
 
-| Keyword | Behavior |
-|---|---|
+| Keyword           | Behavior                                                         |
+| ----------------- | ---------------------------------------------------------------- |
 | `mx <expression>` | Evaluate expression and show Alfred rows from `market-cli expr`. |
-| `mx` | Shows usage guidance for expression syntax. |
+| `mx`              | Shows usage guidance for expression syntax.                      |
 
 ## Validation
 

@@ -28,7 +28,7 @@ When no explicit timezone list is provided, local timezone must be resolved in t
 4. Platform command lookup
    - macOS: `/usr/sbin/systemsetup -gettimezone`
    - Linux: `timedatectl show -p Timezone --value`
-5. `/etc/localtime` symlink parse (`.../zoneinfo/<IANA>`) 
+5. `/etc/localtime` symlink parse (`.../zoneinfo/<IANA>`)
 6. `UTC` terminal fallback
 
 Rules:

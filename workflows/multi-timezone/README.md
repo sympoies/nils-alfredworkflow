@@ -19,18 +19,18 @@ Show current time across one or more IANA timezones and copy a selected value.
 
 Set these via Alfred's "Configure Workflow..." UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `TIMEZONE_CLI_BIN` | No | (empty) | Optional absolute path override for `timezone-cli` (useful for local debugging). |
-| `MULTI_TZ_ZONES` | No | (empty) | Default timezone list used when query is empty. Supports comma/newline separated IANA IDs. |
-| `MULTI_TZ_LOCAL_OVERRIDE` | No | `Europe/London` | Optional local timezone override in fallback mode (must be IANA timezone ID). |
+| Variable                  | Required | Default         | Description                                                                                |
+| ------------------------- | -------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `TIMEZONE_CLI_BIN`        | No       | (empty)         | Optional absolute path override for `timezone-cli` (useful for local debugging).           |
+| `MULTI_TZ_ZONES`          | No       | (empty)         | Default timezone list used when query is empty. Supports comma/newline separated IANA IDs. |
+| `MULTI_TZ_LOCAL_OVERRIDE` | No       | `Europe/London` | Optional local timezone override in fallback mode (must be IANA timezone ID).              |
 
 ## Keyword
 
-| Keyword | Behavior |
-|---|---|
-| `tz <timezone-list>` | Show current time for provided IANA timezone list in the same order as input. |
-| `tz` | Use `MULTI_TZ_ZONES`; if empty, fallback chain starts from `MULTI_TZ_LOCAL_OVERRIDE` (default `Europe/London`). |
+| Keyword              | Behavior                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `tz <timezone-list>` | Show current time for provided IANA timezone list in the same order as input.                                   |
+| `tz`                 | Use `MULTI_TZ_ZONES`; if empty, fallback chain starts from `MULTI_TZ_LOCAL_OVERRIDE` (default `Europe/London`). |
 
 ## Local Timezone Fallback Chain
 

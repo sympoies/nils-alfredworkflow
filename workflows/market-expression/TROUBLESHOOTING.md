@@ -25,13 +25,13 @@ rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT" workflows/market-expression/workflow.
 
 ## Common failures and actions
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `market-cli binary not found` row | Binary is absent in all lookup paths | Package workflow again or set `MARKET_CLI_BIN` to executable absolute path. |
-| `Unsupported operator` row | Asset expression used `*` or `/` | Use `+`/`-` for asset terms. Keep `*`/`/` for numeric-only expressions. |
-| `Invalid expression terms` row | Mixed raw numeric and asset terms in same expression | Use a single expression type per side (all numeric or all asset terms). |
-| `Invalid to-clause` row | Missing/incomplete `to <FIAT>` target | Use complete target clause, e.g. `1 BTC + 2 ETH to USD`. |
-| `provider failure` or transient runtime errors | Upstream provider/API issue | Retry after a short delay; do not assume local script defect first. |
+| Symptom                                        | Likely cause                                         | Action                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| `market-cli binary not found` row              | Binary is absent in all lookup paths                 | Package workflow again or set `MARKET_CLI_BIN` to executable absolute path. |
+| `Unsupported operator` row                     | Asset expression used `*` or `/`                     | Use `+`/`-` for asset terms. Keep `*`/`/` for numeric-only expressions.     |
+| `Invalid expression terms` row                 | Mixed raw numeric and asset terms in same expression | Use a single expression type per side (all numeric or all asset terms).     |
+| `Invalid to-clause` row                        | Missing/incomplete `to <FIAT>` target                | Use complete target clause, e.g. `1 BTC + 2 ETH to USD`.                    |
+| `provider failure` or transient runtime errors | Upstream provider/API issue                          | Retry after a short delay; do not assume local script defect first.         |
 
 Syntax probe example (safe, no clipboard action):
 
@@ -51,4 +51,5 @@ scripts/workflow-pack.sh --id market-expression
 
 1. Re-install the previous known-good package from `dist/market-expression/<version>/`.
 2. Restore workflow variables to defaults (`MARKET_CLI_BIN=""`, `MARKET_DEFAULT_FIAT="USD"`) and retest.
-3. If issue persists, roll back only `workflows/market-expression/` on a branch, then run all Validation commands before release.
+3. If issue persists, roll back only `workflows/market-expression/` on a branch, then run all Validation commands before
+   release.

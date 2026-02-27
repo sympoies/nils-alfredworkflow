@@ -12,18 +12,21 @@
 ## Alfred Item JSON Contract
 
 Success item contract:
+
 - `title`: full quote text in canonical format (`"<quote>" — <author>`)
 - `subtitle`: static guidance such as `Press Enter to copy quote.`
 - `arg`: same quote text for copy action
 - `valid`: `true`
 
 Fallback/error item contract:
+
 - `title`: human-friendly status/error title
 - `subtitle`: recovery guidance
 - `valid`: `false`
 - `arg`: omitted
 
 All `script_filter.sh` code paths must emit valid Alfred JSON:
+
 - root object with `items` array
 - no raw stderr mixed into stdout JSON payload
 
@@ -57,6 +60,7 @@ Legacy storage definitions come from `/Users/terry/.config/zsh/bootstrap/quote-i
 | Runtime trigger | Shell login init (`zsh`) | Alfred keyword runtime (`qq`) |
 
 Migration guidance:
+
 - v1 does not auto-import legacy files from shell bootstrap paths.
 - To keep historical cache, copy legacy files into the active workflow data directory before first run.
 - If not copied, workflow starts with empty cache and rebuilds from ZenQuotes refreshes.
@@ -79,6 +83,7 @@ Migration guidance:
 | `QUOTE_DATA_DIR` | No | `(empty)` | non-empty path overrides quote cache directory |
 
 Advanced runtime override:
+
 - `QUOTE_CLI_BIN` (optional): absolute executable path override for local/debug runtime.
 
 ## Constraints and Non-Goals

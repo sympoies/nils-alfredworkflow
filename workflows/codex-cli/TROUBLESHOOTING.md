@@ -26,13 +26,13 @@ sed -n '1,120p' workflows/codex-cli/scripts/lib/codex_cli_runtime.sh
 
 ## Common failures and actions
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `codex-cli binary not found` row | Bundled binary missing and no usable fallback | Re-package workflow (`scripts/workflow-pack.sh --id codex-cli`) or set `CODEX_CLI_BIN` to an executable absolute path. |
-| `auth save`/`auth remove`/`auth use` actions fail | Secret directory is unset/unwritable | In Alfred workflow variables, set `CODEX_SECRET_DIR` to a writable directory (for example `~/.config/codex_secrets`), then retry. |
-| `diag`/`cxda result` looks stale | Diag cache still within TTL | Temporarily set `CODEX_DIAG_CACHE_TTL_SECONDS=0`, rerun query, then restore default (`300`). |
-| `diag` requests appear blocked too long | Contention on refresh lock | Reduce contention and verify `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS` (default `15`). |
-| macOS blocks bundled executable | Quarantine attribute on packaged binary | Re-import workflow and retry. If needed, clear quarantine on installed workflow bundle per root troubleshooting policy. |
+| Symptom                                           | Likely cause                                  | Action                                                                                                                            |
+| ------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `codex-cli binary not found` row                  | Bundled binary missing and no usable fallback | Re-package workflow (`scripts/workflow-pack.sh --id codex-cli`) or set `CODEX_CLI_BIN` to an executable absolute path.            |
+| `auth save`/`auth remove`/`auth use` actions fail | Secret directory is unset/unwritable          | In Alfred workflow variables, set `CODEX_SECRET_DIR` to a writable directory (for example `~/.config/codex_secrets`), then retry. |
+| `diag`/`cxda result` looks stale                  | Diag cache still within TTL                   | Temporarily set `CODEX_DIAG_CACHE_TTL_SECONDS=0`, rerun query, then restore default (`300`).                                      |
+| `diag` requests appear blocked too long           | Contention on refresh lock                    | Reduce contention and verify `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS` (default `15`).                                                |
+| macOS blocks bundled executable                   | Quarantine attribute on packaged binary       | Re-import workflow and retry. If needed, clear quarantine on installed workflow bundle per root troubleshooting policy.           |
 
 For conservative local cache cleanup during triage:
 
@@ -58,5 +58,7 @@ bash workflows/codex-cli/scripts/script_filter_diag_all.sh "diag all-json"
 ## Rollback guidance
 
 1. Re-install the last known good packaged artifact from `dist/codex-cli/<version>/`.
-2. Reset workflow variables to known defaults (`CODEX_CLI_BIN=""`, `CODEX_SECRET_DIR=""`, `CODEX_DIAG_CACHE_TTL_SECONDS="300"`, `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS="15"`).
-3. If regression is source-level, roll back `workflows/codex-cli/` on a dedicated branch and re-run the Validation commands before re-packaging.
+2. Reset workflow variables to known defaults (`CODEX_CLI_BIN=""`, `CODEX_SECRET_DIR=""`,
+   `CODEX_DIAG_CACHE_TTL_SECONDS="300"`, `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS="15"`).
+3. If regression is source-level, roll back `workflows/codex-cli/` on a dedicated branch and re-run the Validation
+   commands before re-packaging.

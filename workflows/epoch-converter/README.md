@@ -19,16 +19,16 @@ Convert between epoch timestamps and datetime values from Alfred, then copy any 
 
 Set these via Alfred's "Configure Workflow..." UI:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `EPOCH_CLI_BIN` | No | (empty) | Optional absolute path override for `epoch-cli` (useful for local debugging). |
+| Variable        | Required | Default | Description                                                                   |
+| --------------- | -------- | ------- | ----------------------------------------------------------------------------- |
+| `EPOCH_CLI_BIN` | No       | (empty) | Optional absolute path override for `epoch-cli` (useful for local debugging). |
 
 ## Keyword
 
-| Keyword | Behavior |
-|---|---|
-| `epoch <epoch-or-datetime>` or `ts <epoch-or-datetime>` | Convert input via `epoch-cli` and show copyable result rows. |
-| `epoch` or `ts` | Show current epoch rows and best-effort conversion rows from clipboard content. |
+| Keyword                                                 | Behavior                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `epoch <epoch-or-datetime>` or `ts <epoch-or-datetime>` | Convert input via `epoch-cli` and show copyable result rows.                    |
+| `epoch` or `ts`                                         | Show current epoch rows and best-effort conversion rows from clipboard content. |
 
 ## Output Rows
 

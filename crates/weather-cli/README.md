@@ -4,11 +4,18 @@ CLI backend for one-day and seven-day weather forecast retrieval.
 
 ## Commands
 
-| Command | Options | Description |
-| --- | --- | --- |
-| `weather-cli today` | `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]` `[--lang <en|zh>]` | Today weather forecast. |
-| `weather-cli week` | `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]` `[--lang <en|zh>]` | 7-day weather forecast. |
-| `weather-cli hourly` | `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]` `[--lang <en|zh>]` `[--hours <1..48>]` | Hourly weather forecast from current hour (24h default). |
+- `weather-cli today`
+  - Options: `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]`
+    `[--lang <en|zh>]`
+  - Description: Today weather forecast.
+- `weather-cli week`
+  - Options: `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]`
+    `[--lang <en|zh>]`
+  - Description: 7-day weather forecast.
+- `weather-cli hourly`
+  - Options: `--city <CITY>` or `--lat <LAT> --lon <LON>` `[--json]` `[--output <human|json|alfred-json>]`
+    `[--lang <en|zh>]` `[--hours <1..48>]`
+  - Description: Hourly weather forecast from current hour (24h default).
 
 ## Environment Variables
 

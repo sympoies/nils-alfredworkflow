@@ -17,20 +17,20 @@ Starter scaffold for creating a new workflow in this monorepo.
 
 Update these fields before packaging a new workflow:
 
-| Field | File | Description |
-|---|---|---|
-| `id` | `workflow.toml` | Workflow id slug (used for packaging path and identifiers). |
-| `name` | `workflow.toml` | Human-readable workflow name shown in Alfred. |
-| `bundle_id` | `workflow.toml` | Unique Alfred bundle id (`com.example.<id>` style). |
-| `script_filter` | `workflow.toml` | Script file name for script filter entrypoint. |
-| `action` | `workflow.toml` | Script file name for action entrypoint. |
-| `rust_binary` | `workflow.toml` | Binary name packaged into `bin/` for runtime scripts. |
+| Field           | File            | Description                                                 |
+| --------------- | --------------- | ----------------------------------------------------------- |
+| `id`            | `workflow.toml` | Workflow id slug (used for packaging path and identifiers). |
+| `name`          | `workflow.toml` | Human-readable workflow name shown in Alfred.               |
+| `bundle_id`     | `workflow.toml` | Unique Alfred bundle id (`com.example.<id>` style).         |
+| `script_filter` | `workflow.toml` | Script file name for script filter entrypoint.              |
+| `action`        | `workflow.toml` | Script file name for action entrypoint.                     |
+| `rust_binary`   | `workflow.toml` | Binary name packaged into `bin/` for runtime scripts.       |
 
 ## Example Configuration Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `EXAMPLE_VAR` | No | `example` | Demonstration variable placeholder. Replace with real workflow settings. |
+| Variable      | Required | Default   | Description                                                              |
+| ------------- | -------- | --------- | ------------------------------------------------------------------------ |
+| `EXAMPLE_VAR` | No       | `example` | Demonstration variable placeholder. Replace with real workflow settings. |
 
 ## Usage Notes
 

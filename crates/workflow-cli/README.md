@@ -4,11 +4,15 @@ Shared CLI for open-project workflow actions and script-filter rendering.
 
 ## Commands
 
-| Command | Options | Description |
-| --- | --- | --- |
-| `workflow-cli script-filter` | `--query <QUERY> [--mode <open|github>]` | Render Alfred script-filter JSON. |
-| `workflow-cli record-usage` | `--path <PATH>` | Record usage timestamp for a selected project path. |
-| `workflow-cli github-url` | `--path <PATH>` | Resolve project origin URL to canonical GitHub URL. |
+- `workflow-cli script-filter`
+  - Options: `--query <QUERY> [--mode <open|github>]`
+  - Description: Render Alfred script-filter JSON.
+- `workflow-cli record-usage`
+  - Options: `--path <PATH>`
+  - Description: Record usage timestamp for a selected project path.
+- `workflow-cli github-url`
+  - Options: `--path <PATH>`
+  - Description: Resolve project origin URL to canonical GitHub URL.
 
 ## Environment Variables
 

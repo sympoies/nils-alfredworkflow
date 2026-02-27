@@ -17,12 +17,12 @@ Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md
 
 ## Common failures and actions
 
-| Symptom in Alfred | Likely cause | Action |
-| --- | --- | --- |
-| `Invalid Bilibili workflow config` | `BILIBILI_MAX_RESULTS` or `BILIBILI_TIMEOUT_MS` value is invalid. | Correct variable values and retry. |
-| `Bilibili API unavailable` | DNS/TLS/network timeout, malformed payload, or upstream `5xx`. | Check local network and retry; if sustained, pause rollout. |
-| `No suggestions found` | Query has no suggest rows. | Press Enter on direct-search fallback row or use a broader query. |
-| `Keep typing (2+ chars)` | Query is shorter than minimum length (`<2`). | Continue typing until at least 2 characters. |
+| Symptom in Alfred                  | Likely cause                                                      | Action                                                            |
+| ---------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `Invalid Bilibili workflow config` | `BILIBILI_MAX_RESULTS` or `BILIBILI_TIMEOUT_MS` value is invalid. | Correct variable values and retry.                                |
+| `Bilibili API unavailable`         | DNS/TLS/network timeout, malformed payload, or upstream `5xx`.    | Check local network and retry; if sustained, pause rollout.       |
+| `No suggestions found`             | Query has no suggest rows.                                        | Press Enter on direct-search fallback row or use a broader query. |
+| `Keep typing (2+ chars)`           | Query is shorter than minimum length (`<2`).                      | Continue typing until at least 2 characters.                      |
 
 ## Validation
 
@@ -53,7 +53,8 @@ Use this when API failures are sustained or workflow usability drops sharply.
    - `workflows/bilibili-search/`
    - `crates/bilibili-cli/`
    - workspace membership in `Cargo.toml`
-   - docs updates tied to rollout (`workflows/bilibili-search/README.md`, `workflows/bilibili-search/TROUBLESHOOTING.md`, and `ALFRED_WORKFLOW_DEVELOPMENT.md` if changed)
+   - docs updates tied to rollout (`workflows/bilibili-search/README.md`,
+     `workflows/bilibili-search/TROUBLESHOOTING.md`, and `ALFRED_WORKFLOW_DEVELOPMENT.md` if changed)
 3. Rebuild and validate rollback state:
    - `scripts/workflow-lint.sh`
    - `scripts/workflow-test.sh`

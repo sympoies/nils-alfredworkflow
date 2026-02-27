@@ -45,6 +45,7 @@ args, and deterministic error behavior.
   - `storesearch` uses legacy `storesearch` JSON endpoint.
 
 Language behavior by backend:
+
 - `search-suggestions`: language is sent as locale context (not query param `l`).
 - `storesearch`: empty language omits query param `l`.
 
