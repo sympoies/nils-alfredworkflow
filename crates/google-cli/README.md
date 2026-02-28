@@ -2,12 +2,13 @@
 
 Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 3 status
+## Sprint 4 (lane g1) status
 
 - Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
 - Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
 - Gmail commands now execute through native Rust modules (`src/gmail/*`) with native account resolution reuse.
-- Drive remains wrapper-backed through `src/runtime.rs` until the native Drive sprint lands.
+- Drive `ls/search/get/upload` now execute through native Rust modules (`src/drive/*`).
+- Drive `download` remains wrapper-backed through `src/runtime.rs` until Sprint 4 lane g2 lands.
 
 ## Command scope to preserve
 

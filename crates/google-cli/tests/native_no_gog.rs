@@ -123,13 +123,66 @@ fn gmail_commands_run_without_gog_binary() {
 }
 
 #[test]
-fn drive_commands_still_require_gog_binary() {
+fn drive_ls_runs_without_gog_binary() {
+    let temp = tempdir().expect("tempdir");
+    seed_auth(temp.path());
+
+    let fixture_path = temp.path().join("drive-fixture.json");
+    std::fs::write(
+        &fixture_path,
+        serde_json::to_vec_pretty(&json!({
+            "files": [
+                {
+                    "id": "file-1",
+                    "name": "report.pdf",
+                    "mime_type": "application/pdf",
+                    "size_bytes": 2048,
+                    "parents": ["folder-1"]
+                }
+            ]
+        }))
+        .expect("serialize fixture"),
+    )
+    .expect("write fixture");
+
+    let missing = temp.path().join("missing-gog");
+
+    let output = run(
+        temp.path(),
+        &["--json", "drive", "ls", "--parent", "folder-1"],
+        &[
+            ("GOOGLE_CLI_GOG_BIN", missing.to_string_lossy().as_ref()),
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0));
+
+    let payload = json_output(&output);
+    assert_eq!(payload.get("ok").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        payload.get("command").and_then(Value::as_str),
+        Some("google.drive.ls")
+    );
+}
+
+#[test]
+fn drive_download_still_requires_gog_binary() {
     let temp = tempdir().expect("tempdir");
     let missing = temp.path().join("missing-gog");
 
     let output = run(
         temp.path(),
-        &["--json", "drive", "ls"],
+        &[
+            "--json",
+            "drive",
+            "download",
+            "file-123",
+            "--out",
+            "/tmp/out.bin",
+        ],
         &[("GOOGLE_CLI_GOG_BIN", missing.to_string_lossy().as_ref())],
     );
     assert_eq!(output.status.code(), Some(1));

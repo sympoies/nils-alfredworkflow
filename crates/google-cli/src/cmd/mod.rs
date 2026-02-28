@@ -29,7 +29,7 @@ pub enum Commands {
     Auth(auth::AuthArgs),
     /// Native Gmail commands.
     Gmail(gmail::GmailArgs),
-    /// Drive commands (wrapper-backed until native Drive sprint lands).
+    /// Native Drive commands.
     Drive(drive::DriveArgs),
 }
 

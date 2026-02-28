@@ -14,6 +14,9 @@ pub const ERROR_CODE_RUNTIME_AUTH_STATE_MISMATCH: &str = "NILS_GOOGLE_008";
 pub const ERROR_CODE_USER_GMAIL_INVALID_INPUT: &str = "NILS_GOOGLE_009";
 pub const ERROR_CODE_RUNTIME_GMAIL_NOT_FOUND: &str = "NILS_GOOGLE_010";
 pub const ERROR_CODE_RUNTIME_GMAIL_FAILED: &str = "NILS_GOOGLE_011";
+pub const ERROR_CODE_USER_DRIVE_INVALID_INPUT: &str = "NILS_GOOGLE_012";
+pub const ERROR_CODE_RUNTIME_DRIVE_NOT_FOUND: &str = "NILS_GOOGLE_013";
+pub const ERROR_CODE_RUNTIME_DRIVE_FAILED: &str = "NILS_GOOGLE_014";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
@@ -147,6 +150,34 @@ impl AppError {
             ERROR_CODE_RUNTIME_GMAIL_FAILED,
             message,
             Some(json!({ "kind": "gmail_runtime_failure" })),
+        )
+    }
+
+    pub fn invalid_drive_input(message: impl Into<String>) -> Self {
+        Self::user(
+            ERROR_CODE_USER_DRIVE_INVALID_INPUT,
+            message,
+            Some(json!({ "kind": "drive_invalid_input" })),
+        )
+    }
+
+    pub fn drive_not_found(entity: &str, id: &str) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_DRIVE_NOT_FOUND,
+            format!("{entity} `{id}` not found"),
+            Some(json!({
+                "kind": "drive_not_found",
+                "entity": entity,
+                "id": id,
+            })),
+        )
+    }
+
+    pub fn drive_failure(message: impl Into<String>) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_DRIVE_FAILED,
+            message,
+            Some(json!({ "kind": "drive_runtime_failure" })),
         )
     }
 

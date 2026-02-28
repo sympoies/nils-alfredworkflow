@@ -1,131 +1,166 @@
 mod common;
 
-use serde_json::Value;
+#[path = "common/native_drive.rs"]
+mod native_drive;
+
+use serde_json::{Value, json};
+use tempfile::tempdir;
 
 use common::TestHarness;
 
 #[test]
-fn drive_subcommands_forward_expected_paths_and_args() {
-    let cases: &[(&[&str], &[&str])] = &[
-        (
-            &[
-                "drive",
-                "ls",
-                "--parent",
-                "root",
-                "--query",
-                "mimeType='application/pdf'",
-            ],
-            &[
-                "drive",
-                "ls",
-                "--parent",
-                "root",
-                "--query",
-                "mimeType='application/pdf'",
-            ],
-        ),
-        (
-            &["drive", "search", "report", "--raw-query", "--max", "10"],
-            &["drive", "search", "report", "--raw-query", "--max", "10"],
-        ),
-        (&["drive", "get", "file-123"], &["drive", "get", "file-123"]),
-        (
-            &[
-                "drive",
-                "download",
-                "file-123",
-                "--out",
-                "/tmp/file.pdf",
-                "--format",
-                "pdf",
-            ],
-            &[
-                "drive",
-                "download",
-                "file-123",
-                "--out",
-                "/tmp/file.pdf",
-                "--format",
-                "pdf",
-            ],
-        ),
-        (
-            &[
-                "drive",
-                "upload",
-                "./report.pdf",
-                "--parent",
-                "folder-1",
-                "--name",
-                "report.pdf",
-            ],
-            &[
-                "drive",
-                "upload",
-                "./report.pdf",
-                "--parent",
-                "folder-1",
-                "--name",
-                "report.pdf",
-            ],
-        ),
-    ];
+fn drive_json_contract_covers_ls_search_get_and_upload() {
+    let temp = tempdir().expect("tempdir");
+    native_drive::seed_account(temp.path(), "me@example.com");
 
-    for (args, expected) in cases {
-        let harness = TestHarness::new();
-        let output = harness.run(args, &[("FAKE_GOG_STDOUT", "{}")]);
-        assert_eq!(output.status.code(), Some(0), "args: {args:?}");
-        assert_eq!(
-            harness.logged_args(),
-            expected
-                .iter()
-                .map(|value| value.to_string())
-                .collect::<Vec<_>>(),
-            "args: {args:?}"
-        );
-    }
+    let fixture_path = native_drive::write_fixture(
+        temp.path(),
+        &json!({
+            "files": [
+                {
+                    "id": "file-1",
+                    "name": "report.pdf",
+                    "mime_type": "application/pdf",
+                    "size_bytes": 2048,
+                    "parents": ["folder-1"]
+                }
+            ]
+        }),
+    );
+    let missing_gog = temp.path().join("missing-gog");
+
+    let ls = native_drive::run(
+        temp.path(),
+        &["--json", "drive", "ls", "--parent", "folder-1"],
+        &[
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(ls.status.code(), Some(0));
+    let ls_payload = native_drive::json(&ls);
+    assert_eq!(
+        ls_payload.get("command").and_then(Value::as_str),
+        Some("google.drive.ls")
+    );
+
+    let search = native_drive::run(
+        temp.path(),
+        &["--json", "drive", "search", "report"],
+        &[
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(search.status.code(), Some(0));
+
+    let get = native_drive::run(
+        temp.path(),
+        &["--json", "drive", "get", "file-1"],
+        &[
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(get.status.code(), Some(0));
+
+    let upload_source = temp.path().join("upload.txt");
+    std::fs::write(&upload_source, b"hello").expect("write upload source");
+
+    let upload = native_drive::run(
+        temp.path(),
+        &[
+            "--json",
+            "drive",
+            "upload",
+            upload_source.to_string_lossy().as_ref(),
+            "--name",
+            "upload.txt",
+        ],
+        &[
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(upload.status.code(), Some(0));
+    let upload_payload = native_drive::json(&upload);
+    assert_eq!(
+        upload_payload.get("command").and_then(Value::as_str),
+        Some("google.drive.upload")
+    );
 }
 
 #[test]
-fn drive_supports_plain_mode_passthrough() {
-    let harness = TestHarness::new();
-    let output = harness.run(
-        &["--plain", "drive", "ls", "--parent", "root"],
-        &[("FAKE_GOG_STDOUT", "id\tname\n123\treport.pdf\n")],
+fn drive_plain_contract_emits_human_text() {
+    let temp = tempdir().expect("tempdir");
+    native_drive::seed_account(temp.path(), "me@example.com");
+
+    let fixture_path = native_drive::write_fixture(
+        temp.path(),
+        &json!({
+            "files": [
+                {
+                    "id": "file-1",
+                    "name": "report.pdf",
+                    "mime_type": "application/pdf",
+                    "size_bytes": 2048,
+                    "parents": ["folder-1"]
+                }
+            ]
+        }),
+    );
+
+    let output = native_drive::run(
+        temp.path(),
+        &["--plain", "drive", "search", "report"],
+        &[(
+            "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+            fixture_path.to_string_lossy().as_ref(),
+        )],
     );
     assert_eq!(output.status.code(), Some(0));
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "id\tname\n123\treport.pdf\n"
-    );
-    assert_eq!(
-        harness.logged_args(),
-        vec!["--plain", "drive", "ls", "--parent", "root"]
-    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Found"));
 }
 
 #[test]
-fn drive_invalid_json_output_maps_to_runtime_error() {
+fn drive_download_still_forwards_to_wrapper_runtime_path() {
     let harness = TestHarness::new();
     let output = harness.run(
         &[
-            "--json",
             "drive",
             "download",
             "file-123",
             "--out",
             "/tmp/file.pdf",
+            "--format",
+            "pdf",
         ],
-        &[("FAKE_GOG_STDOUT", "{broken-json")],
+        &[("FAKE_GOG_STDOUT", "{}")],
     );
-    assert_eq!(output.status.code(), Some(1));
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
+    assert_eq!(output.status.code(), Some(0));
     assert_eq!(
-        json.get("error")
-            .and_then(|error| error.get("code"))
-            .and_then(Value::as_str),
-        Some("NILS_GOOGLE_004")
+        harness.logged_args(),
+        vec![
+            "drive",
+            "download",
+            "file-123",
+            "--out",
+            "/tmp/file.pdf",
+            "--format",
+            "pdf"
+        ]
     );
 }

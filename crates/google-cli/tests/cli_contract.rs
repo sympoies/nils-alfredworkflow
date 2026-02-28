@@ -56,7 +56,7 @@ fn missing_gog_returns_runtime_error_envelope() {
     let harness = TestHarness::new();
     let missing = harness.missing_gog_path();
     let output = harness.run(
-        &["--json", "drive", "ls"],
+        &["--json", "drive", "download", "file-id"],
         &[("GOOGLE_CLI_GOG_BIN", missing.as_str())],
     );
     assert_eq!(output.status.code(), Some(1));
@@ -64,7 +64,7 @@ fn missing_gog_returns_runtime_error_envelope() {
     let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
     assert_eq!(
         json.get("command").and_then(Value::as_str),
-        Some("google.drive.ls")
+        Some("google.drive.download")
     );
     assert_eq!(json.get("ok").and_then(Value::as_bool), Some(false));
     assert_eq!(
