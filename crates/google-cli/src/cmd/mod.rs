@@ -25,11 +25,11 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Commands {
-    /// gog auth wrapper commands.
+    /// Native auth commands.
     Auth(auth::AuthArgs),
-    /// gog gmail wrapper commands.
+    /// Native Gmail commands.
     Gmail(gmail::GmailArgs),
-    /// gog drive wrapper commands.
+    /// Drive commands (wrapper-backed until native Drive sprint lands).
     Drive(drive::DriveArgs),
 }
 

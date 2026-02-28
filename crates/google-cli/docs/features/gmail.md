@@ -12,12 +12,19 @@
 
 ## Native semantics
 
-- Primary transport uses generated Gmail client crates.
-- `reqwest` fallback is allowed for generated-client gaps.
+- Gmail command routing is native (`google.gmail.*`) and no longer shells out to `gog`.
+- Native account/default resolution is shared with auth semantics.
+- Response adapters map fixture/transport payloads into stable local JSON/plain output.
 - `gmail send` uses native MIME composition and attachment type inference.
 - Output/error envelopes stay native and repo-standard.
+- Thread label mutation supports add/remove semantics over thread-scoped messages.
 
 ## Validation
 
-- `rg -n "native|generated|fallback|gmail send" docs/reports/google-cli-native-capability-matrix.md`
-- `cargo run -p google-cli -- gmail --help`
+- `cargo test -p google-cli --test gmail_read`
+- `cargo test -p google-cli --test gmail_thread`
+- `cargo test -p google-cli --test gmail_send`
+- `cargo test -p google-cli --test gmail_cli_contract`
+- `cargo test -p google-cli --test account_resolution_shared`
+- `cargo run -p google-cli -- gmail search --help`
+- `cargo run -p google-cli -- gmail thread --help`

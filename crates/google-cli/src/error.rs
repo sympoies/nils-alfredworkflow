@@ -11,6 +11,9 @@ pub const ERROR_CODE_USER_AUTH_INVALID_INPUT: &str = "NILS_GOOGLE_005";
 pub const ERROR_CODE_USER_AUTH_AMBIGUOUS_ACCOUNT: &str = "NILS_GOOGLE_006";
 pub const ERROR_CODE_RUNTIME_AUTH_STORE_FAILED: &str = "NILS_GOOGLE_007";
 pub const ERROR_CODE_RUNTIME_AUTH_STATE_MISMATCH: &str = "NILS_GOOGLE_008";
+pub const ERROR_CODE_USER_GMAIL_INVALID_INPUT: &str = "NILS_GOOGLE_009";
+pub const ERROR_CODE_RUNTIME_GMAIL_NOT_FOUND: &str = "NILS_GOOGLE_010";
+pub const ERROR_CODE_RUNTIME_GMAIL_FAILED: &str = "NILS_GOOGLE_011";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
@@ -116,6 +119,34 @@ impl AppError {
                 "expected": expected,
                 "received": received,
             })),
+        )
+    }
+
+    pub fn invalid_gmail_input(message: impl Into<String>) -> Self {
+        Self::user(
+            ERROR_CODE_USER_GMAIL_INVALID_INPUT,
+            message,
+            Some(json!({ "kind": "gmail_invalid_input" })),
+        )
+    }
+
+    pub fn gmail_not_found(entity: &str, id: &str) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_GMAIL_NOT_FOUND,
+            format!("{entity} `{id}` not found"),
+            Some(json!({
+                "kind": "gmail_not_found",
+                "entity": entity,
+                "id": id,
+            })),
+        )
+    }
+
+    pub fn gmail_failure(message: impl Into<String>) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_GMAIL_FAILED,
+            message,
+            Some(json!({ "kind": "gmail_runtime_failure" })),
         )
     }
 

@@ -1,158 +1,222 @@
-mod common;
+#[path = "common/native_gmail.rs"]
+mod native_gmail;
 
-use serde_json::Value;
-
-use common::TestHarness;
-
-#[test]
-fn gmail_subcommands_forward_expected_paths_and_args() {
-    let cases: &[(&[&str], &[&str])] = &[
-        (
-            &["gmail", "search", "from:me", "--max", "10", "--page", "p1"],
-            &["gmail", "search", "from:me", "--max", "10", "--page", "p1"],
-        ),
-        (
-            &[
-                "gmail",
-                "get",
-                "msg-123",
-                "--format",
-                "metadata",
-                "--headers",
-                "Subject,From",
-            ],
-            &[
-                "gmail",
-                "get",
-                "msg-123",
-                "--format",
-                "metadata",
-                "--headers",
-                "Subject,From",
-            ],
-        ),
-        (
-            &[
-                "gmail",
-                "send",
-                "--to",
-                "team@example.com",
-                "--subject",
-                "Status",
-                "--body",
-                "Wrapped",
-            ],
-            &[
-                "gmail",
-                "send",
-                "--to",
-                "team@example.com",
-                "--subject",
-                "Status",
-                "--body",
-                "Wrapped",
-            ],
-        ),
-        (
-            &[
-                "gmail",
-                "thread",
-                "get",
-                "thread-123",
-                "--format",
-                "metadata",
-            ],
-            &[
-                "gmail",
-                "thread",
-                "get",
-                "thread-123",
-                "--format",
-                "metadata",
-            ],
-        ),
-    ];
-
-    for (args, expected) in cases {
-        let harness = TestHarness::new();
-        let output = harness.run(args, &[("FAKE_GOG_STDOUT", "{}")]);
-        assert_eq!(output.status.code(), Some(0), "args: {args:?}");
-        assert_eq!(
-            harness.logged_args(),
-            expected
-                .iter()
-                .map(|value| value.to_string())
-                .collect::<Vec<_>>(),
-            "args: {args:?}"
-        );
-    }
-}
+use serde_json::{Value, json};
+use tempfile::tempdir;
 
 #[test]
-fn gmail_search_supports_json_mode_and_global_flags() {
-    let harness = TestHarness::new();
-    let output = harness.run(
+fn gmail_json_contract_covers_search_get_thread_and_send() {
+    let temp = tempdir().expect("tempdir");
+    native_gmail::seed_account(temp.path(), "me@example.com");
+
+    let fixture_path = native_gmail::write_fixture(
+        temp.path(),
+        &json!({
+            "messages": [
+                {
+                    "id": "msg-1",
+                    "thread_id": "thread-1",
+                    "snippet": "status update",
+                    "label_ids": ["INBOX"],
+                    "headers": {
+                        "From": "team@example.com",
+                        "Subject": "Daily Status"
+                    },
+                    "body": "Daily status body"
+                }
+            ]
+        }),
+    );
+    let missing_gog = temp.path().join("missing-gog");
+
+    let search = native_gmail::run(
+        temp.path(),
         &[
-            "--account",
-            "me@example.com",
             "--json",
-            "--results-only",
             "gmail",
             "search",
-            "label:inbox",
+            "from:team@example.com",
             "--max",
-            "5",
+            "10",
+            "--format",
+            "metadata",
+            "--headers",
+            "Subject,From",
         ],
-        &[("FAKE_GOG_STDOUT", r#"{"threads":[]}"#)],
+        &[
+            (
+                "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
     );
-    assert_eq!(output.status.code(), Some(0));
-
+    assert_eq!(search.status.code(), Some(0));
+    let search_payload = native_gmail::json(&search);
     assert_eq!(
-        harness.logged_args(),
-        vec![
-            "--account",
-            "me@example.com",
-            "--json",
-            "--results-only",
-            "gmail",
-            "search",
-            "label:inbox",
-            "--max",
-            "5",
-        ]
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
-    assert_eq!(
-        json.get("command").and_then(Value::as_str),
+        search_payload.get("command").and_then(Value::as_str),
         Some("google.gmail.search")
     );
-}
+    assert_eq!(
+        search_payload
+            .get("result")
+            .and_then(|result| result.get("count"))
+            .and_then(Value::as_u64),
+        Some(1)
+    );
 
-#[test]
-fn gmail_process_failure_maps_to_runtime_error() {
-    let harness = TestHarness::new();
-    let output = harness.run(
+    let get = native_gmail::run(
+        temp.path(),
+        &["--json", "gmail", "get", "msg-1", "--format", "full"],
+        &[
+            (
+                "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(get.status.code(), Some(0));
+    let get_payload = native_gmail::json(&get);
+    assert_eq!(
+        get_payload
+            .get("result")
+            .and_then(|result| result.get("message"))
+            .and_then(|message| message.get("id"))
+            .and_then(Value::as_str),
+        Some("msg-1")
+    );
+
+    let thread_get = native_gmail::run(
+        temp.path(),
+        &[
+            "--json",
+            "gmail",
+            "thread",
+            "get",
+            "thread-1",
+            "--format",
+            "metadata",
+            "--headers",
+            "Subject",
+        ],
+        &[
+            (
+                "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(thread_get.status.code(), Some(0));
+
+    let send = native_gmail::run(
+        temp.path(),
         &[
             "--json",
             "gmail",
             "send",
             "--to",
-            "me@example.com",
+            "team@example.com",
             "--subject",
-            "S",
+            "Status",
             "--body",
-            "B",
+            "Native body",
+            "--thread-id",
+            "thread-1",
         ],
-        &[("FAKE_GOG_EXIT_CODE", "9"), ("FAKE_GOG_STDERR", "boom")],
+        &[
+            (
+                "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
+    );
+    assert_eq!(send.status.code(), Some(0));
+    let send_payload = native_gmail::json(&send);
+    assert_eq!(
+        send_payload.get("command").and_then(Value::as_str),
+        Some("google.gmail.send")
+    );
+    assert!(
+        send_payload
+            .get("result")
+            .and_then(|result| result.get("message"))
+            .and_then(|message| message.get("mime_bytes"))
+            .and_then(Value::as_u64)
+            .unwrap_or_default()
+            > 0
+    );
+}
+
+#[test]
+fn gmail_plain_contract_emits_human_text() {
+    let temp = tempdir().expect("tempdir");
+    native_gmail::seed_account(temp.path(), "me@example.com");
+
+    let fixture_path = native_gmail::write_fixture(
+        temp.path(),
+        &json!({
+            "messages": [
+                {
+                    "id": "msg-1",
+                    "thread_id": "thread-1",
+                    "snippet": "status update",
+                    "label_ids": ["INBOX"],
+                    "headers": {
+                        "From": "team@example.com",
+                        "Subject": "Daily Status"
+                    },
+                    "body": "Daily status body"
+                }
+            ]
+        }),
+    );
+
+    let output = native_gmail::run(
+        temp.path(),
+        &[
+            "--plain",
+            "gmail",
+            "search",
+            "from:team@example.com",
+            "--max",
+            "5",
+        ],
+        &[(
+            "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+            fixture_path.to_string_lossy().as_ref(),
+        )],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Found"));
+}
+
+#[test]
+fn gmail_get_missing_message_maps_to_not_found_error() {
+    let temp = tempdir().expect("tempdir");
+    native_gmail::seed_account(temp.path(), "me@example.com");
+
+    let fixture_path = native_gmail::write_fixture(temp.path(), &json!({ "messages": [] }));
+
+    let output = native_gmail::run(
+        temp.path(),
+        &["--json", "gmail", "get", "missing-message"],
+        &[(
+            "GOOGLE_CLI_GMAIL_FIXTURE_PATH",
+            fixture_path.to_string_lossy().as_ref(),
+        )],
     );
     assert_eq!(output.status.code(), Some(1));
 
-    let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
+    let payload = native_gmail::json(&output);
     assert_eq!(
-        json.get("error")
+        payload
+            .get("error")
             .and_then(|error| error.get("code"))
             .and_then(Value::as_str),
-        Some("NILS_GOOGLE_003")
+        Some("NILS_GOOGLE_010")
     );
 }

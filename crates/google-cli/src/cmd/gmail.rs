@@ -20,7 +20,7 @@ enum GmailCommand {
     Get(TargetArgs),
     /// Send an email.
     Send(ExtraArgs),
-    /// Thread operations delegated to gog.
+    /// Thread operations.
     #[command(alias = "threads")]
     Thread(NestedArgs),
 }

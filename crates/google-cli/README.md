@@ -2,11 +2,12 @@
 
 Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 2 status
+## Sprint 3 status
 
 - Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
 - Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
-- Gmail and Drive remain wrapper-backed through `src/runtime.rs` until their native sprints land.
+- Gmail commands now execute through native Rust modules (`src/gmail/*`) with native account resolution reuse.
+- Drive remains wrapper-backed through `src/runtime.rs` until the native Drive sprint lands.
 
 ## Command scope to preserve
 
@@ -43,10 +44,11 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 
 ## Environment variables
 
-- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands (`gmail`/`drive`) during migration.
+- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands (`drive`) during migration.
 - `GOOGLE_CLI_CONFIG_DIR`: override native auth config directory.
 - `GOOGLE_CLI_KEYRING_MODE`: auth storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
 - `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable automatic browser launch for loopback auth.
+- `GOOGLE_CLI_GMAIL_FIXTURE_PATH`: optional fixture JSON path for local/native Gmail integration testing.
 
 ## Output contract
 
@@ -59,6 +61,11 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 - `cargo test -p google-cli --test auth_oauth_flow`
 - `cargo test -p google-cli --test auth_account_resolution`
 - `cargo test -p google-cli --test auth_cli_contract`
+- `cargo test -p google-cli --test gmail_read`
+- `cargo test -p google-cli --test gmail_thread`
+- `cargo test -p google-cli --test gmail_send`
+- `cargo test -p google-cli --test gmail_cli_contract`
+- `cargo test -p google-cli --test account_resolution_shared`
 - `cargo test -p google-cli --test native_no_gog`
 
 ## Manual smoke checklist (auth)
@@ -72,6 +79,14 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
    `cargo run -p google-cli -- auth add <email> --remote --step 1`
 7. Optional remote flow step 2:
    `cargo run -p google-cli -- auth add <email> --remote --step 2 --state <state> --code <code>`
+
+## Manual smoke checklist (gmail)
+
+1. `cargo run -p google-cli -- gmail search "from:team@example.com" --max 5 --format metadata --headers Subject,From`
+2. `cargo run -p google-cli -- gmail get <messageId> --format full`
+3. `cargo run -p google-cli -- gmail thread get <threadId> --format metadata --headers Subject`
+4. `cargo run -p google-cli -- gmail thread modify <threadId> --add-label STARRED --remove-label UNREAD`
+5. `cargo run -p google-cli -- gmail send --to team@example.com --subject "Sprint Update" --body "Native Gmail path"`
 
 ## Documentation
 

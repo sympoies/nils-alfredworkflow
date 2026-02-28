@@ -30,7 +30,7 @@ impl Runtime {
         global: &GlobalOptions,
         invocation: &Invocation,
     ) -> Result<ProcessOutput, AppError> {
-        // Sprint 1 keeps the legacy wrapper runtime in place behind a dedicated module boundary.
+        // Wrapper runtime remains for commands that are not yet migrated (for now: Drive).
         let mut command = Command::new(&self.program);
         command.args(global.gog_flags()?);
         command.args(invocation.path.clone());

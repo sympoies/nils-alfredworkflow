@@ -23,22 +23,22 @@ pub fn run(cli: Cli) -> Result<RenderedOutput, AppError> {
 pub fn run_request(request: &Request) -> Result<RenderedOutput, AppError> {
     if request.invocation.command_id.starts_with("google.auth.") {
         let native = auth::execute_native(&request.global, &request.invocation)?;
-        return Ok(match request.global.output_mode_hint() {
-            OutputMode::Json => RenderedOutput {
-                stdout: json!({
-                    "schema_version": ENVELOPE_SCHEMA_VERSION,
-                    "command": request.invocation.command_id,
-                    "ok": true,
-                    "result": native.payload,
-                })
-                .to_string(),
-                stderr: String::new(),
-            },
-            OutputMode::Human | OutputMode::Plain => RenderedOutput {
-                stdout: format!("{}\n", native.text),
-                stderr: String::new(),
-            },
-        });
+        return Ok(render_native_response(
+            request.invocation.command_id.as_str(),
+            request.global.output_mode_hint(),
+            native.payload,
+            native.text,
+        ));
+    }
+
+    if request.invocation.command_id.starts_with("google.gmail.") {
+        let native = gmail::execute_native(&request.global, &request.invocation)?;
+        return Ok(render_native_response(
+            request.invocation.command_id.as_str(),
+            request.global.output_mode_hint(),
+            native.payload,
+            native.text,
+        ));
     }
 
     let runtime = Runtime::from_global(&request.global)?;
@@ -52,6 +52,30 @@ pub fn run_request(request: &Request) -> Result<RenderedOutput, AppError> {
 
 pub fn render_failure(cli: &Cli, error: &AppError) -> RenderedOutput {
     render_error(cli.command_id_hint(), cli.output_mode_hint(), error)
+}
+
+fn render_native_response(
+    command_id: &str,
+    mode: OutputMode,
+    payload: serde_json::Value,
+    text: String,
+) -> RenderedOutput {
+    match mode {
+        OutputMode::Json => RenderedOutput {
+            stdout: json!({
+                "schema_version": ENVELOPE_SCHEMA_VERSION,
+                "command": command_id,
+                "ok": true,
+                "result": payload,
+            })
+            .to_string(),
+            stderr: String::new(),
+        },
+        OutputMode::Human | OutputMode::Plain => RenderedOutput {
+            stdout: format!("{text}\n"),
+            stderr: String::new(),
+        },
+    }
 }
 
 #[cfg(test)]
