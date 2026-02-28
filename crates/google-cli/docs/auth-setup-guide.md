@@ -21,7 +21,7 @@ Notes:
 If you already have `client_id` and `client_secret`:
 
 ```bash
-cargo run -p google-cli -- auth credentials set \
+cargo run -p nils-google-cli -- auth credentials set \
   --client-id "<client_id>" \
   --client-secret "<client_secret>"
 ```
@@ -36,7 +36,7 @@ AUTH_URI=$(jq -r '.installed.auth_uri' "$CONFIG_JSON")
 TOKEN_URI=$(jq -r '.installed.token_uri' "$CONFIG_JSON")
 REDIRECT_URI=$(jq -r '.installed.redirect_uris[0]' "$CONFIG_JSON")
 
-cargo run -p google-cli -- auth credentials set \
+cargo run -p nils-google-cli -- auth credentials set \
   --client-id "$CID" \
   --client-secret "$CSECRET" \
   --auth-uri "$AUTH_URI" \
@@ -47,7 +47,7 @@ cargo run -p google-cli -- auth credentials set \
 Verify:
 
 ```bash
-cargo run -p google-cli -- --json auth credentials list
+cargo run -p nils-google-cli -- --json auth credentials list
 ```
 
 ## 2. Login account using remote flow (recommended)
@@ -55,7 +55,7 @@ cargo run -p google-cli -- --json auth credentials list
 ### Step 2.1: Generate auth URL
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com --remote --step 1
+cargo run -p nils-google-cli -- --json auth add you@example.com --remote --step 1
 ```
 
 Copy from JSON:
@@ -76,7 +76,7 @@ http://localhost/?state=state-xxxx&code=4/0A...
 Run:
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com \
+cargo run -p nils-google-cli -- --json auth add you@example.com \
   --remote --step 2 \
   --state "state-xxxx" \
   --code "4/0A..."
@@ -85,8 +85,8 @@ cargo run -p google-cli -- --json auth add you@example.com \
 ## 3. Verify account and token state
 
 ```bash
-cargo run -p google-cli -- --json auth list
-cargo run -p google-cli -- --json auth status -a you@example.com
+cargo run -p nils-google-cli -- --json auth list
+cargo run -p nils-google-cli -- --json auth status -a you@example.com
 ```
 
 Expected:
@@ -99,15 +99,15 @@ Expected:
 Repeat remote flow for each account:
 
 ```bash
-cargo run -p google-cli -- --json auth add another@example.com --remote --step 1
+cargo run -p nils-google-cli -- --json auth add another@example.com --remote --step 1
 # browser consent
-cargo run -p google-cli -- --json auth add another@example.com --remote --step 2 --state "<state>" --code "<code>"
+cargo run -p nils-google-cli -- --json auth add another@example.com --remote --step 2 --state "<state>" --code "<code>"
 ```
 
 Check final list:
 
 ```bash
-cargo run -p google-cli -- --json auth list
+cargo run -p nils-google-cli -- --json auth list
 ```
 
 ## 5. Set and use aliases
@@ -115,20 +115,20 @@ cargo run -p google-cli -- --json auth list
 Create alias:
 
 ```bash
-cargo run -p google-cli -- --json auth alias set work terry@sympoies.com
+cargo run -p nils-google-cli -- --json auth alias set work terry@sympoies.com
 ```
 
 List aliases:
 
 ```bash
-cargo run -p google-cli -- --json auth alias list
+cargo run -p nils-google-cli -- --json auth alias list
 ```
 
 Use alias in Gmail/Drive commands:
 
 ```bash
-cargo run -p google-cli -- --json -a work gmail search --query "in:inbox" --max 3
-cargo run -p google-cli -- --json -a work drive ls --max 5
+cargo run -p nils-google-cli -- --json -a work gmail search --query "in:inbox" --max 3
+cargo run -p nils-google-cli -- --json -a work drive ls --max 5
 ```
 
 ## 6. Re-login or rotate token
@@ -136,15 +136,15 @@ cargo run -p google-cli -- --json -a work drive ls --max 5
 Re-login existing account (safe overwrite):
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com --remote --step 1
+cargo run -p nils-google-cli -- --json auth add you@example.com --remote --step 1
 # browser consent
-cargo run -p google-cli -- --json auth add you@example.com --remote --step 2 --state "<state>" --code "<code>"
+cargo run -p nils-google-cli -- --json auth add you@example.com --remote --step 2 --state "<state>" --code "<code>"
 ```
 
 Remove account:
 
 ```bash
-cargo run -p google-cli -- --json auth remove you@example.com
+cargo run -p nils-google-cli -- --json auth remove you@example.com
 ```
 
 ## 7. Troubleshooting

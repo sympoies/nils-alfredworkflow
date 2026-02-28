@@ -9,8 +9,8 @@ compile-only probe.
 
 | Crate | Exact pin | Role | Decision notes |
 | --- | --- | --- | --- |
-| `google-gmail1` | `=7.0.0+20251215` | Generated Gmail API client | Selected as the primary Gmail surface. |
-| `google-drive3` | `=7.0.0+20251218` | Generated Drive API client | Selected as the primary Drive surface. |
+| `google-gmail1` | manifest `=7.0.0`; lockfile `7.0.0+20251215` | Generated Gmail API client | Selected as the primary Gmail surface. Cargo ignores build metadata in version requirements, so the dated variant is locked via `Cargo.lock`. |
+| `google-drive3` | manifest `=7.0.0`; lockfile `7.0.0+20251218` | Generated Drive API client | Selected as the primary Drive surface. Cargo ignores build metadata in version requirements, so the dated variant is locked via `Cargo.lock`. |
 | `google-apis-common` | `=8.0.0` | Shared auth/http glue used by generated clients | Selected to align with generated client internals. |
 | `yup-oauth2` | `=12.1.2` | OAuth installed/manual exchange support | Selected for loopback/manual/remote auth modes. |
 | `keyring` | `=3.6.2` | Token persistence in system keychain | Selected; stable line avoids 4.x release-candidate risk. |
@@ -45,7 +45,7 @@ compile-only probe.
 - Rollback target: last wrapper-era release tag before native completion (`v1.1.9`) for emergency restore.
 - Rollback method: revert `crates/google-cli` to wrapper-era runtime files, restore wrapper-era docs/specs, and remove
   native-only modules/reports in one revert change set.
-- Rollback verification: run `cargo test -p google-cli`, `scripts/workflow-lint.sh`, and `scripts/workflow-test.sh`
+- Rollback verification: run `cargo test -p nils-google-cli`, `scripts/workflow-lint.sh`, and `scripts/workflow-test.sh`
   after the revert to confirm release readiness.
 
 ## Compile probe intent

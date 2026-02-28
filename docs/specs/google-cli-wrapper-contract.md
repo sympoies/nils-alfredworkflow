@@ -3,6 +3,8 @@
 ## Wrapper boundary
 
 - Crate: `crates/google-cli`
+- Package: `nils-google-cli`
+- Binary: `google-cli`
 - Role: `gog` wrapper focused on `auth`, `gmail`, and `drive`
 - Scope in this phase:
   - `auth`: `credentials`, `add`, `list`, `status`, `remove`, `alias`, `manage`

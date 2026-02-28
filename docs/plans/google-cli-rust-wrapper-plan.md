@@ -38,7 +38,7 @@ sprints.
 - OverlapHotspots: `docs/specs/google-cli-wrapper-contract.md` and `crates/google-cli/tests/common/mod.rs` are reused
   across multiple tasks; keep sequencing strict to avoid churn.
 **Demo/Validation**:
-- Command(s): `plan-tooling validate --file docs/plans/google-cli-rust-wrapper-plan.md`, `cargo check -p google-cli`
+- Command(s): `plan-tooling validate --file docs/plans/google-cli-rust-wrapper-plan.md`, `cargo check -p nils-google-cli`
 - Verify: crate compiles with architecture modules in place and documented command/runtime contracts.
 
 ### Task 1.1: Publish Wrapper Command And Runtime Contract
@@ -80,8 +80,8 @@ sprints.
   - Command router skeleton and empty auth/gmail/drive module stubs are present with compile-only wiring (no feature
     behavior).
 - **Validation**:
-  - `cargo check -p google-cli`
-  - `cargo run -p google-cli -- --help | rg -n "auth|gmail|drive"`
+  - `cargo check -p nils-google-cli`
+  - `cargo run -p nils-google-cli -- --help | rg -n "auth|gmail|drive"`
   - `test -f crates/google-cli/src/cmd/auth.rs && test -f crates/google-cli/src/cmd/gmail.rs && test -f crates/google-cli/src/cmd/drive.rs`
 
 ### Task 1.3: Build Shared Wrapper Runtime Layer
@@ -101,15 +101,15 @@ sprints.
   - Shared command builder supports global pass-through flags and command-specific arguments.
   - Output decoding utilities support JSON mode and plain-text mode handling paths.
 - **Validation**:
-  - `cargo test -p google-cli --lib`
+  - `cargo test -p nils-google-cli --lib`
 
 ### Task 1.4: Create Baseline Docs And Test Harness Skeleton
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/src/auth/README.md`
-  - `crates/google-cli/src/gmail/README.md`
-  - `crates/google-cli/src/drive/README.md`
+  - `crates/google-cli/docs/auth.md`
+  - `crates/google-cli/docs/gmail.md`
+  - `crates/google-cli/docs/drive.md`
   - `crates/google-cli/tests/common/mod.rs`
   - `crates/google-cli/tests/cli_contract.rs`
 - **Description**: Establish baseline crate docs and reusable test harness utilities for feature sprints.
@@ -121,9 +121,9 @@ sprints.
   - Feature doc files exist as stubs with command/validation headings and complete prose sections.
   - Test harness provides reusable process fixture helpers for wrapped `gog` execution tests.
 - **Validation**:
-  - `cargo test -p google-cli --test cli_contract -- --nocapture`
+  - `cargo test -p nils-google-cli --test cli_contract -- --nocapture`
   - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/README.md`
-  - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/src/auth/README.md crates/google-cli/src/gmail/README.md crates/google-cli/src/drive/README.md`
+  - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/docs/auth.md crates/google-cli/docs/gmail.md crates/google-cli/docs/drive.md`
 
 ## Sprint 2: Auth Feature Implementation
 
@@ -139,13 +139,13 @@ sprints.
 - MaxBatchWidth: 2
 - OverlapHotspots: `crates/google-cli/src/cmd/auth.rs` and crate README auth sections are tightly coupled.
 **Demo/Validation**:
-- Command(s): `cargo test -p google-cli --test auth_cli_contract`, `cargo run -p google-cli -- auth --help`
+- Command(s): `cargo test -p nils-google-cli --test auth_cli_contract`, `cargo run -p nils-google-cli -- auth --help`
 - Verify: auth wrapper commands execute expected `gog auth ...` calls and docs/tests are complete.
 
 ### Task 2.1: Lock Auth Command Surface And Usage Contract
 
 - **Location**:
-  - `crates/google-cli/src/auth/README.md`
+  - `crates/google-cli/docs/auth.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Finalize auth subcommand scope and option policy for this phase (`credentials`, `add`, `list`,
   `status`, `remove`, `alias`, `manage`).
@@ -157,7 +157,7 @@ sprints.
   - Contract defines pass-through expectations for account/client/manual/remote auth options.
   - Validation and error behavior for auth command failures is documented.
 - **Validation**:
-  - `rg -n "credentials|add|list|status|remove|alias|manage|pass-through" crates/google-cli/src/auth/README.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "credentials|add|list|status|remove|alias|manage|pass-through" crates/google-cli/docs/auth.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 2.2: Implement Auth Wrapper Commands
 
@@ -175,8 +175,8 @@ sprints.
   - Wrapper forwards command arguments and global flags without mutation bugs.
   - Runtime/process errors map to stable wrapper exit/error contract.
 - **Validation**:
-  - `cargo test -p google-cli --lib`
-  - `cargo run -p google-cli -- auth list --help`
+  - `cargo test -p nils-google-cli --lib`
+  - `cargo run -p nils-google-cli -- auth list --help`
 
 ### Task 2.3: Add Auth Contract Tests
 
@@ -193,13 +193,13 @@ sprints.
   - Tests verify process failure and malformed output handling.
   - Fixture strategy keeps tests deterministic without requiring real Google auth.
 - **Validation**:
-  - `cargo test -p google-cli --test auth_cli_contract`
+  - `cargo test -p nils-google-cli --test auth_cli_contract`
 
 ### Task 2.4: Finalize Auth README/Docs Section
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/src/auth/README.md`
+  - `crates/google-cli/docs/auth.md`
 - **Description**: Publish auth usage examples, environment/flag notes, and validation commands in crate docs.
 - **Dependencies**:
   - Task 2.2
@@ -209,7 +209,7 @@ sprints.
   - Feature doc includes troubleshooting and expected error signatures.
   - Validation commands in docs match executable test/help commands.
 - **Validation**:
-  - `rg -n "## Auth|auth add|auth list|auth status|validation" crates/google-cli/README.md crates/google-cli/src/auth/README.md`
+  - `rg -n "## Auth|auth add|auth list|auth status|validation" crates/google-cli/README.md crates/google-cli/docs/auth.md`
 
 ## Sprint 3: Gmail Feature Implementation
 
@@ -226,13 +226,13 @@ sprints.
 - OverlapHotspots: `crates/google-cli/src/cmd/gmail.rs` and test fixtures must evolve together to keep command
   assertions stable.
 **Demo/Validation**:
-- Command(s): `cargo test -p google-cli --test gmail_cli_contract`, `cargo run -p google-cli -- gmail --help`
+- Command(s): `cargo test -p nils-google-cli --test gmail_cli_contract`, `cargo run -p nils-google-cli -- gmail --help`
 - Verify: wrapper supports scoped Gmail subcommands with deterministic forwarding/docs/tests.
 
 ### Task 3.1: Lock Gmail Command Contract For Wrapper Scope
 
 - **Location**:
-  - `crates/google-cli/src/gmail/README.md`
+  - `crates/google-cli/docs/gmail.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Define scoped Gmail subcommands and option policy for the wrapper phase (query/list/get/send-focused
   command set).
@@ -244,7 +244,7 @@ sprints.
   - Contract includes required account/client/pass-through handling for Gmail commands.
   - Output mode expectations (`--json`/`--plain`) are documented.
 - **Validation**:
-  - `rg -n "gmail|search|thread|get|send|json|plain|pass-through" crates/google-cli/src/gmail/README.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "gmail|search|thread|get|send|json|plain|pass-through" crates/google-cli/docs/gmail.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 3.2: Implement Gmail Wrapper Commands
 
@@ -261,8 +261,8 @@ sprints.
   - Shared runtime is used consistently (no command-local process spawning duplication).
   - Error mapping for non-zero `gog` exits is deterministic and testable.
 - **Validation**:
-  - `cargo test -p google-cli --lib`
-  - `cargo run -p google-cli -- gmail search --help`
+  - `cargo test -p nils-google-cli --lib`
+  - `cargo run -p nils-google-cli -- gmail search --help`
 
 ### Task 3.3: Add Gmail Contract Tests
 
@@ -279,13 +279,13 @@ sprints.
   - Tests verify forwarding of representative Gmail query/send flags.
   - Tests remain deterministic without live Gmail API dependency.
 - **Validation**:
-  - `cargo test -p google-cli --test gmail_cli_contract`
+  - `cargo test -p nils-google-cli --test gmail_cli_contract`
 
 ### Task 3.4: Finalize Gmail README/Docs Section
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/src/gmail/README.md`
+  - `crates/google-cli/docs/gmail.md`
 - **Description**: Document Gmail wrapper usage, examples, limitations, and test/validation commands.
 - **Dependencies**:
   - Task 3.2
@@ -295,7 +295,7 @@ sprints.
   - Feature doc contains troubleshooting guidance for wrapper/runtime failures.
   - Doc commands are consistent with tested command surface.
 - **Validation**:
-  - `rg -n "## Gmail|gmail search|gmail get|gmail send|validation" crates/google-cli/README.md crates/google-cli/src/gmail/README.md`
+  - `rg -n "## Gmail|gmail search|gmail get|gmail send|validation" crates/google-cli/README.md crates/google-cli/docs/gmail.md`
 
 ## Sprint 4: Drive Feature Implementation
 
@@ -311,13 +311,13 @@ sprints.
 - MaxBatchWidth: 2
 - OverlapHotspots: `crates/google-cli/src/cmd/drive.rs` and docs command tables must stay synchronized.
 **Demo/Validation**:
-- Command(s): `cargo test -p google-cli --test drive_cli_contract`, `cargo run -p google-cli -- drive --help`
+- Command(s): `cargo test -p nils-google-cli --test drive_cli_contract`, `cargo run -p nils-google-cli -- drive --help`
 - Verify: wrapper supports scoped Drive subcommands with complete docs/tests.
 
 ### Task 4.1: Lock Drive Command Contract For Wrapper Scope
 
 - **Location**:
-  - `crates/google-cli/src/drive/README.md`
+  - `crates/google-cli/docs/drive.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Define scoped Drive subcommands and option policy for wrapper phase (`ls/search/get/download/upload`
   focused command set).
@@ -329,7 +329,7 @@ sprints.
   - Contract defines forwarding behavior for path/id/query arguments and global flags.
   - Output handling expectations are documented for JSON/plain modes.
 - **Validation**:
-  - `rg -n "drive|ls|search|get|download|upload|json|plain|pass-through" crates/google-cli/src/drive/README.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "drive|ls|search|get|download|upload|json|plain|pass-through" crates/google-cli/docs/drive.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 4.2: Implement Drive Wrapper Commands
 
@@ -346,8 +346,8 @@ sprints.
   - Shared runtime + error mapping patterns match auth/gmail implementation.
   - No feature-specific process layer duplication outside shared runtime.
 - **Validation**:
-  - `cargo test -p google-cli --lib`
-  - `cargo run -p google-cli -- drive ls --help`
+  - `cargo test -p nils-google-cli --lib`
+  - `cargo run -p nils-google-cli -- drive ls --help`
 
 ### Task 4.3: Add Drive Contract Tests
 
@@ -364,13 +364,13 @@ sprints.
   - Tests verify forwarding of representative Drive options (`--parent`, `--query`, `--out`).
   - Tests run deterministically without live Google Drive API.
 - **Validation**:
-  - `cargo test -p google-cli --test drive_cli_contract`
+  - `cargo test -p nils-google-cli --test drive_cli_contract`
 
 ### Task 4.4: Finalize Drive README/Docs Section
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/src/drive/README.md`
+  - `crates/google-cli/docs/drive.md`
 - **Description**: Document Drive wrapper command usage, examples, and troubleshooting.
 - **Dependencies**:
   - Task 4.2
@@ -380,7 +380,7 @@ sprints.
   - Feature doc includes failure-mode and remediation notes for wrapper/runtime errors.
   - Validation/test command references are present and accurate.
 - **Validation**:
-  - `rg -n "## Drive|drive ls|drive search|drive download|validation" crates/google-cli/README.md crates/google-cli/src/drive/README.md`
+  - `rg -n "## Drive|drive ls|drive search|drive download|validation" crates/google-cli/README.md crates/google-cli/docs/drive.md`
 
 ## Sprint 5: Final Integration, Full Test Gates, And Root Documentation
 
@@ -397,9 +397,9 @@ documentation.
 - MaxBatchWidth: 1
 - OverlapHotspots: root README/docs updates and final test evidence can drift if command surface changes late.
 **Demo/Validation**:
-- Command(s): `cargo test -p google-cli`,
-  `cargo test -p google-cli --test cli_contract --test auth_cli_contract --test gmail_cli_contract --test drive_cli_contract`,
-  `cargo run -p google-cli -- --help`,
+- Command(s): `cargo test -p nils-google-cli`,
+  `cargo test -p nils-google-cli --test cli_contract --test auth_cli_contract --test gmail_cli_contract --test drive_cli_contract`,
+  `cargo run -p nils-google-cli -- --help`,
   `plan-tooling validate --file docs/plans/google-cli-rust-wrapper-plan.md`
 - Verify: all scoped CLI contracts pass and repository-level docs describe wrapper usage/status accurately.
 
@@ -418,10 +418,10 @@ documentation.
   - Help output and error messages follow one shared UX contract.
   - No feature-specific divergence in shared runtime invocation path.
 - **Validation**:
-  - `cargo run -p google-cli -- --help`
-  - `cargo run -p google-cli -- auth --help`
-  - `cargo run -p google-cli -- gmail --help`
-  - `cargo run -p google-cli -- drive --help`
+  - `cargo run -p nils-google-cli -- --help`
+  - `cargo run -p nils-google-cli -- auth --help`
+  - `cargo run -p nils-google-cli -- gmail --help`
+  - `cargo run -p nils-google-cli -- drive --help`
 
 ### Task 5.2: Execute Full CLI Contract Test Matrix
 
@@ -439,7 +439,7 @@ documentation.
   - Cross-feature shared runtime/error behavior is explicitly asserted in tests.
   - Test matrix documents required fixture assumptions (`fake_gog`, env overrides).
 - **Validation**:
-  - `cargo test -p google-cli`
+  - `cargo test -p nils-google-cli`
 
 ### Task 5.3: Update Root-Level README And Architecture Docs
 
@@ -480,7 +480,7 @@ documentation.
   `crates/google-cli/src/**`.
 - Integration: feature contract tests in `crates/google-cli/tests/*_cli_contract.rs` with deterministic `fake_gog`
   fixtures.
-- End-to-end crate gate: `cargo test -p google-cli` covering auth/gmail/drive and shared behavior.
+- End-to-end crate gate: `cargo test -p nils-google-cli` covering auth/gmail/drive and shared behavior.
 - Documentation verification: grep-based checks for command examples, validation commands, and known-limitation sections.
 
 ## Risks & gotchas

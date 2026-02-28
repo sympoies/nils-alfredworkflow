@@ -684,28 +684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "google-cli"
-version = "1.1.9"
-dependencies = [
- "base64",
- "clap",
- "directories",
- "google-apis-common",
- "google-drive3",
- "google-gmail1",
- "keyring",
- "mail-builder",
- "mime_guess",
- "open",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "wiremock",
- "yup-oauth2",
-]
-
-[[package]]
 name = "google-drive3"
 version = "7.0.0+20251218"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1352,6 +1330,28 @@ dependencies = [
  "nils-alfred-core",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "nils-google-cli"
+version = "1.1.9"
+dependencies = [
+ "base64",
+ "clap",
+ "directories",
+ "google-apis-common",
+ "google-drive3",
+ "google-gmail1",
+ "keyring",
+ "mail-builder",
+ "mime_guess",
+ "open",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "wiremock",
+ "yup-oauth2",
 ]
 
 [[package]]

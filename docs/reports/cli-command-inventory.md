@@ -35,7 +35,7 @@
 
 ## Scoped native crate
 
-- `google-cli` / `google-cli`
+- `nils-google-cli` / `google-cli`
   - Commands: `auth <...>`, `gmail <...>`, `drive <...>`
   - Key options: `--account`, `--json`, `--plain`, plus command-local native flags
   - Current output mode: native human/plain output; explicit JSON envelope mode

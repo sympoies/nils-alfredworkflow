@@ -1,14 +1,16 @@
-# google-cli
+# nils-google-cli
 
-Native Rust CLI for scoped Google `auth`, `gmail`, and `drive` commands.
+Native Rust package for the `google-cli` binary, scoped to Google `auth`, `gmail`, and `drive` commands.
 
-## Overview
+## Commands
 
-- Runs auth, Gmail, and Drive commands with native Rust implementations.
-- Uses real OAuth token exchange/refresh for API calls.
-- Keeps deterministic local test paths via explicit fixture/test env switches.
+| Command | Description |
+| --- | --- |
+| `google-cli auth <...>` | Manage OAuth credentials, account login, aliases, and account status. |
+| `google-cli gmail <...>` | Search, inspect, and send Gmail messages through the native Gmail API client. |
+| `google-cli drive <...>` | List, inspect, download, and upload Drive files through the native Drive API client. |
 
-## Quick start
+## Quick Start
 
 Set runtime environment:
 
@@ -20,7 +22,7 @@ export GOOGLE_CLI_KEYRING_MODE=file
 Set OAuth credentials:
 
 ```bash
-cargo run -p google-cli -- auth credentials set \
+cargo run -p nils-google-cli -- auth credentials set \
   --client-id "<client_id>" \
   --client-secret "<client_secret>"
 ```
@@ -28,9 +30,9 @@ cargo run -p google-cli -- auth credentials set \
 Login account (remote flow):
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com --remote --step 1
+cargo run -p nils-google-cli -- --json auth add you@example.com --remote --step 1
 # Open result.authorization_url, then run step 2:
-cargo run -p google-cli -- --json auth add you@example.com \
+cargo run -p nils-google-cli -- --json auth add you@example.com \
   --remote --step 2 \
   --state "<state>" \
   --code "<code>"
@@ -39,26 +41,18 @@ cargo run -p google-cli -- --json auth add you@example.com \
 Validate account status:
 
 ```bash
-cargo run -p google-cli -- --json auth status -a you@example.com
+cargo run -p nils-google-cli -- --json auth status -a you@example.com
 ```
 
-Detailed auth operations guide: `docs/auth-setup-guide.md`.
-
-## Module docs (single source of truth)
-
-- Auth: `src/auth/README.md`
-- Gmail: `src/gmail/README.md`
-- Drive: `src/drive/README.md`
-
-## Command help
+## Command Help
 
 ```bash
-cargo run -p google-cli -- auth --help
-cargo run -p google-cli -- gmail --help
-cargo run -p google-cli -- drive --help
+cargo run -p nils-google-cli -- auth --help
+cargo run -p nils-google-cli -- gmail --help
+cargo run -p nils-google-cli -- drive --help
 ```
 
-## Environment variables
+## Environment Variables
 
 - `GOOGLE_CLI_CONFIG_DIR`: override auth config directory.
 - `GOOGLE_CLI_KEYRING_MODE`: token storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
@@ -69,16 +63,32 @@ cargo run -p google-cli -- drive --help
 - `GOOGLE_CLI_DRIVE_FIXTURE_PATH`: Drive fixture JSON file path for local tests.
 - `GOOGLE_CLI_DRIVE_FIXTURE_JSON`: inline Drive fixture JSON for local tests.
 
-## Output contract
+## Output Contract
 
-- Envelope keys: `schema_version`, `command`, `ok`.
-- Success payload key: `result`.
-- Error payload key: `error` (stable error code + details).
-- `--json` for machine-readable output.
-- `--plain` for stable plain text.
+- Default output: human-readable native text for direct terminal usage.
+- `--plain`: stable plain text without the JSON envelope.
+- `--json`: repository envelope with `schema_version`, `command`, `ok`, and exactly one of `result` or `error`.
+- `stderr`: deterministic user/runtime error text for non-JSON runs.
+- Exit codes: `0` success, `1` runtime failure, `2` user/input/config error.
+
+## Standards Status
+
+- README/command docs: compliant.
+- JSON service envelope (`schema_version/command/ok`): implemented.
+- Default human-readable mode: implemented.
+
+## Documentation
+
+- [`docs/README.md`](docs/README.md)
+- [`docs/auth-setup-guide.md`](docs/auth-setup-guide.md)
+- [`docs/auth.md`](docs/auth.md)
+- [`docs/gmail.md`](docs/gmail.md)
+- [`docs/drive.md`](docs/drive.md)
 
 ## Validation
 
-```bash
-cargo test -p google-cli
-```
+- `cargo run -p nils-google-cli -- --help`
+- `cargo run -p nils-google-cli -- auth --help`
+- `cargo run -p nils-google-cli -- gmail --help`
+- `cargo run -p nils-google-cli -- drive --help`
+- `cargo test -p nils-google-cli`

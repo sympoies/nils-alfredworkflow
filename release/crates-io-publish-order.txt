@@ -4,6 +4,7 @@ nils-workflow-common
 nils-brave-cli
 nils-cambridge-cli
 nils-epoch-cli
+nils-google-cli
 nils-market-cli
 nils-quote-cli
 nils-randomer-cli

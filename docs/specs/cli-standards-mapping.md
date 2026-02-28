@@ -22,7 +22,7 @@
 
 ## Native google-cli note
 
-- `google-cli` is a native Rust crate with scoped support for `auth/gmail/drive`.
+- `google-cli` is a native Rust crate with package `nils-google-cli` and scoped support for `auth/gmail/drive`.
 - Native contract owner: `docs/specs/google-cli-native-contract.md`.
 - Local policy for this crate:
   - default output remains human-readable native text

@@ -5,6 +5,9 @@
 Define the native Rust command contract for `google-cli` over the repo-scoped Google surface: `auth`, `gmail`, and
 `drive`.
 
+- Package: `nils-google-cli`
+- Binary: `google-cli`
+
 ## Scope
 
 - Native command ownership includes:

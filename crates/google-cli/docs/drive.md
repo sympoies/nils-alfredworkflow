@@ -1,4 +1,4 @@
-# google-cli drive module
+# google-cli drive
 
 Authoritative Drive documentation for `google-cli`.
 
@@ -22,39 +22,39 @@ Authoritative Drive documentation for `google-cli`.
 List:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com drive ls --max 10
+cargo run -p nils-google-cli -- --json -a you@example.com drive ls --max 10
 ```
 
 Search:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com drive search "name:report" --max 5
+cargo run -p nils-google-cli -- --json -a you@example.com drive search "name:report" --max 5
 ```
 
 Get metadata:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com drive get <file_id>
+cargo run -p nils-google-cli -- --json -a you@example.com drive get <file_id>
 ```
 
 Download:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com \
+cargo run -p nils-google-cli -- --json -a you@example.com \
   drive download <file_id> --out ./downloads/file.bin --overwrite
 ```
 
 Export during download:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com \
+cargo run -p nils-google-cli -- --json -a you@example.com \
   drive download <file_id> --format pdf --out ./downloads/file.pdf --overwrite
 ```
 
 Upload:
 
 ```bash
-cargo run -p google-cli -- --json -a you@example.com \
+cargo run -p nils-google-cli -- --json -a you@example.com \
   drive upload ./report.pdf --name report.pdf --parent <folder_id>
 ```
 

@@ -30,7 +30,7 @@ Provides stable machine error codes shared by all CLI crates using JSON envelope
 | `brave-cli` (`nils-brave-cli`) | `NILS_BRAVE_` | `001-099` |
 | `cambridge-cli` (`nils-cambridge-cli`) | `NILS_CAMBRIDGE_` | `001-099` |
 | `epoch-cli` (`nils-epoch-cli`) | `NILS_EPOCH_` | `001-099` |
-| `google-cli` (`google-cli`) | `NILS_GOOGLE_` | `001-099` |
+| `google-cli` (`nils-google-cli`) | `NILS_GOOGLE_` | `001-099` |
 | `market-cli` (`nils-market-cli`) | `NILS_MARKET_` | `001-099` |
 | `quote-cli` (`nils-quote-cli`) | `NILS_QUOTE_` | `001-099` |
 | `randomer-cli` (`nils-randomer-cli`) | `NILS_RANDOMER_` | `001-099` |

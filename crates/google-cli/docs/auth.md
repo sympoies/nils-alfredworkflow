@@ -1,8 +1,8 @@
-# google-cli auth module
+# google-cli auth
 
 Authoritative auth documentation for `google-cli`.
 
-Detailed operator guide: `../../docs/auth-setup-guide.md`.
+Detailed operator guide: [`auth-setup-guide.md`](auth-setup-guide.md).
 
 ## Scope
 
@@ -41,7 +41,7 @@ export GOOGLE_CLI_KEYRING_MODE=file
 Set OAuth client credentials:
 
 ```bash
-cargo run -p google-cli -- auth credentials set \
+cargo run -p nils-google-cli -- auth credentials set \
   --client-id "<client_id>" \
   --client-secret "<client_secret>"
 ```
@@ -49,13 +49,13 @@ cargo run -p google-cli -- auth credentials set \
 Generate auth URL:
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com --remote --step 1
+cargo run -p nils-google-cli -- --json auth add you@example.com --remote --step 1
 ```
 
 Open `result.authorization_url` in browser, then exchange code:
 
 ```bash
-cargo run -p google-cli -- --json auth add you@example.com \
+cargo run -p nils-google-cli -- --json auth add you@example.com \
   --remote --step 2 \
   --state "<state>" \
   --code "<code>"
@@ -64,13 +64,13 @@ cargo run -p google-cli -- --json auth add you@example.com \
 Verify token state:
 
 ```bash
-cargo run -p google-cli -- --json auth status -a you@example.com
+cargo run -p nils-google-cli -- --json auth status -a you@example.com
 ```
 
 ## Manual mode
 
 ```bash
-cargo run -p google-cli -- auth add you@example.com --manual --code "<authorization_code>"
+cargo run -p nils-google-cli -- auth add you@example.com --manual --code "<authorization_code>"
 ```
 
 ## Multi-account and alias
@@ -80,13 +80,13 @@ Add another account using the same remote flow.
 Set alias:
 
 ```bash
-cargo run -p google-cli -- --json auth alias set work terry@sympoies.com
+cargo run -p nils-google-cli -- --json auth alias set work terry@sympoies.com
 ```
 
 List aliases:
 
 ```bash
-cargo run -p google-cli -- --json auth alias list
+cargo run -p nils-google-cli -- --json auth alias list
 ```
 
 ## Troubleshooting
