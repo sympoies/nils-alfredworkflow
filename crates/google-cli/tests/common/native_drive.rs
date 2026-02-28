@@ -9,6 +9,7 @@ pub fn run(config_dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Output {
     command.env("GOOGLE_CLI_CONFIG_DIR", config_dir);
     command.env("GOOGLE_CLI_KEYRING_MODE", "file");
     command.env("GOOGLE_CLI_AUTH_DISABLE_BROWSER", "1");
+    command.env("GOOGLE_CLI_AUTH_ALLOW_FAKE_EXCHANGE", "1");
     command.env("PATH", config_dir);
     for (key, value) in envs {
         command.env(key, value);

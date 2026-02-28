@@ -107,10 +107,9 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/README.md`
-  - `crates/google-cli/docs/features/auth.md`
-  - `crates/google-cli/docs/features/gmail.md`
-  - `crates/google-cli/docs/features/drive.md`
+  - `crates/google-cli/src/auth/README.md`
+  - `crates/google-cli/src/gmail/README.md`
+  - `crates/google-cli/src/drive/README.md`
   - `crates/google-cli/tests/common/mod.rs`
   - `crates/google-cli/tests/cli_contract.rs`
 - **Description**: Establish baseline crate docs and reusable test harness utilities for feature sprints.
@@ -123,7 +122,8 @@ sprints.
   - Test harness provides reusable process fixture helpers for wrapped `gog` execution tests.
 - **Validation**:
   - `cargo test -p google-cli --test cli_contract -- --nocapture`
-  - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/README.md crates/google-cli/docs/README.md crates/google-cli/docs/features/*.md`
+  - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/README.md`
+  - `rg -n "auth|gmail|drive|validation|contract" crates/google-cli/src/auth/README.md crates/google-cli/src/gmail/README.md crates/google-cli/src/drive/README.md`
 
 ## Sprint 2: Auth Feature Implementation
 
@@ -145,7 +145,7 @@ sprints.
 ### Task 2.1: Lock Auth Command Surface And Usage Contract
 
 - **Location**:
-  - `crates/google-cli/docs/features/auth.md`
+  - `crates/google-cli/src/auth/README.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Finalize auth subcommand scope and option policy for this phase (`credentials`, `add`, `list`,
   `status`, `remove`, `alias`, `manage`).
@@ -157,7 +157,7 @@ sprints.
   - Contract defines pass-through expectations for account/client/manual/remote auth options.
   - Validation and error behavior for auth command failures is documented.
 - **Validation**:
-  - `rg -n "credentials|add|list|status|remove|alias|manage|pass-through" crates/google-cli/docs/features/auth.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "credentials|add|list|status|remove|alias|manage|pass-through" crates/google-cli/src/auth/README.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 2.2: Implement Auth Wrapper Commands
 
@@ -199,7 +199,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/auth.md`
+  - `crates/google-cli/src/auth/README.md`
 - **Description**: Publish auth usage examples, environment/flag notes, and validation commands in crate docs.
 - **Dependencies**:
   - Task 2.2
@@ -209,7 +209,7 @@ sprints.
   - Feature doc includes troubleshooting and expected error signatures.
   - Validation commands in docs match executable test/help commands.
 - **Validation**:
-  - `rg -n "## Auth|auth add|auth list|auth status|validation" crates/google-cli/README.md crates/google-cli/docs/features/auth.md`
+  - `rg -n "## Auth|auth add|auth list|auth status|validation" crates/google-cli/README.md crates/google-cli/src/auth/README.md`
 
 ## Sprint 3: Gmail Feature Implementation
 
@@ -232,7 +232,7 @@ sprints.
 ### Task 3.1: Lock Gmail Command Contract For Wrapper Scope
 
 - **Location**:
-  - `crates/google-cli/docs/features/gmail.md`
+  - `crates/google-cli/src/gmail/README.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Define scoped Gmail subcommands and option policy for the wrapper phase (query/list/get/send-focused
   command set).
@@ -244,7 +244,7 @@ sprints.
   - Contract includes required account/client/pass-through handling for Gmail commands.
   - Output mode expectations (`--json`/`--plain`) are documented.
 - **Validation**:
-  - `rg -n "gmail|search|thread|get|send|json|plain|pass-through" crates/google-cli/docs/features/gmail.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "gmail|search|thread|get|send|json|plain|pass-through" crates/google-cli/src/gmail/README.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 3.2: Implement Gmail Wrapper Commands
 
@@ -285,7 +285,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/gmail.md`
+  - `crates/google-cli/src/gmail/README.md`
 - **Description**: Document Gmail wrapper usage, examples, limitations, and test/validation commands.
 - **Dependencies**:
   - Task 3.2
@@ -295,7 +295,7 @@ sprints.
   - Feature doc contains troubleshooting guidance for wrapper/runtime failures.
   - Doc commands are consistent with tested command surface.
 - **Validation**:
-  - `rg -n "## Gmail|gmail search|gmail get|gmail send|validation" crates/google-cli/README.md crates/google-cli/docs/features/gmail.md`
+  - `rg -n "## Gmail|gmail search|gmail get|gmail send|validation" crates/google-cli/README.md crates/google-cli/src/gmail/README.md`
 
 ## Sprint 4: Drive Feature Implementation
 
@@ -317,7 +317,7 @@ sprints.
 ### Task 4.1: Lock Drive Command Contract For Wrapper Scope
 
 - **Location**:
-  - `crates/google-cli/docs/features/drive.md`
+  - `crates/google-cli/src/drive/README.md`
   - `docs/specs/google-cli-wrapper-contract.md`
 - **Description**: Define scoped Drive subcommands and option policy for wrapper phase (`ls/search/get/download/upload`
   focused command set).
@@ -329,7 +329,7 @@ sprints.
   - Contract defines forwarding behavior for path/id/query arguments and global flags.
   - Output handling expectations are documented for JSON/plain modes.
 - **Validation**:
-  - `rg -n "drive|ls|search|get|download|upload|json|plain|pass-through" crates/google-cli/docs/features/drive.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "drive|ls|search|get|download|upload|json|plain|pass-through" crates/google-cli/src/drive/README.md docs/specs/google-cli-wrapper-contract.md`
 
 ### Task 4.2: Implement Drive Wrapper Commands
 
@@ -370,7 +370,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/drive.md`
+  - `crates/google-cli/src/drive/README.md`
 - **Description**: Document Drive wrapper command usage, examples, and troubleshooting.
 - **Dependencies**:
   - Task 4.2
@@ -380,7 +380,7 @@ sprints.
   - Feature doc includes failure-mode and remediation notes for wrapper/runtime errors.
   - Validation/test command references are present and accurate.
 - **Validation**:
-  - `rg -n "## Drive|drive ls|drive search|drive download|validation" crates/google-cli/README.md crates/google-cli/docs/features/drive.md`
+  - `rg -n "## Drive|drive ls|drive search|drive download|validation" crates/google-cli/README.md crates/google-cli/src/drive/README.md`
 
 ## Sprint 5: Final Integration, Full Test Gates, And Root Documentation
 
@@ -463,7 +463,6 @@ documentation.
 - **Location**:
   - `docs/reports/google-cli-validation-report.md`
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/README.md`
 - **Description**: Capture final command/test evidence and confirm crate-level docs are complete for handoff.
 - **Dependencies**:
   - Task 5.3
@@ -473,7 +472,7 @@ documentation.
   - Crate README/docs contain runnable quickstart and verification commands.
   - Remaining known risks/limitations are explicitly listed.
 - **Validation**:
-  - `rg -n "Validation|Known limitations|Quickstart" docs/reports/google-cli-validation-report.md crates/google-cli/README.md crates/google-cli/docs/README.md`
+  - `rg -n "Validation|Known limitations|Quickstart" docs/reports/google-cli-validation-report.md crates/google-cli/README.md`
 
 ## Testing Strategy
 

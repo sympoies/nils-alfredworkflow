@@ -175,7 +175,13 @@ fn execute_add(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse,
                     )
                 })?;
 
-                let token = oauth::finish_remote(&account, &expected.state, provided_state, code)?;
+                let token = oauth::finish_remote(
+                    &account,
+                    &expected.state,
+                    provided_state,
+                    code,
+                    &credentials,
+                )?;
                 let persist = persist_token(paths, &account, &token)?;
                 metadata.add_account(&account);
                 save_metadata(paths, &metadata)?;
@@ -208,7 +214,10 @@ fn execute_add(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse,
             .ok_or_else(|| {
                 AppError::invalid_auth_input("manual auth requires `--code <authorization_code>`")
             })?;
-        (AuthFlowMode::Manual, oauth::run_manual(&account, &code))
+        (
+            AuthFlowMode::Manual,
+            oauth::run_manual(&account, &code, &credentials)?,
+        )
     } else {
         let outcome = oauth::run_loopback(&account, &credentials)?;
         (AuthFlowMode::Loopback, outcome.token)

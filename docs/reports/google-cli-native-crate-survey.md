@@ -50,5 +50,5 @@ compile-only probe.
 
 ## Compile probe intent
 
-`crates/google-cli/examples/native_probe.rs` is compile-only. It imports and type-checks the selected OAuth + Gmail +
-Drive stack without runtime behavior.
+`crates/google-cli/tests/native_dependency_probe.rs` is a dependency probe test. It imports and type-checks the selected OAuth + Gmail +
+Drive stack without external API calls or browser launches.

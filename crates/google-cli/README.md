@@ -1,76 +1,84 @@
 # google-cli
 
-Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
+Native Rust CLI for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 5 status
+## Overview
 
-- Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
-- Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
-- Gmail commands now execute through native Rust modules (`src/gmail/*`) with native account resolution reuse.
-- Drive commands (`ls/search/get/download/upload`) now execute through native Rust modules (`src/drive/*`).
-- Wrapper-era runtime shelling and `gog` override paths are removed from production code.
+- Runs auth, Gmail, and Drive commands with native Rust implementations.
+- Uses real OAuth token exchange/refresh for API calls.
+- Keeps deterministic local test paths via explicit fixture/test env switches.
 
-## Command scope to preserve
+## Quick start
 
-## Auth
+Set runtime environment:
 
-| Command | Sprint 1 contract stance |
-| --- | --- |
-| `auth credentials <...>` | Fully native config/credential read-write behavior. |
-| `auth add <email> [flags...]` | Fully native OAuth modes: `loopback`, `manual`, `remote`. |
-| `auth list` | Native account inventory behavior (accounts/default/aliases). |
-| `auth status` | Deterministic default-account resolution or explicit ambiguity error. |
-| `auth remove <email>` | Native token + metadata removal behavior. |
-| `auth alias <...>` | Native alias metadata behavior. |
-| `auth manage [flags...]` | Terminal summary-only behavior (no browser account-manager UI). |
+```bash
+export GOOGLE_CLI_CONFIG_DIR="$HOME/.config/google/credentials"
+export GOOGLE_CLI_KEYRING_MODE=file
+```
 
-## Gmail
+Set OAuth credentials:
 
-| Command | Sprint 1 contract stance |
-| --- | --- |
-| `gmail search <query...> [flags...]` | Primary path is generated client; reqwest fallback allowed. |
-| `gmail get <messageId> [flags...]` | Primary generated client path. |
-| `gmail send [flags...]` | Native MIME path using `mail-builder` and `mime_guess`. |
-| `gmail thread <...>` | Primary generated client path with fallback allowance. |
+```bash
+cargo run -p google-cli -- auth credentials set \
+  --client-id "<client_id>" \
+  --client-secret "<client_secret>"
+```
 
-## Drive
+Login account (remote flow):
 
-| Command | Sprint 1 contract stance |
-| --- | --- |
-| `drive ls [flags...]` | Primary generated client path with fallback allowance. |
-| `drive search <query...> [flags...]` | Primary generated client path with fallback allowance. |
-| `drive get <fileId>` | Primary generated client path with fallback allowance. |
-| `drive download <fileId> [flags...]` | Native destination/export path with overwrite controls. |
-| `drive upload <localPath> [flags...]` | Primary generated client path with fallback allowance. |
+```bash
+cargo run -p google-cli -- --json auth add you@example.com --remote --step 1
+# Open result.authorization_url, then run step 2:
+cargo run -p google-cli -- --json auth add you@example.com \
+  --remote --step 2 \
+  --state "<state>" \
+  --code "<code>"
+```
+
+Validate account status:
+
+```bash
+cargo run -p google-cli -- --json auth status -a you@example.com
+```
+
+Detailed auth operations guide: `docs/auth-setup-guide.md`.
+
+## Module docs (single source of truth)
+
+- Auth: `src/auth/README.md`
+- Gmail: `src/gmail/README.md`
+- Drive: `src/drive/README.md`
+
+## Command help
+
+```bash
+cargo run -p google-cli -- auth --help
+cargo run -p google-cli -- gmail --help
+cargo run -p google-cli -- drive --help
+```
 
 ## Environment variables
 
-- `GOOGLE_CLI_CONFIG_DIR`: override native auth config directory.
-- `GOOGLE_CLI_KEYRING_MODE`: auth storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
-- `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable automatic browser launch for loopback auth.
-- `GOOGLE_CLI_GMAIL_FIXTURE_PATH`: optional fixture JSON path for local/native Gmail integration testing.
-- `GOOGLE_CLI_DRIVE_FIXTURE_PATH`: optional fixture JSON path for local/native Drive integration testing.
+- `GOOGLE_CLI_CONFIG_DIR`: override auth config directory.
+- `GOOGLE_CLI_KEYRING_MODE`: token storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
+- `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable browser auto-launch for auth flows.
+- `GOOGLE_CLI_AUTH_ALLOW_FAKE_EXCHANGE`: test-only OAuth bypass switch. Do not use in normal runs.
+- `GOOGLE_CLI_GMAIL_FIXTURE_PATH`: Gmail fixture JSON file path for local tests.
+- `GOOGLE_CLI_GMAIL_FIXTURE_JSON`: inline Gmail fixture JSON for local tests.
+- `GOOGLE_CLI_DRIVE_FIXTURE_PATH`: Drive fixture JSON file path for local tests.
+- `GOOGLE_CLI_DRIVE_FIXTURE_JSON`: inline Drive fixture JSON for local tests.
 
 ## Output contract
 
-- Envelope stays repository-standard: `schema_version`, `command`, `ok`, and `result`/`error`.
-- `--json` expects machine-readable output; `--plain` requests stable text output.
+- Envelope keys: `schema_version`, `command`, `ok`.
+- Success payload key: `result`.
+- Error payload key: `error` (stable error code + details).
+- `--json` for machine-readable output.
+- `--plain` for stable plain text.
 
 ## Validation
 
-- `cargo test -p google-cli --test auth_storage`
-- `cargo test -p google-cli --test auth_oauth_flow`
-- `cargo test -p google-cli --test auth_account_resolution`
-- `cargo test -p google-cli --test auth_cli_contract`
-- `cargo test -p google-cli --test gmail_read`
-- `cargo test -p google-cli --test gmail_thread`
-- `cargo test -p google-cli --test gmail_send`
-- `cargo test -p google-cli --test gmail_cli_contract`
-- `cargo test -p google-cli --test drive_read`
-- `cargo test -p google-cli --test drive_download`
-- `cargo test -p google-cli --test drive_upload`
-- `cargo test -p google-cli --test drive_cli_contract`
-- `cargo test -p google-cli --test native_no_gog`
-- `cargo run -p google-cli -- auth --help`
-- `cargo run -p google-cli -- gmail --help`
-- `cargo run -p google-cli -- drive --help`
+```bash
+cargo test -p google-cli
+```

@@ -10,7 +10,7 @@ pub fn execute_search(
     args: &[String],
 ) -> Result<NativeGmailResponse, AppError> {
     let request = parse_search_args(args)?;
-    let messages = session.search(&request);
+    let messages = session.search(&request)?;
 
     Ok(response(
         json!({

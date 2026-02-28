@@ -50,7 +50,7 @@ one implementation contract.
 **Merge order**: Task 1.1 and Task 1.2 may merge independently; then Task 1.3; then Task 1.4.
 **Demo/Validation**:
 - Command(s): `plan-tooling validate --file docs/plans/google-cli-native-rust-replacement-plan.md`,
-  `cargo check -p google-cli --example native_probe`,
+  `cargo test -p google-cli --test native_dependency_probe`,
   `rg -n "google-gmail1|google-drive3|yup-oauth2|keyring|directories|open|mail-builder|wiremock" docs/reports/google-cli-native-crate-survey.md`,
   `rg -n "usable via generated crate|usable via reqwest fallback|blocked|auth add|gmail send|drive upload" docs/reports/google-cli-native-capability-matrix.md`
 - Verify: the repo has a pinned dependency decision record, a per-command capability matrix, a compile-only native
@@ -81,7 +81,7 @@ one implementation contract.
   - `docs/reports/google-cli-native-crate-survey.md`
   - `docs/reports/google-cli-native-capability-matrix.md`
   - `crates/google-cli/Cargo.toml`
-  - `crates/google-cli/examples/native_probe.rs`
+  - `crates/google-cli/tests/native_dependency_probe.rs`
   - `Cargo.lock`
 - **Description**: Evaluate and pin the native dependency stack, including Google API clients, OAuth, token storage,
   browser launching, MIME construction, and HTTP-test tooling. The survey must compare the primary plan
@@ -98,9 +98,9 @@ one implementation contract.
   - Capability matrix covers every repo-scoped operation and marks each one as generated-crate, reqwest-fallback, or
     blocked.
   - `Cargo.toml` exact-pins the chosen crates needed for the compile spike.
-  - `examples/native_probe.rs` compiles the selected OAuth + Gmail + Drive client stack without runtime behavior.
+  - `tests/native_dependency_probe.rs` validates the selected OAuth + Gmail + Drive client stack without external API calls or browser launches.
 - **Validation**:
-  - `cargo check -p google-cli --example native_probe`
+  - `cargo test -p google-cli --test native_dependency_probe`
   - `cargo tree -p google-cli`
   - `rg -n "Primary|Fallback|google-gmail1|google-drive3|yup-oauth2|keyring|wiremock" docs/reports/google-cli-native-crate-survey.md`
   - `rg -n "usable via generated crate|usable via reqwest fallback|blocked|auth add|gmail send|drive upload" docs/reports/google-cli-native-capability-matrix.md`
@@ -109,9 +109,9 @@ one implementation contract.
 
 - **Location**:
   - `docs/specs/google-cli-native-contract.md`
-  - `crates/google-cli/docs/features/auth.md`
-  - `crates/google-cli/docs/features/gmail.md`
-  - `crates/google-cli/docs/features/drive.md`
+  - `crates/google-cli/src/auth/README.md`
+  - `crates/google-cli/src/gmail/README.md`
+  - `crates/google-cli/src/drive/README.md`
 - **Description**: Replace the wrapper contract with a native contract covering command scope, native output/error
   envelope behavior, OAuth modes, multi-account/default resolution, and the no-UI decision for account management.
 - **Dependencies**:
@@ -123,7 +123,9 @@ one implementation contract.
   - Contract explicitly defines `auth status` semantics when `--account` is omitted.
   - Contract states how `auth manage` is handled without a browser UI.
 - **Validation**:
-  - `rg -n "native|default account|auth status|auth manage|loopback|manual|remote" docs/specs/google-cli-native-contract.md crates/google-cli/docs/features/*.md`
+  - `rg -n "native|default account|auth status|auth manage|loopback|manual|remote" docs/specs/google-cli-native-contract.md`
+  - `rg -n "native|default account|auth status|auth manage|loopback|manual|remote" crates/google-cli/src/auth/README.md`
+  - `rg -n "native|default account|auth status|auth manage|loopback|manual|remote" crates/google-cli/src/gmail/README.md crates/google-cli/src/drive/README.md`
 
 ### Task 1.4: Reshape Crate Layout For Native Service Modules
 
@@ -262,7 +264,7 @@ CLI behavior; Task 2.5 finalizes docs and native-no-`gog` validation.
 
 - **Location**:
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/auth.md`
+  - `crates/google-cli/src/auth/README.md`
   - `docs/reports/google-cli-native-gap-analysis.md`
 - **Description**: Update auth docs with the native flow, exact prerequisites, non-UI account-management stance, and a
   manual smoke checklist that uses the loopback callback flow.
@@ -274,7 +276,7 @@ CLI behavior; Task 2.5 finalizes docs and native-no-`gog` validation.
   - Docs explain how default-account resolution affects `auth status` and other auth-adjacent commands.
   - Manual smoke checklist is runnable and references current commands only.
 - **Validation**:
-  - `rg -n "loopback|default account|auth manage|gog" crates/google-cli/README.md crates/google-cli/docs/features/auth.md docs/reports/google-cli-native-gap-analysis.md`
+  - `rg -n "loopback|default account|auth manage|gog" crates/google-cli/README.md crates/google-cli/src/auth/README.md docs/reports/google-cli-native-gap-analysis.md`
 
 ## Sprint 3: Native Gmail Commands
 
@@ -382,7 +384,7 @@ then integrates CLI tests and docs.
   - `crates/google-cli/src/cmd/gmail.rs`
   - `crates/google-cli/tests/gmail_cli_contract.rs`
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/gmail.md`
+  - `crates/google-cli/src/gmail/README.md`
 - **Description**: Align native Gmail help/output semantics, add CLI contract coverage, and update docs with runnable
   smoke commands.
 - **Dependencies**:
@@ -398,7 +400,7 @@ then integrates CLI tests and docs.
 - **Validation**:
   - `cargo test -p google-cli --test gmail_cli_contract`
   - `cargo test -p google-cli --test account_resolution_shared`
-  - `rg -n "gmail search|gmail get|gmail send|thread modify|gog" crates/google-cli/README.md crates/google-cli/docs/features/gmail.md`
+  - `rg -n "gmail search|gmail get|gmail send|thread modify|gog" crates/google-cli/README.md crates/google-cli/src/gmail/README.md`
 
 ## Sprint 4: Native Drive Commands
 
@@ -506,7 +508,7 @@ then integrates CLI tests and docs.
   - `crates/google-cli/src/cmd/drive.rs`
   - `crates/google-cli/tests/drive_cli_contract.rs`
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/features/drive.md`
+  - `crates/google-cli/src/drive/README.md`
 - **Description**: Align native Drive help/output semantics, add CLI contract coverage, and update docs with runnable
   smoke commands.
 - **Dependencies**:
@@ -522,7 +524,7 @@ then integrates CLI tests and docs.
 - **Validation**:
   - `cargo test -p google-cli --test drive_cli_contract`
   - `cargo test -p google-cli --test account_resolution_shared`
-  - `rg -n "drive ls|drive search|drive upload|drive download|gog" crates/google-cli/README.md crates/google-cli/docs/features/drive.md`
+  - `rg -n "drive ls|drive search|drive upload|drive download|gog" crates/google-cli/README.md crates/google-cli/src/drive/README.md`
 
 ## Sprint 5: Native Integration, De-Wrapper Cleanup, And Release Gates
 
@@ -617,7 +619,6 @@ collecting validation evidence.
   - `docs/specs/cli-standards-mapping.md`
   - `docs/specs/cli-error-code-registry.md`
   - `crates/google-cli/README.md`
-  - `crates/google-cli/docs/README.md`
 - **Description**: Update repo-wide docs, architecture notes, and CLI standards mappings so `google-cli` is documented
   as a native client rather than a `gog` wrapper.
 - **Dependencies**:
@@ -632,8 +633,7 @@ collecting validation evidence.
   ```bash
   rg -n "Rust wrapper over gog|shells out to gog|GOOGLE_CLI_GOG_BIN" \
     README.md docs/ARCHITECTURE.md docs/specs/cli-standards-mapping.md \
-    docs/specs/cli-error-code-registry.md crates/google-cli/README.md \
-    crates/google-cli/docs/README.md
+    docs/specs/cli-error-code-registry.md crates/google-cli/README.md
   ```
 
 ### Task 5.4: Finalize Dependency Audit, Rollback Notes, And Release Readiness

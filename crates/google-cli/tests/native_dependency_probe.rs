@@ -1,4 +1,4 @@
-//! Compile-only probe for the Sprint 1 native dependency stack.
+//! Compile probe ensuring the native Google dependency stack stays type-compatible.
 
 use directories::ProjectDirs;
 use google_drive3 as drive3;
@@ -10,7 +10,6 @@ use reqwest::Client;
 use wiremock::MockServer;
 use yup_oauth2::ApplicationSecret;
 
-#[allow(dead_code)]
 fn compile_probe() {
     let _project_dirs = ProjectDirs::from("com", "nils", "google-cli");
 
@@ -27,7 +26,10 @@ fn compile_probe() {
     let _mock_server_type = std::mem::size_of::<MockServer>();
 
     let _google_common_type = std::any::type_name::<google_apis_common::Error>();
-    let _browser_launcher = open::that_detached("https://accounts.google.com");
+    let _browser_launcher = |url: &str| open::that_detached(url);
 }
 
-fn main() {}
+#[test]
+fn native_dependency_stack_compiles() {
+    compile_probe();
+}

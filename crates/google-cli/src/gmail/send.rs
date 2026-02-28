@@ -1,5 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -26,19 +24,15 @@ pub fn execute_send(
         attachments: request.attachments.clone(),
     })?;
 
-    let message_id = message_id_for(&composed.rfc822, &session.account);
-    let thread_id = request
-        .thread_id
-        .clone()
-        .unwrap_or_else(|| format!("thread-{message_id}"));
+    let sent = session.send_raw_message(&composed.rfc822, request.thread_id.as_deref())?;
 
     Ok(response(
         json!({
             "account": session.account,
             "account_source": session.account_source,
             "message": {
-                "id": message_id,
-                "thread_id": thread_id,
+                "id": sent.id,
+                "thread_id": sent.thread_id,
                 "to": request.to,
                 "subject": request.subject,
                 "attachment_count": composed.attachments.len(),
@@ -47,7 +41,7 @@ pub fn execute_send(
                 "mime_preview": String::from_utf8_lossy(&composed.rfc822).chars().take(120).collect::<String>(),
             },
         }),
-        "Sent Gmail message via native MIME path.",
+        "Sent Gmail message via native API path.",
     ))
 }
 
@@ -183,11 +177,4 @@ fn parse_csv(input: &str) -> Vec<String> {
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
         .collect()
-}
-
-fn message_id_for(rfc822: &[u8], account: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    account.hash(&mut hasher);
-    rfc822.hash(&mut hasher);
-    format!("msg-{:x}", hasher.finish())
 }

@@ -10,7 +10,7 @@ pub fn execute_ls(
     args: &[String],
 ) -> Result<NativeDriveResponse, AppError> {
     let request = parse_ls_args(args)?;
-    let files = session.list(&request);
+    let files = session.list(&request)?;
 
     Ok(response(
         json!({
@@ -32,7 +32,7 @@ pub fn execute_search(
     args: &[String],
 ) -> Result<NativeDriveResponse, AppError> {
     let request = parse_search_args(args)?;
-    let files = session.search(&request);
+    let files = session.search(&request)?;
 
     Ok(response(
         json!({
