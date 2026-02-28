@@ -169,10 +169,31 @@ fn drive_ls_runs_without_gog_binary() {
 }
 
 #[test]
-fn drive_download_still_requires_gog_binary() {
+fn drive_download_runs_without_gog_binary() {
     let temp = tempdir().expect("tempdir");
-    let missing = temp.path().join("missing-gog");
+    seed_auth(temp.path());
 
+    let fixture_path = temp.path().join("drive-fixture.json");
+    std::fs::write(
+        &fixture_path,
+        serde_json::to_vec_pretty(&json!({
+            "files": [
+                {
+                    "id": "file-123",
+                    "name": "report.pdf",
+                    "mime_type": "application/pdf",
+                    "size_bytes": 2048,
+                    "parents": ["folder-1"],
+                    "content": "fixture-content"
+                }
+            ]
+        }))
+        .expect("serialize fixture"),
+    )
+    .expect("write fixture");
+
+    let missing = temp.path().join("missing-gog");
+    let out_path = temp.path().join("out.bin");
     let output = run(
         temp.path(),
         &[
@@ -181,18 +202,22 @@ fn drive_download_still_requires_gog_binary() {
             "download",
             "file-123",
             "--out",
-            "/tmp/out.bin",
+            out_path.to_string_lossy().as_ref(),
         ],
-        &[("GOOGLE_CLI_GOG_BIN", missing.to_string_lossy().as_ref())],
+        &[
+            ("GOOGLE_CLI_GOG_BIN", missing.to_string_lossy().as_ref()),
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+        ],
     );
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(0));
 
     let payload = json_output(&output);
+    assert_eq!(payload.get("ok").and_then(Value::as_bool), Some(true));
     assert_eq!(
-        payload
-            .get("error")
-            .and_then(|error| error.get("code"))
-            .and_then(Value::as_str),
-        Some("NILS_GOOGLE_002")
+        payload.get("command").and_then(Value::as_str),
+        Some("google.drive.download")
     );
 }
