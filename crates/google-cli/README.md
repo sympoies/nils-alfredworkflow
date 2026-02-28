@@ -2,12 +2,11 @@
 
 Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 1 status
+## Sprint 2 status
 
 - Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
-- Native module tree now exists under `src/auth`, `src/gmail`, `src/drive`, and `src/client`.
-- Runtime execution is still wrapper-backed via `src/runtime.rs` while native implementations are delivered in later
-  sprints.
+- Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
+- Gmail and Drive remain wrapper-backed through `src/runtime.rs` until their native sprints land.
 
 ## Command scope to preserve
 
@@ -15,13 +14,13 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 
 | Command | Sprint 1 contract stance |
 | --- | --- |
-| `auth credentials <...>` | Native-owned config/credential behavior (implementation follows in Sprint 2). |
-| `auth add <email> [flags...]` | Native OAuth modes: `loopback`, `manual`, `remote`. |
-| `auth list` | Native account inventory behavior. |
-| `auth status` | Must resolve default account deterministically or return explicit ambiguity guidance. |
+| `auth credentials <...>` | Fully native config/credential read-write behavior. |
+| `auth add <email> [flags...]` | Fully native OAuth modes: `loopback`, `manual`, `remote`. |
+| `auth list` | Native account inventory behavior (accounts/default/aliases). |
+| `auth status` | Deterministic default-account resolution or explicit ambiguity error. |
 | `auth remove <email>` | Native token + metadata removal behavior. |
 | `auth alias <...>` | Native alias metadata behavior. |
-| `auth manage [flags...]` | No browser account-manager UI; terminal summary/help behavior only. |
+| `auth manage [flags...]` | Terminal summary-only behavior (no browser account-manager UI). |
 
 ## Gmail
 
@@ -44,7 +43,10 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 
 ## Environment variables
 
-- `GOOGLE_CLI_GOG_BIN`: explicit override for the current wrapper-runtime binary while migration is in progress.
+- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands (`gmail`/`drive`) during migration.
+- `GOOGLE_CLI_CONFIG_DIR`: override native auth config directory.
+- `GOOGLE_CLI_KEYRING_MODE`: auth storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
+- `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable automatic browser launch for loopback auth.
 
 ## Output contract
 
@@ -53,9 +55,23 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 
 ## Validation
 
-- `cargo check -p google-cli --example native_probe`
-- `cargo check -p google-cli`
-- `cargo run -p google-cli -- auth --help`
+- `cargo test -p google-cli --test auth_storage`
+- `cargo test -p google-cli --test auth_oauth_flow`
+- `cargo test -p google-cli --test auth_account_resolution`
+- `cargo test -p google-cli --test auth_cli_contract`
+- `cargo test -p google-cli --test native_no_gog`
+
+## Manual smoke checklist (auth)
+
+1. `cargo run -p google-cli -- auth credentials set --client-id <id> --client-secret <secret>`
+2. `cargo run -p google-cli -- auth add <email>` (loopback mode; callback flow)
+3. `cargo run -p google-cli -- auth list`
+4. `cargo run -p google-cli -- auth status` (verifies default account resolution)
+5. `cargo run -p google-cli -- auth manage` (summary-only; no browser manager page)
+6. Optional remote flow step 1:
+   `cargo run -p google-cli -- auth add <email> --remote --step 1`
+7. Optional remote flow step 2:
+   `cargo run -p google-cli -- auth add <email> --remote --step 2 --state <state> --code <code>`
 
 ## Documentation
 

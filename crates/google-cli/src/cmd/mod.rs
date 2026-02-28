@@ -14,7 +14,7 @@ pub use common::GlobalOptions;
 #[command(
     author,
     version,
-    about = "Rust wrapper over gog for auth, Gmail, and Drive commands"
+    about = "Native Rust Google CLI for auth, Gmail, and Drive commands"
 )]
 pub struct Cli {
     #[command(flatten)]

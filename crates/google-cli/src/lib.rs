@@ -9,8 +9,9 @@ pub mod runtime;
 
 use cmd::{Cli, Request};
 use error::AppError;
-use output::{RenderedOutput, render_error, render_success};
+use output::{ENVELOPE_SCHEMA_VERSION, OutputMode, RenderedOutput, render_error, render_success};
 use runtime::Runtime;
+use serde_json::json;
 
 pub use cmd::Cli as GoogleCli;
 
@@ -20,7 +21,26 @@ pub fn run(cli: Cli) -> Result<RenderedOutput, AppError> {
 }
 
 pub fn run_request(request: &Request) -> Result<RenderedOutput, AppError> {
-    // Sprint 1 note: command routing is still wrapper-backed while native modules are introduced.
+    if request.invocation.command_id.starts_with("google.auth.") {
+        let native = auth::execute_native(&request.global, &request.invocation)?;
+        return Ok(match request.global.output_mode_hint() {
+            OutputMode::Json => RenderedOutput {
+                stdout: json!({
+                    "schema_version": ENVELOPE_SCHEMA_VERSION,
+                    "command": request.invocation.command_id,
+                    "ok": true,
+                    "result": native.payload,
+                })
+                .to_string(),
+                stderr: String::new(),
+            },
+            OutputMode::Human | OutputMode::Plain => RenderedOutput {
+                stdout: format!("{}\n", native.text),
+                stderr: String::new(),
+            },
+        });
+    }
+
     let runtime = Runtime::from_global(&request.global)?;
     let process = runtime.execute(&request.global, &request.invocation)?;
     render_success(

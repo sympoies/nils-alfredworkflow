@@ -52,6 +52,21 @@ Capture the wrapper-era baseline for `google-cli` and convert it into a native i
 | Account management UX | `auth manage` relies on browser page owned by upstream tooling. | Provide terminal-native behavior with no browser manager page. |
 | Gmail/Drive behavior | Wrapper forwards command-specific flags directly to `gog`. | Keep command scope but execute through native Rust clients. |
 
+## Sprint 2 auth closure notes
+
+- Native auth now owns credentials, token persistence, alias/default metadata, and account-resolution semantics.
+- Loopback mode is the primary interactive path; `manual` and two-step `remote` exchange are also supported.
+- `auth status` now resolves default account deterministically or returns explicit ambiguity guidance.
+- `auth manage` remains summary-only by design; browser account-manager UI is still a non-goal.
+- `gog` is no longer a runtime dependency for `auth` commands (still required for wrapper-backed `gmail`/`drive`).
+
+## Manual auth smoke checklist
+
+1. `google-cli auth credentials set --client-id <id> --client-secret <secret>`
+2. `google-cli auth add <email>` (loopback)
+3. `google-cli auth list` and `google-cli auth status`
+4. `google-cli auth manage` (summary-only)
+
 ## Explicit non-goals for this migration
 
 - non-goal: rebuilding the browser account-manager page.

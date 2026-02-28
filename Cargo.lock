@@ -731,6 +731,7 @@ dependencies = [
  "mime_guess",
  "open",
  "reqwest",
+ "serde",
  "serde_json",
  "tempfile",
  "wiremock",

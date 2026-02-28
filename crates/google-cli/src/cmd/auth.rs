@@ -24,7 +24,7 @@ enum AuthCommand {
     Remove(TargetArgs),
     /// Manage account aliases.
     Alias(NestedArgs),
-    /// Open accounts manager in the browser.
+    /// Show terminal-native account management summary.
     Manage(ExtraArgs),
 }
 
