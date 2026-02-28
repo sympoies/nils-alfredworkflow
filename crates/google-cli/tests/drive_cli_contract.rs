@@ -6,8 +6,6 @@ mod native_drive;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
-use common::TestHarness;
-
 #[test]
 fn drive_json_contract_covers_ls_search_get_and_upload() {
     let temp = tempdir().expect("tempdir");
@@ -136,31 +134,68 @@ fn drive_plain_contract_emits_human_text() {
 }
 
 #[test]
-fn drive_download_still_forwards_to_wrapper_runtime_path() {
-    let harness = TestHarness::new();
-    let output = harness.run(
+fn drive_download_executes_natively_and_writes_output() {
+    let temp = tempdir().expect("tempdir");
+    native_drive::seed_account(temp.path(), "drive@example.com");
+
+    let fixture_path = native_drive::write_fixture(
+        temp.path(),
+        &json!({
+            "files": [
+                {
+                    "id": "file-123",
+                    "name": "fixture.txt",
+                    "mime_type": "text/plain",
+                    "size_bytes": 14,
+                    "parents": ["root"],
+                    "content": "fixture-content",
+                    "export_formats": {
+                        "pdf": "%PDF fixture"
+                    }
+                }
+            ]
+        }),
+    );
+
+    let output_path = temp.path().join("out.pdf");
+    let missing_gog = temp.path().join("missing-gog");
+
+    let output = native_drive::run(
+        temp.path(),
         &[
+            "--json",
             "drive",
             "download",
             "file-123",
             "--out",
-            "/tmp/file.pdf",
+            output_path.to_string_lossy().as_ref(),
             "--format",
             "pdf",
         ],
-        &[("FAKE_GOG_STDOUT", "{}")],
+        &[
+            (
+                "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+                fixture_path.to_string_lossy().as_ref(),
+            ),
+            ("GOOGLE_CLI_GOG_BIN", missing_gog.to_string_lossy().as_ref()),
+        ],
     );
+
     assert_eq!(output.status.code(), Some(0));
+    let payload = native_drive::json(&output);
     assert_eq!(
-        harness.logged_args(),
-        vec![
-            "drive",
-            "download",
-            "file-123",
-            "--out",
-            "/tmp/file.pdf",
-            "--format",
-            "pdf"
-        ]
+        payload.get("command").and_then(Value::as_str),
+        Some("google.drive.download")
+    );
+    assert_eq!(
+        payload
+            .get("result")
+            .and_then(|result| result.get("source"))
+            .and_then(Value::as_str),
+        Some("export")
+    );
+    assert_eq!(
+        std::fs::read_to_string(&output_path).expect("downloaded file"),
+        "%PDF fixture"
     );
 }

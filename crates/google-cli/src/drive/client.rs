@@ -1,4 +1,4 @@
-use std::collections::hash_map::DefaultHasher;
+use std::collections::{BTreeMap, hash_map::DefaultHasher};
 use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -28,6 +28,10 @@ pub struct DriveFile {
     pub size_bytes: u64,
     #[serde(default)]
     pub parents: Vec<String>,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub export_formats: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -94,6 +98,16 @@ pub struct UploadResult {
     pub convert_requested: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DownloadPayload {
+    pub file_id: String,
+    pub file_name: String,
+    pub mime_type: String,
+    pub format: Option<String>,
+    pub source: &'static str,
+    pub bytes: Vec<u8>,
+}
+
 impl DriveSession {
     pub fn from_global(global: &GlobalOptions) -> Result<Self, AppError> {
         let paths = AuthPaths::resolve()?;
@@ -150,6 +164,45 @@ impl DriveSession {
             .find(|file| file.id == request.file_id)
             .ok_or_else(|| AppError::drive_not_found("file", request.file_id.as_str()))?;
         Ok(view_for_file(file))
+    }
+
+    pub fn resolve_download(
+        &self,
+        file_id: &str,
+        format: Option<&str>,
+    ) -> Result<DownloadPayload, AppError> {
+        let file = self
+            .fixture
+            .files
+            .iter()
+            .find(|candidate| candidate.id == file_id)
+            .ok_or_else(|| AppError::drive_not_found("file", file_id))?;
+
+        if let Some(format) = format {
+            let Some(content) = file.export_formats.get(format) else {
+                return Err(AppError::invalid_drive_input(format!(
+                    "file `{file_id}` does not support export format `{format}`"
+                )));
+            };
+
+            return Ok(DownloadPayload {
+                file_id: file.id.clone(),
+                file_name: file.name.clone(),
+                mime_type: file.mime_type.clone(),
+                format: Some(format.to_string()),
+                source: "export",
+                bytes: content.as_bytes().to_vec(),
+            });
+        }
+
+        Ok(DownloadPayload {
+            file_id: file.id.clone(),
+            file_name: file.name.clone(),
+            mime_type: file.mime_type.clone(),
+            format: None,
+            source: "download",
+            bytes: file.content.as_bytes().to_vec(),
+        })
     }
 
     pub fn upload(&self, request: &UploadRequest) -> Result<UploadResult, AppError> {
@@ -295,6 +348,8 @@ fn load_fixture_store() -> Result<DriveFixtureStore, AppError> {
             mime_type: "text/plain".to_string(),
             size_bytes: 12,
             parents: vec!["root".to_string()],
+            content: "sample".to_string(),
+            export_formats: BTreeMap::new(),
         }],
     })
 }

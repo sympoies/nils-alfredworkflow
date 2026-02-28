@@ -2,13 +2,12 @@
 
 Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 4 (lane g1) status
+## Sprint 4 status
 
 - Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
 - Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
 - Gmail commands now execute through native Rust modules (`src/gmail/*`) with native account resolution reuse.
-- Drive `ls/search/get/upload` now execute through native Rust modules (`src/drive/*`).
-- Drive `download` remains wrapper-backed through `src/runtime.rs` until Sprint 4 lane g2 lands.
+- Drive commands (`ls/search/get/download/upload`) now execute through native Rust modules (`src/drive/*`).
 
 ## Command scope to preserve
 
@@ -40,16 +39,17 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 | `drive ls [flags...]` | Primary generated client path with fallback allowance. |
 | `drive search <query...> [flags...]` | Primary generated client path with fallback allowance. |
 | `drive get <fileId>` | Primary generated client path with fallback allowance. |
-| `drive download <fileId> [flags...]` | Primary generated client path with fallback allowance. |
+| `drive download <fileId> [flags...]` | Native destination/export path with overwrite controls. |
 | `drive upload <localPath> [flags...]` | Primary generated client path with fallback allowance. |
 
 ## Environment variables
 
-- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands (`drive`) during migration.
+- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands still on migration path.
 - `GOOGLE_CLI_CONFIG_DIR`: override native auth config directory.
 - `GOOGLE_CLI_KEYRING_MODE`: auth storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
 - `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable automatic browser launch for loopback auth.
 - `GOOGLE_CLI_GMAIL_FIXTURE_PATH`: optional fixture JSON path for local/native Gmail integration testing.
+- `GOOGLE_CLI_DRIVE_FIXTURE_PATH`: optional fixture JSON path for local/native Drive integration testing.
 
 ## Output contract
 
@@ -66,33 +66,11 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 - `cargo test -p google-cli --test gmail_thread`
 - `cargo test -p google-cli --test gmail_send`
 - `cargo test -p google-cli --test gmail_cli_contract`
-- `cargo test -p google-cli --test account_resolution_shared`
+- `cargo test -p google-cli --test drive_read`
+- `cargo test -p google-cli --test drive_download`
+- `cargo test -p google-cli --test drive_upload`
+- `cargo test -p google-cli --test drive_cli_contract`
 - `cargo test -p google-cli --test native_no_gog`
-
-## Manual smoke checklist (auth)
-
-1. `cargo run -p google-cli -- auth credentials set --client-id <id> --client-secret <secret>`
-2. `cargo run -p google-cli -- auth add <email>` (loopback mode; callback flow)
-3. `cargo run -p google-cli -- auth list`
-4. `cargo run -p google-cli -- auth status` (verifies default account resolution)
-5. `cargo run -p google-cli -- auth manage` (summary-only; no browser manager page)
-6. Optional remote flow step 1:
-   `cargo run -p google-cli -- auth add <email> --remote --step 1`
-7. Optional remote flow step 2:
-   `cargo run -p google-cli -- auth add <email> --remote --step 2 --state <state> --code <code>`
-
-## Manual smoke checklist (gmail)
-
-1. `cargo run -p google-cli -- gmail search "from:team@example.com" --max 5 --format metadata --headers Subject,From`
-2. `cargo run -p google-cli -- gmail get <messageId> --format full`
-3. `cargo run -p google-cli -- gmail thread get <threadId> --format metadata --headers Subject`
-4. `cargo run -p google-cli -- gmail thread modify <threadId> --add-label STARRED --remove-label UNREAD`
-5. `cargo run -p google-cli -- gmail send --to team@example.com --subject "Sprint Update" --body "Native Gmail path"`
-
-## Documentation
-
-- [`docs/README.md`](docs/README.md)
-- [`docs/features/auth.md`](docs/features/auth.md)
-- [`docs/features/gmail.md`](docs/features/gmail.md)
-- [`docs/features/drive.md`](docs/features/drive.md)
-- [`../../docs/specs/google-cli-native-contract.md`](../../docs/specs/google-cli-native-contract.md)
+- `cargo run -p google-cli -- auth --help`
+- `cargo run -p google-cli -- gmail --help`
+- `cargo run -p google-cli -- drive --help`

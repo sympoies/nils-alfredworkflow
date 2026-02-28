@@ -41,9 +41,8 @@ pub fn run_request(request: &Request) -> Result<RenderedOutput, AppError> {
         ));
     }
 
-    if request.invocation.command_id.starts_with("google.drive.")
-        && let Some(native) = drive::execute_native(&request.global, &request.invocation)?
-    {
+    if request.invocation.command_id.starts_with("google.drive.") {
+        let native = drive::execute_native(&request.global, &request.invocation)?;
         return Ok(render_native_response(
             request.invocation.command_id.as_str(),
             request.global.output_mode_hint(),
