@@ -2,7 +2,7 @@
 
 ## Inventory Scope
 
-- Scope: workspace CLI crates under `crates/*-cli`, plus the scoped wrapper crate `crates/google-cli`.
+- Scope: workspace CLI crates under `crates/*-cli`, plus the scoped native crate `crates/google-cli`.
 - Baseline date: 2026-02-27.
 - Sources:
   - `crates/*-cli/src/main.rs` command definitions.
@@ -33,20 +33,20 @@
 | `nils-workflow-cli`  | `workflow-cli`  | `github-url`    | `--path <dir>`                                                                         | Plain text (URL)                                                     | Keep plain text action contract                                            | `workflows/open-project/scripts/action_open_github.sh`                                                                                 |
 | `nils-youtube-cli`   | `youtube-cli`   | `search`        | `--query <text>`                                                                       | Legacy Alfred JSON (top-level `items`)                               | `human-readable` default + explicit `--json` envelope + compatibility mode | `workflows/youtube-search/scripts/script_filter.sh`                                                                                    |
 
-## Scoped wrapper crate
+## Scoped native crate
 
 - `google-cli` / `google-cli`
   - Commands: `auth <...>`, `gmail <...>`, `drive <...>`
-  - Key options: `--account`, `--client`, `--json`, `--plain`, plus scoped pass-through flags
-  - Current output mode: human/plain passthrough; explicit wrapper JSON envelope
-  - Target mode: keep scoped wrapper behavior for direct CLI and future integrations
-  - Primary consumer mapping: direct terminal use and fake-`gog` contract tests; no Alfred workflow consumer in this phase
+  - Key options: `--account`, `--json`, `--plain`, plus command-local native flags
+  - Current output mode: native human/plain output; explicit JSON envelope mode
+  - Target mode: keep scoped native behavior for direct CLI and future integrations
+  - Primary consumer mapping: direct terminal use and native contract tests; no Alfred workflow consumer in this phase
 
 ## Consumer Risk Notes
 
 - Highest migration sensitivity: all workflow `script_filter` and `script-filter` callers currently assume Alfred JSON
   by default.
-- `google-cli` is a scoped direct-use wrapper only; its main risk is upstream `gog` drift rather than Alfred consumer breakage.
+- `google-cli` is a scoped direct-use native crate; its main risk is Google API behavior drift rather than Alfred consumer breakage.
 - `weather-cli` now has direct workflow consumers (`wt` / `ww`), so script-filter compatibility mode must remain stable.
 - `workflow-cli` must preserve action-command plain text behavior while adding explicit machine mode for structured
   integrations.

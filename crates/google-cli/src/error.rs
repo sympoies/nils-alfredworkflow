@@ -1,11 +1,11 @@
-use std::io;
-use std::path::{Path, PathBuf};
-
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 pub const ERROR_CODE_USER_INVALID_OUTPUT_FLAGS: &str = "NILS_GOOGLE_001";
+// Reserved after native migration removed wrapper runtime errors.
 pub const ERROR_CODE_RUNTIME_MISSING_GOG: &str = "NILS_GOOGLE_002";
+// Reserved after native migration removed wrapper runtime errors.
 pub const ERROR_CODE_RUNTIME_GOG_FAILED: &str = "NILS_GOOGLE_003";
+// Reserved after native migration removed wrapper runtime errors.
 pub const ERROR_CODE_RUNTIME_INVALID_JSON: &str = "NILS_GOOGLE_004";
 pub const ERROR_CODE_USER_AUTH_INVALID_INPUT: &str = "NILS_GOOGLE_005";
 pub const ERROR_CODE_USER_AUTH_AMBIGUOUS_ACCOUNT: &str = "NILS_GOOGLE_006";
@@ -180,81 +180,6 @@ impl AppError {
             Some(json!({ "kind": "drive_runtime_failure" })),
         )
     }
-
-    pub fn missing_gog(requested: &str, searched: &[PathBuf]) -> Self {
-        let searched = searched
-            .iter()
-            .map(|path| Value::String(path.display().to_string()))
-            .collect::<Vec<_>>();
-        Self::runtime(
-            ERROR_CODE_RUNTIME_MISSING_GOG,
-            format!("could not resolve `{requested}`; install gog or set GOOGLE_CLI_GOG_BIN"),
-            Some(json!({
-                "kind": "missing_binary",
-                "requested": requested,
-                "searched": searched,
-                "env": "GOOGLE_CLI_GOG_BIN",
-            })),
-        )
-    }
-
-    pub fn process_launch(program: &Path, error: &io::Error) -> Self {
-        Self::runtime(
-            ERROR_CODE_RUNTIME_GOG_FAILED,
-            format!("failed to launch `{}`: {error}", program.display()),
-            Some(json!({
-                "kind": "process_launch",
-                "program": program.display().to_string(),
-            })),
-        )
-    }
-
-    pub fn process_failure(command: &str, exit_code: Option<i32>, stderr: &[u8]) -> Self {
-        let stderr = redact_sensitive(&String::from_utf8_lossy(stderr));
-        let mut details = Map::new();
-        details.insert(
-            "kind".to_string(),
-            Value::String("process_failure".to_string()),
-        );
-        if let Some(code) = exit_code {
-            details.insert("exit_code".to_string(), Value::Number(code.into()));
-        }
-        if !stderr.trim().is_empty() {
-            details.insert(
-                "stderr_excerpt".to_string(),
-                Value::String(first_line(&stderr)),
-            );
-        }
-
-        let exit_label = exit_code
-            .map(|code| code.to_string())
-            .unwrap_or_else(|| "unknown".to_string());
-        let message = if stderr.trim().is_empty() {
-            format!("{command} failed with exit code {exit_label}")
-        } else {
-            format!(
-                "{command} failed with exit code {exit_label}: {}",
-                first_line(&stderr)
-            )
-        };
-
-        Self::runtime(
-            ERROR_CODE_RUNTIME_GOG_FAILED,
-            message,
-            Some(Value::Object(details)),
-        )
-    }
-
-    pub fn invalid_json(command: &str, raw_output: &str, error: &serde_json::Error) -> Self {
-        Self::runtime(
-            ERROR_CODE_RUNTIME_INVALID_JSON,
-            format!("{command} returned invalid JSON output: {error}"),
-            Some(json!({
-                "kind": "invalid_json",
-                "raw_excerpt": first_line(&redact_sensitive(raw_output)),
-            })),
-        )
-    }
 }
 
 pub fn redact_sensitive(input: &str) -> String {
@@ -332,15 +257,6 @@ fn find_value_end(input: &str, mut index: usize) -> usize {
         index += 1;
     }
     index
-}
-
-fn first_line(input: &str) -> String {
-    input
-        .lines()
-        .next()
-        .map(str::trim)
-        .unwrap_or_default()
-        .to_string()
 }
 
 #[cfg(test)]

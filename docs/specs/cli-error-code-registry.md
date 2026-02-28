@@ -53,10 +53,20 @@ Provides stable machine error codes shared by all CLI crates using JSON envelope
 | `NILS_CAMBRIDGE_003` | cambridge | scraper runtime process failure |
 | `NILS_EPOCH_001` | epoch | unsupported query format |
 | `NILS_EPOCH_002` | epoch | out-of-range datetime/epoch |
-| `NILS_GOOGLE_001` | google | invalid wrapper input / conflicting output flags |
-| `NILS_GOOGLE_002` | google | missing wrapped `gog` binary |
-| `NILS_GOOGLE_003` | google | wrapped `gog` process launch/exit failure |
-| `NILS_GOOGLE_004` | google | wrapped `gog` invalid JSON output |
+| `NILS_GOOGLE_001` | google | invalid google-cli input / conflicting output flags |
+| `NILS_GOOGLE_002` | google | reserved after native migration (legacy external-runtime missing binary) |
+| `NILS_GOOGLE_003` | google | reserved after native migration (legacy external-runtime process failure) |
+| `NILS_GOOGLE_004` | google | reserved after native migration (legacy external-runtime invalid JSON) |
+| `NILS_GOOGLE_005` | google | auth invalid input |
+| `NILS_GOOGLE_006` | google | auth ambiguous account selection |
+| `NILS_GOOGLE_007` | google | auth store/runtime persistence failure |
+| `NILS_GOOGLE_008` | google | auth remote/manual state mismatch |
+| `NILS_GOOGLE_009` | google | Gmail invalid input |
+| `NILS_GOOGLE_010` | google | Gmail resource not found |
+| `NILS_GOOGLE_011` | google | Gmail runtime failure |
+| `NILS_GOOGLE_012` | google | Drive invalid input |
+| `NILS_GOOGLE_013` | google | Drive resource not found |
+| `NILS_GOOGLE_014` | google | Drive runtime failure |
 | `NILS_MARKET_001` | market | invalid symbol/amount expression |
 | `NILS_MARKET_002` | market | provider unavailable/rate-limited |
 | `NILS_QUOTE_001` | quote | invalid quote config value |

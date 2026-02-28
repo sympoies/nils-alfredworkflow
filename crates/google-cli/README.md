@@ -2,12 +2,13 @@
 
 Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` commands.
 
-## Sprint 4 status
+## Sprint 5 status
 
 - Native dependency stack is pinned in `crates/google-cli/Cargo.toml`.
 - Auth commands now execute through native Rust modules (`src/auth/*`) with local config + token persistence.
 - Gmail commands now execute through native Rust modules (`src/gmail/*`) with native account resolution reuse.
 - Drive commands (`ls/search/get/download/upload`) now execute through native Rust modules (`src/drive/*`).
+- Wrapper-era runtime shelling and `gog` override paths are removed from production code.
 
 ## Command scope to preserve
 
@@ -44,7 +45,6 @@ Native Rust migration crate for scoped Google `auth`, `gmail`, and `drive` comma
 
 ## Environment variables
 
-- `GOOGLE_CLI_GOG_BIN`: explicit override for wrapper-backed commands still on migration path.
 - `GOOGLE_CLI_CONFIG_DIR`: override native auth config directory.
 - `GOOGLE_CLI_KEYRING_MODE`: auth storage mode (`keyring`, `file`, `fail`, `keyring-strict`).
 - `GOOGLE_CLI_AUTH_DISABLE_BROWSER`: disable automatic browser launch for loopback auth.

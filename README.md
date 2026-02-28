@@ -36,8 +36,8 @@ Alfred workflows for macOS users.
 
 ## Developer crates
 
-- `google-cli`: `gog` wrapper for `auth/gmail/drive`, intended for direct terminal use and contract-tested runtime integration.
-- Current non-goals for `google-cli`: Alfred workflow wiring, workflow packaging, and non-scoped `gog` domains.
+- `google-cli`: native Rust client for scoped Google `auth/gmail/drive`, intended for direct terminal use and contract-tested runtime integration.
+- Current non-goals for `google-cli`: Alfred workflow wiring, workflow packaging, and non-scoped Google domains.
 
 ## macOS Gatekeeper standalone script
 

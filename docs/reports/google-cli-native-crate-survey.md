@@ -33,6 +33,21 @@ compile-only probe.
   fallback provide better delivery speed.
 - Rebuilding OAuth and token-exchange primitives from scratch: rejected in favor of `yup-oauth2` + targeted fallback.
 
+## Final choice (Sprint 5 freeze)
+
+- Final choice: keep the primary generated-client stack (`google-gmail1`, `google-drive3`, `google-apis-common`,
+  `yup-oauth2`) with native auth/account modules and command-local adapters.
+- Final choice: keep `reqwest` as a documented fallback for blocked operations, but do not make it the default path.
+- Final choice: keep `keyring` `=3.6.2` as the default secure token backend with deterministic file-mode test fallback.
+
+## Rollback notes
+
+- Rollback target: last wrapper-era release tag before native completion (`v1.1.9`) for emergency restore.
+- Rollback method: revert `crates/google-cli` to wrapper-era runtime files, restore wrapper-era docs/specs, and remove
+  native-only modules/reports in one revert change set.
+- Rollback verification: run `cargo test -p google-cli`, `scripts/workflow-lint.sh`, and `scripts/workflow-test.sh`
+  after the revert to confirm release readiness.
+
 ## Compile probe intent
 
 `crates/google-cli/examples/native_probe.rs` is compile-only. It imports and type-checks the selected OAuth + Gmail +

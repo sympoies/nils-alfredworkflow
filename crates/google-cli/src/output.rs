@@ -1,7 +1,6 @@
 use serde_json::{Value, json};
 
 use crate::error::{AppError, ErrorKind, redact_sensitive};
-use crate::runtime::ProcessOutput;
 
 pub const ENVELOPE_SCHEMA_VERSION: &str = "v1";
 
@@ -32,22 +31,18 @@ impl RenderedOutput {
 pub fn render_success(
     command_id: &str,
     mode: OutputMode,
-    process: ProcessOutput,
-) -> Result<RenderedOutput, AppError> {
+    payload: Value,
+    text: &str,
+) -> RenderedOutput {
     match mode {
-        OutputMode::Json => {
-            let stdout = String::from_utf8_lossy(&process.stdout).to_string();
-            let payload: Value = serde_json::from_str(&stdout)
-                .map_err(|error| AppError::invalid_json(command_id, stdout.as_str(), &error))?;
-            Ok(RenderedOutput {
-                stdout: format_success_envelope(command_id, payload),
-                stderr: String::new(),
-            })
-        }
-        OutputMode::Human | OutputMode::Plain => Ok(RenderedOutput {
-            stdout: String::from_utf8_lossy(&process.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&process.stderr).to_string(),
-        }),
+        OutputMode::Json => RenderedOutput {
+            stdout: format_success_envelope(command_id, payload),
+            stderr: String::new(),
+        },
+        OutputMode::Human | OutputMode::Plain => RenderedOutput {
+            stdout: format!("{text}\n"),
+            stderr: String::new(),
+        },
     }
 }
 
@@ -98,7 +93,7 @@ fn format_error_envelope(command_id: &str, error: &AppError) -> String {
     });
 
     if let Some(details) = error.details() {
-        envelope["error"]["details"]["wrapper"] = details.clone();
+        envelope["error"]["details"]["context"] = details.clone();
     }
 
     envelope.to_string()
@@ -108,20 +103,16 @@ fn format_error_envelope(command_id: &str, error: &AppError) -> String {
 mod tests {
     use serde_json::Value;
 
-    use super::{OutputMode, render_success};
-    use crate::runtime::ProcessOutput;
+    use super::{OutputMode, render_error, render_success};
 
     #[test]
-    fn json_success_wraps_valid_payload() {
+    fn json_success_wraps_payload() {
         let output = render_success(
             "google.auth.list",
             OutputMode::Json,
-            ProcessOutput {
-                stdout: br#"{"accounts":["me@example.com"]}"#.to_vec(),
-                stderr: Vec::new(),
-            },
-        )
-        .expect("render");
+            serde_json::json!({"accounts": ["me@example.com"]}),
+            "Listed native auth accounts.",
+        );
 
         let json: Value = serde_json::from_str(&output.stdout).expect("json");
         assert_eq!(
@@ -142,17 +133,23 @@ mod tests {
     }
 
     #[test]
-    fn json_success_rejects_invalid_payload() {
-        let error = render_success(
-            "google.auth.list",
-            OutputMode::Json,
-            ProcessOutput {
-                stdout: b"not-json".to_vec(),
-                stderr: Vec::new(),
-            },
-        )
-        .expect_err("invalid payload should fail");
-
-        assert_eq!(error.code(), crate::error::ERROR_CODE_RUNTIME_INVALID_JSON);
+    fn json_error_wraps_context_details() {
+        let error = crate::error::AppError::invalid_auth_input("missing account");
+        let output = render_error("google.auth.add", OutputMode::Json, &error);
+        let json: Value = serde_json::from_str(&output.stdout).expect("json");
+        assert_eq!(
+            json.get("error")
+                .and_then(|value| value.get("code"))
+                .and_then(Value::as_str),
+            Some("NILS_GOOGLE_005")
+        );
+        assert_eq!(
+            json.get("error")
+                .and_then(|value| value.get("details"))
+                .and_then(|value| value.get("context"))
+                .and_then(|value| value.get("kind"))
+                .and_then(Value::as_str),
+            Some("auth_invalid_input")
+        );
     }
 }

@@ -20,15 +20,15 @@
 | Exit code semantics | Keep current repo behavior: `0=success`, `1=runtime/dependency`, `2=user/input/config`. | Revisit only with explicit RFC and multi-crate rollout plan. |
 | Secret safety | Never include secrets/tokens in `result`, `error.message`, or `error.details`. | Contract tests must include secret-redaction assertions for JSON paths. |
 
-## Wrapper crate note
+## Native google-cli note
 
-- `google-cli` is a `gog wrapper` crate with scoped support for `auth/gmail/drive`.
-- Wrapper-specific contract owner: `docs/specs/google-cli-wrapper-contract.md`.
-- Local policy for this wrapper:
-  - default output remains human-readable upstream passthrough
-  - `--plain` forwards upstream stable text unchanged
-  - `--json` forwards upstream JSON mode, then re-wraps the validated payload in the repo envelope
-  - wrapper-owned errors must use stable `NILS_GOOGLE_*` codes
+- `google-cli` is a native Rust crate with scoped support for `auth/gmail/drive`.
+- Native contract owner: `docs/specs/google-cli-native-contract.md`.
+- Local policy for this crate:
+  - default output remains human-readable native text
+  - `--plain` emits stable native text unchanged
+  - `--json` emits the repo envelope around native payloads
+  - native-owned errors must use stable `NILS_GOOGLE_*` codes (`NILS_GOOGLE_002`-`004` remain reserved)
 
 ## Legacy Exceptions (Time-bounded)
 
