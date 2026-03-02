@@ -76,6 +76,19 @@
 - For workflow-specific or CLI-specific checks (for example live smoke or probe scripts), run the validation steps
   documented in the corresponding `workflows/<workflow-id>/README.md`.
 
+### Third-party license generator workflow
+
+- One-command regeneration:
+  - `bash scripts/generate-third-party-licenses.sh --write`
+- Freshness check (fails when `THIRD_PARTY_LICENSES.md` drifts from source metadata):
+  - `bash scripts/generate-third-party-licenses.sh --check`
+- Regression tests for generator behavior:
+  - `bash tests/third-party-licenses/generator.test.sh`
+- Expected failure modes:
+  - `--check` exits non-zero with `FAIL [check] THIRD_PARTY_LICENSES.md is stale` and a remediation command.
+  - Missing required input files (for example `Cargo.lock`, `package-lock.json`, or
+    `scripts/lib/codex_cli_version.sh`) exit non-zero with `required input missing: <path>`.
+
 ### Alfred Script Filter guardrail
 
 - For workflows where Script Filter output is already fully controlled by our CLI/script JSON, keep

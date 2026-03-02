@@ -14,13 +14,27 @@ This document lists required local tools for development, linting, testing, and 
 - Rust toolchain (`rustup`, `cargo`, `rustc`)
 - Rust components: `rustfmt`, `clippy`, `llvm-tools-preview`
 - Cargo tools: `cargo-nextest`, `cargo-llvm-cov`
-- Core CLI/runtime: `git`, `jq`, `rg` (ripgrep)
+- Core CLI/runtime: `git`, `jq`, `rg` (ripgrep), `curl`
 - Shell tooling: `shellcheck`, `shfmt`
 - Node runtime: `node`, `npm`
 - Node dependency: `playwright` package (managed via root `package.json`)
+- SHA-256 provider (at least one): `shasum` or `sha256sum` or `openssl`
 - Packaging/runtime helpers: `zip`, `unzip`, `open` (macOS install/runtime), `xdg-open` (Linux CI/local smoke
   compatibility)
 - Optional live scraper runtime: Playwright Chromium browser (`npx playwright install chromium`)
+
+## Third-party license generator prerequisites
+
+- Regenerate the artifact:
+  - `bash scripts/generate-third-party-licenses.sh --write`
+- Verify artifact freshness:
+  - `bash scripts/generate-third-party-licenses.sh --check`
+- Run regression tests:
+  - `bash tests/third-party-licenses/generator.test.sh`
+- Generator/runtime prerequisites:
+  - `cargo`, `jq`, and `curl`
+  - one SHA-256 provider (`shasum`, `sha256sum`, or `openssl`)
+  - standard shell utilities used by the script (`awk`, `cmp`, `mktemp`, `sed`, `sort`)
 
 ## Crates.io pinned binary packaging policy
 
