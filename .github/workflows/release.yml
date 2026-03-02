@@ -27,6 +27,12 @@ jobs:
           source scripts/lib/codex_cli_version.sh
           cargo install "${CODEX_CLI_CRATE}" --version "${CODEX_CLI_VERSION}" --locked
 
+      - name: Regenerate third-party licenses artifact
+        run: bash scripts/generate-third-party-licenses.sh --write
+
+      - name: Verify third-party licenses artifact
+        run: bash scripts/generate-third-party-licenses.sh --check
+
       - name: Package all workflows
         run: scripts/workflow-pack.sh --all
 
@@ -39,6 +45,8 @@ jobs:
           bundle_path="$bundle_dir/$bundle_name"
           standalone_script="scripts/workflow-clear-quarantine-standalone.sh"
           standalone_asset="$bundle_dir/workflow-clear-quarantine-standalone.sh"
+          license_source="THIRD_PARTY_LICENSES.md"
+          license_asset="$bundle_dir/THIRD_PARTY_LICENSES.md"
           mkdir -p "$bundle_dir"
 
           bundle_inputs=()
@@ -73,6 +81,24 @@ jobs:
             sha256sum "$standalone_asset" >"$standalone_asset.sha256"
           fi
 
+          if [[ ! -f "$license_source" ]]; then
+            echo "error: missing required license artifact at repository root: $license_source"
+            exit 1
+          fi
+
+          cp "$license_source" "$license_asset"
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "$license_asset" >"$license_asset.sha256"
+          elif command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$license_asset" >"$license_asset.sha256"
+          fi
+
+      - name: Audit release bundle third-party artifacts
+        run: |
+          bash scripts/ci/release-bundle-third-party-audit.sh \
+            --tag "${GITHUB_REF_NAME}" \
+            --dist-dir dist/release-bundles
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
@@ -85,3 +111,5 @@ jobs:
             dist/release-bundles/*.zip.sha256
             dist/release-bundles/workflow-clear-quarantine-standalone.sh
             dist/release-bundles/workflow-clear-quarantine-standalone.sh.sha256
+            dist/release-bundles/THIRD_PARTY_LICENSES.md
+            dist/release-bundles/THIRD_PARTY_LICENSES.md.sha256

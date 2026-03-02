@@ -25,6 +25,7 @@ gate failures.
      - `sed -n '1,120p' scripts/lib/codex_cli_version.sh`
 3. Re-run CI/release gate checks locally:
    - `bash scripts/ci/third-party-licenses-audit.sh --strict`
+   - `bash scripts/ci/release-bundle-third-party-audit.sh --tag <tag> --dist-dir dist/release-bundles`
 4. If failures persist, follow release-specific guidance:
    - `docs/RELEASE.md` (`Third-party license gate remediation`)
 

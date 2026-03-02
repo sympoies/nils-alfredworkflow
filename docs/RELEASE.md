@@ -25,6 +25,26 @@ Artifacts are written to `dist/<workflow-id>/<version>/`.
 
 Tag push (`v*`) triggers `.github/workflows/release.yml` and uploads built `.alfredworkflow` artifacts and checksums.
 
+## Third-party license release assets
+
+Release uploads include third-party license compliance artifacts under `dist/release-bundles/`:
+
+- `THIRD_PARTY_LICENSES.md`
+- `THIRD_PARTY_LICENSES.md.sha256`
+
+Before upload, release CI runs:
+
+1. `bash scripts/generate-third-party-licenses.sh --write`
+2. `bash scripts/generate-third-party-licenses.sh --check`
+3. `bash scripts/ci/release-bundle-third-party-audit.sh --tag <tag> --dist-dir dist/release-bundles`
+
+To validate locally after packaging:
+
+1. `bash scripts/generate-third-party-licenses.sh --write`
+2. `bash scripts/generate-third-party-licenses.sh --check`
+3. `bash scripts/workflow-pack.sh --all`
+4. `bash scripts/ci/release-bundle-third-party-audit.sh --tag v0.0.0-test --dist-dir dist/release-bundles`
+
 ## Third-party license gate remediation
 
 If release-time checks fail on `THIRD_PARTY_LICENSES.md` freshness or license audit gate commands, run:
@@ -34,7 +54,9 @@ If release-time checks fail on `THIRD_PARTY_LICENSES.md` freshness or license au
    - `bash scripts/generate-third-party-licenses.sh --check`
 2. Re-run strict audit gate:
    - `bash scripts/ci/third-party-licenses-audit.sh --strict`
-3. Retry release flow after the checks pass.
+3. Re-run release bundle audit gate:
+   - `bash scripts/ci/release-bundle-third-party-audit.sh --tag <tag> --dist-dir dist/release-bundles`
+4. Retry release flow after the checks pass.
 
 For detailed troubleshooting (including crates.io lookup failures), use:
 
