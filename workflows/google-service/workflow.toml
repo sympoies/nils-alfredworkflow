@@ -1,0 +1,23 @@
+id = "google-service"
+name = "Google Service"
+bundle_id = "com.sympoies.google-service"
+version = "0.2.0"
+script_filter = "script_filter.sh"
+action = "action_open.sh"
+rust_binary = "google-cli"
+assets = ["src/assets/icon.png"]
+
+[env]
+# Optional absolute path override for google-cli binary.
+GOOGLE_CLI_BIN = ""
+# Optional auth config root for google-cli. Leave empty to use google-cli defaults.
+GOOGLE_CLI_CONFIG_DIR = ""
+# Optional keyring mode override for google-cli token backend.
+# Allowed: keyring, file, fail, keyring-strict
+GOOGLE_CLI_KEYRING_MODE = ""
+# Require remove confirmation dialog when available (1=true, 0=false).
+GOOGLE_AUTH_REMOVE_CONFIRM = "1"
+
+[alfred]
+min_alfred = "5"
+min_macos = "13.0"

@@ -138,6 +138,12 @@
           "search_driver",
           "cli_driver"
         ]
+      },
+      "google-service": {
+        "script_filter": "workflows/google-service/scripts/script_filter.sh",
+        "requires": [
+          "helper_loader"
+        ]
       }
     }
   },
@@ -184,6 +190,13 @@
         "C4A6E4D4-4C89-4F8E-B6F8-2F1A7A5E6D09",
         "A9F12D4E-1D99-4D7B-A950-6E84A583A9C2",
         "EC219E70-FAD4-4E58-A883-8E02D7E43630"
+      ]
+    },
+    "google-service": {
+      "template": "workflows/google-service/src/info.plist.template",
+      "object_uids": [
+        "9A5E9D5B-94C7-4A7D-94F9-3ABBCF29DF21",
+        "F36B0D90-7A45-4B9D-9C1B-7791A3E3D781"
       ]
     }
   }

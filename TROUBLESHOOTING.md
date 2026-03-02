@@ -35,6 +35,7 @@ gate failures.
 - `workflows/bilibili-search/TROUBLESHOOTING.md`
 - `workflows/wiki-search/TROUBLESHOOTING.md`
 - `workflows/google-search/TROUBLESHOOTING.md`
+- `workflows/google-service/TROUBLESHOOTING.md`
 - `workflows/youtube-search/TROUBLESHOOTING.md`
 - `workflows/bangumi-search/TROUBLESHOOTING.md`
 
