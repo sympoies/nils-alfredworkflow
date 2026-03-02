@@ -188,8 +188,45 @@ source "$codex_cli_version_script"
 [[ -n "${CODEX_CLI_VERSION:-}" ]] || fail "missing CODEX_CLI_VERSION after sourcing $codex_cli_version_script"
 
 runtime_source_url="https://crates.io/api/v1/crates/${CODEX_CLI_CRATE}/${CODEX_CLI_VERSION}"
-if ! curl -fsSL "$runtime_source_url" >"$runtime_response_json"; then
-  fail "failed to fetch runtime crate metadata from crates.io: $runtime_source_url"
+runtime_fetch_attempts="${THIRD_PARTY_LICENSES_CRATES_IO_MAX_ATTEMPTS:-4}"
+runtime_fetch_backoff_seconds="${THIRD_PARTY_LICENSES_CRATES_IO_RETRY_BASE_SECONDS:-1}"
+runtime_fetch_user_agent="${THIRD_PARTY_LICENSES_USER_AGENT:-nils-alfredworkflow-third-party-licenses/1.0 (+https://github.com/sympoies/nils-alfredworkflow)}"
+
+[[ "$runtime_fetch_attempts" =~ ^[1-9][0-9]*$ ]] || fail "THIRD_PARTY_LICENSES_CRATES_IO_MAX_ATTEMPTS must be a positive integer"
+[[ "$runtime_fetch_backoff_seconds" =~ ^[0-9]+$ ]] || fail "THIRD_PARTY_LICENSES_CRATES_IO_RETRY_BASE_SECONDS must be a non-negative integer"
+
+runtime_fetch_error_file="$tmp_root/runtime-crates-io-fetch.stderr"
+runtime_fetch_ok=0
+
+for ((runtime_fetch_attempt = 1; runtime_fetch_attempt <= runtime_fetch_attempts; runtime_fetch_attempt++)); do
+  : >"$runtime_fetch_error_file"
+  if curl -fsSL \
+    --retry 0 \
+    --connect-timeout 10 \
+    --max-time 30 \
+    -A "$runtime_fetch_user_agent" \
+    -H 'Accept: application/json' \
+    "$runtime_source_url" >"$runtime_response_json" 2>"$runtime_fetch_error_file"; then
+    runtime_fetch_ok=1
+    if [[ "$runtime_fetch_attempt" -gt 1 ]]; then
+      echo "note: crates.io fetch succeeded after retry ${runtime_fetch_attempt}/${runtime_fetch_attempts}" >&2
+    fi
+    break
+  fi
+
+  runtime_fetch_rc=$?
+  runtime_fetch_error="$(tr '\n' ' ' <"$runtime_fetch_error_file" | sed -e 's/[[:space:]]\+/ /g' -e 's/^ //' -e 's/ $//')"
+  [[ -n "$runtime_fetch_error" ]] || runtime_fetch_error="no stderr output"
+  echo "warn: crates.io fetch attempt ${runtime_fetch_attempt}/${runtime_fetch_attempts} failed (exit=${runtime_fetch_rc}): ${runtime_fetch_error}" >&2
+
+  if [[ "$runtime_fetch_attempt" -lt "$runtime_fetch_attempts" ]]; then
+    runtime_backoff_sleep="$((runtime_fetch_backoff_seconds * runtime_fetch_attempt))"
+    sleep "$runtime_backoff_sleep"
+  fi
+done
+
+if [[ "$runtime_fetch_ok" -ne 1 ]]; then
+  fail "failed to fetch runtime crate metadata from crates.io after ${runtime_fetch_attempts} attempts: $runtime_source_url"
 fi
 
 runtime_crate="$(jq -r '.version.crate // ""' "$runtime_response_json")"

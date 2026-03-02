@@ -54,6 +54,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 bash "$repo_root/scripts/ci/markdownlint-audit.sh" --strict
 bash "$repo_root/scripts/workflow-shared-foundation-audit.sh" --check
 bash "$repo_root/scripts/workflow-cli-resolver-audit.sh" --check
+bash "$repo_root/scripts/ci/third-party-licenses-audit.sh" --strict
 
 if command -v shellcheck >/dev/null 2>&1; then
   mapfile -t sh_files < <(find "$repo_root/scripts" "$repo_root/workflows" -type f -name '*.sh' | sort)

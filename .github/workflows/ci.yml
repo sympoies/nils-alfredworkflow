@@ -47,6 +47,9 @@ jobs:
       - name: Lint (includes cli-standards-audit, docs-placement-audit, markdownlint-audit)
         run: scripts/workflow-lint.sh
 
+      - name: Third-party licenses audit (strict)
+        run: bash scripts/ci/third-party-licenses-audit.sh --strict
+
       - name: Node scraper tests
         run: npm run test:cambridge-scraper
 
