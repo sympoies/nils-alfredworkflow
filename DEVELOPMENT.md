@@ -70,6 +70,7 @@
 
 - Recommended pre-commit sequence:
   - `scripts/workflow-lint.sh`
+  - `bash scripts/ci/third-party-licenses-audit.sh --strict`
   - `bash scripts/workflow-sync-script-filter-policy.sh --check`
   - `cargo test --workspace`
   - `scripts/workflow-test.sh`
