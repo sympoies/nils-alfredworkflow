@@ -34,6 +34,7 @@ Outputs:
   - tracked root `package.json` and `package-lock.json` version fields
   - `workflows/bangumi-search/src/info.plist.template` `BANGUMI_USER_AGENT` placeholder (`nils-bangumi-cli/X.Y.Z`)
 - Refreshes tracked `Cargo.lock` workspace package versions when present.
+- Regenerates tracked root `THIRD_PARTY_LICENSES.md` when its inputs changed.
 - Creates a version-bump commit when sync changes are needed.
 - Pushes the version-bump commit to the current upstream branch.
 - Creates an annotated git tag (`Release <version>`).
@@ -64,8 +65,8 @@ Failure modes:
 
 1. Validate repository state (`git` repo, clean tree, remote exists, upstream branch ready).
 2. Validate version format and tag uniqueness (local + remote).
-3. Sync versions (`Cargo.toml` + workflow manifests + root `package*.json` + Bangumi User-Agent placeholder) to input
-   semver and commit/push when needed.
+3. Sync versions (`Cargo.toml` + workflow manifests + root `package*.json` + Bangumi User-Agent placeholder), refresh
+   `Cargo.lock` and tracked `THIRD_PARTY_LICENSES.md` as needed, then commit/push when changes exist.
 4. Create annotated tag `Release <version>`.
 5. Push tag to remote.
 6. Print success summary and release URL.

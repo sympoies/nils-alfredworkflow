@@ -303,6 +303,27 @@ refresh_cargo_lock_if_present() {
   fi
 }
 
+refresh_third_party_licenses_if_present() {
+  local generator_script="scripts/generate-third-party-licenses.sh"
+  local artifact_file="THIRD_PARTY_LICENSES.md"
+
+  if ! git ls-files --error-unmatch "$artifact_file" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  [[ -f "$generator_script" ]] \
+    || fail 3 "tracked $artifact_file requires generator script: $generator_script"
+
+  bash "$generator_script" --write >/dev/null
+
+  if ! git diff --quiet -- "$artifact_file"; then
+    add_version_target \
+      "$artifact_file" \
+      "third-party-licenses" \
+      "$artifact_file: refresh generated artifact for release inputs"
+  fi
+}
+
 ensure_upstream_ready() {
   local remote="$1"
   local upstream_ref counts behind_count ahead_count upstream_remote
@@ -422,16 +443,19 @@ if [[ "${#VERSION_TARGET_FILES[@]}" -gt 0 ]]; then
       bangumi-user-agent)
         set_bangumi_user_agent_placeholder_version "$target_file" "$semver"
         ;;
-      cargo-lock)
+      cargo-lock|third-party-licenses)
         ;;
       *)
         fail 1 "unsupported version target kind '$target_kind' for $target_file"
         ;;
     esac
   done
+fi
 
-  refresh_cargo_lock_if_present "$semver"
+refresh_cargo_lock_if_present "$semver"
+refresh_third_party_licenses_if_present
 
+if [[ "${#VERSION_TARGET_FILES[@]}" -gt 0 ]]; then
   if ! command -v semantic-commit >/dev/null 2>&1; then
     fail 3 "semantic-commit is required to commit version bump changes"
   fi
@@ -442,6 +466,7 @@ chore(release): bump version to ${semver}
 
 - Sync Cargo, workflow, package, and Bangumi UA placeholder versions to ${semver}.
 - Refresh Cargo.lock workspace package versions when present.
+- Regenerate THIRD_PARTY_LICENSES.md when tracked.
 EOF
 
   git push "$remote" "HEAD:${RELEASE_UPSTREAM_BRANCH}"
