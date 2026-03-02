@@ -246,6 +246,79 @@ test_missing_input_error() {
   return 0
 }
 
+test_mpl_source_and_license_url_lines() {
+  local fixture
+  fixture="$(setup_fixture)"
+
+  local fake_crate_dir="$fixture/fake-crates/option-ext-0.2.0"
+  mkdir -p "$fake_crate_dir"
+  cat >"$fake_crate_dir/Cargo.toml" <<'__FAKE_CARGO_TOML__'
+[package]
+name = "option-ext"
+version = "0.2.0"
+edition = "2021"
+__FAKE_CARGO_TOML__
+  cat >"$fake_crate_dir/LICENSE.txt" <<'__FAKE_LICENSE__'
+Fake MPL text fixture.
+__FAKE_LICENSE__
+
+  local fake_metadata="$fixture/fake-cargo-metadata.json"
+  cat >"$fake_metadata" <<__FAKE_METADATA__
+{
+  "packages": [
+    {
+      "name": "third-party-artifacts-generator-fixture",
+      "version": "0.1.0",
+      "id": "path+file://$fixture#third-party-artifacts-generator-fixture@0.1.0",
+      "source": null,
+      "manifest_path": "$fixture/Cargo.toml"
+    },
+    {
+      "name": "option-ext",
+      "version": "0.2.0",
+      "id": "registry+https://github.com/rust-lang/crates.io-index#option-ext@0.2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license": "MPL-2.0",
+      "manifest_path": "$fake_crate_dir/Cargo.toml"
+    }
+  ]
+}
+__FAKE_METADATA__
+
+  cat >"$fixture/bin/cargo" <<__FAKE_CARGO__
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "\$#" -gt 0 && "\$1" == "metadata" ]]; then
+  cat "$fake_metadata"
+  exit 0
+fi
+
+echo "unexpected cargo invocation in fixture: \$*" >&2
+exit 1
+__FAKE_CARGO__
+  chmod +x "$fixture/bin/cargo"
+
+  run_generator "$fixture" --write
+  if ! assert_eq "0" "$last_rc" "mpl fixture write exit code"; then
+    dump_last_run
+    return 1
+  fi
+
+  local notices
+  notices="$(cat "$fixture/THIRD_PARTY_NOTICES.md")"
+  if ! assert_contains "$notices" "- Source URL: <https://crates.io/crates/option-ext/0.2.0>" "mpl source url line"; then
+    dump_last_run
+    return 1
+  fi
+  if ! assert_contains "$notices" "- License text (MPL-2.0): <https://mozilla.org/MPL/2.0/>" "mpl license text line"; then
+    dump_last_run
+    return 1
+  fi
+
+  return 0
+}
+
 run_test() {
   local test_name="$1"
   tests_total=$((tests_total + 1))
@@ -259,6 +332,7 @@ run_test() {
 run_test test_clean_write_and_check
 run_test test_drift_detection
 run_test test_missing_input_error
+run_test test_mpl_source_and_license_url_lines
 
 if [[ "$tests_failed" -ne 0 ]]; then
   printf 'FAIL: %d/%d tests failed\n' "$tests_failed" "$tests_total" >&2

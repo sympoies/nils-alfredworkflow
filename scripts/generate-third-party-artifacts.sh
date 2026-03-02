@@ -388,6 +388,20 @@ def cargo_source_label(source: str) -> str:
     return source
 
 
+def cargo_source_url(pkg: dict) -> str | None:
+    source = (pkg.get("source") or "").strip()
+    name = (pkg.get("name") or "").strip()
+    version = (pkg.get("version") or "").strip()
+
+    if source == "registry+https://github.com/rust-lang/crates.io-index" and name and version:
+        return f"https://crates.io/crates/{name}/{version}"
+    if source.startswith("registry+"):
+        return source.removeprefix("registry+")
+    if source.startswith("git+"):
+        return source.removeprefix("git+").split("#", 1)[0]
+    return None
+
+
 def normalize_manifest_dir(manifest_path: str) -> pathlib.Path:
     parsed = urlparse(manifest_path)
     if parsed.scheme == "file":
@@ -570,6 +584,12 @@ for pkg in third_party:
     lines.append("")
     lines.append(f"- License: `{license_expr}`")
     lines.append(f"- Source: `{source}`")
+    is_mpl = re.search(r"(?i)\bMPL-2\.0\b", license_expr) is not None
+    source_url = cargo_source_url(pkg)
+    if source_url and is_mpl:
+        lines.append(f"- Source URL: <{source_url}>")
+    if is_mpl:
+        lines.append("- License text (MPL-2.0): <https://mozilla.org/MPL/2.0/>")
 
     if notice_refs:
         lines.append("- Notice files:")

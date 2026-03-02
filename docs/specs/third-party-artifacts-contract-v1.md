@@ -56,6 +56,14 @@ Must render sections in this exact order:
   - `Crate | Version | License | Repository | Source`
 
 `THIRD_PARTY_NOTICES.md` uses deterministic per-crate bullet sections under `## Dependency Notices`.
+Each per-crate section renders bullets in this order:
+
+1. `- License: ...`
+2. `- Source: ...`
+3. `- Source URL: ...` (only when resolved `License` includes `MPL-2.0` and URL is derivable from source metadata)
+4. `- License text (MPL-2.0): <https://mozilla.org/MPL/2.0/>` (only when the resolved license expression includes `MPL-2.0`)
+5. Notice files bullets / fallback line
+6. License file references bullets / fallback line
 
 ## Input Sources
 

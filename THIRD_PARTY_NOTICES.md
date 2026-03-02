@@ -1239,6 +1239,8 @@ This file documents third-party notice-file discovery for Rust crates used by th
 
 - License: `MPL-2.0`
 - Source: `crates.io`
+- Source URL: <https://crates.io/crates/option-ext/0.2.0>
+- License text (MPL-2.0): <https://mozilla.org/MPL/2.0/>
 - Notice files: No explicit NOTICE file discovered.
 - License file references:
   - `LICENSE.txt`
