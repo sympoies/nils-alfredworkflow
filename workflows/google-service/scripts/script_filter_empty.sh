@@ -2,6 +2,42 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../../.." && pwd)"
+
+helper_loader=""
+for candidate in \
+  "$script_dir/lib/workflow_helper_loader.sh" \
+  "$script_dir/../../../scripts/lib/workflow_helper_loader.sh"; do
+  if [[ -f "$candidate" ]]; then
+    helper_loader="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$helper_loader" ]]; then
+  git_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$git_repo_root" && -f "$git_repo_root/scripts/lib/workflow_helper_loader.sh" ]]; then
+    helper_loader="$git_repo_root/scripts/lib/workflow_helper_loader.sh"
+  fi
+fi
+
+if [[ -z "$helper_loader" ]]; then
+  printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate workflow_helper_loader.sh runtime helper.","valid":false}]}'
+  exit 0
+fi
+
+# shellcheck disable=SC1090
+source "$helper_loader"
+
+load_helper_or_exit() {
+  local helper_name="$1"
+  if ! wfhl_source_helper "$script_dir" "$helper_name" auto; then
+    wfhl_emit_missing_helper_item_json "$helper_name"
+    exit 0
+  fi
+}
+
+load_helper_or_exit "workflow_cli_resolver.sh"
 
 json_escape() {
   local value="${1-}"
@@ -26,34 +62,6 @@ emit_item_json() {
   fi
 
   printf '}]}'
-}
-
-sf_trim() {
-  local value="${1-}"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf '%s' "$value"
-}
-
-expand_home_path() {
-  local value="${1-}"
-
-  case "$value" in
-  "~")
-    if [[ -n "${HOME:-}" ]]; then
-      printf '%s\n' "${HOME%/}"
-      return 0
-    fi
-    ;;
-  \~/*)
-    if [[ -n "${HOME:-}" ]]; then
-      printf '%s/%s\n' "${HOME%/}" "${value#\~/}"
-      return 0
-    fi
-    ;;
-  esac
-
-  printf '%s\n' "$value"
 }
 
 resolve_workflow_data_dir() {
@@ -85,41 +93,12 @@ read_active_account() {
 }
 
 resolve_google_cli() {
-  local configured="${GOOGLE_CLI_BIN:-}"
-  configured="$(sf_trim "$configured")"
-  configured="$(expand_home_path "$configured")"
-  if [[ -n "$configured" && -x "$configured" ]]; then
-    printf '%s\n' "$configured"
-    return 0
-  fi
-
-  local packaged="$script_dir/../bin/google-cli"
-  if [[ -x "$packaged" ]]; then
-    printf '%s\n' "$packaged"
-    return 0
-  fi
-
-  local repo_root
-  repo_root="$(cd "$script_dir/../../.." && pwd)"
-
-  local release_bin="$repo_root/target/release/google-cli"
-  if [[ -x "$release_bin" ]]; then
-    printf '%s\n' "$release_bin"
-    return 0
-  fi
-
-  local debug_bin="$repo_root/target/debug/google-cli"
-  if [[ -x "$debug_bin" ]]; then
-    printf '%s\n' "$debug_bin"
-    return 0
-  fi
-
-  if command -v google-cli >/dev/null 2>&1; then
-    command -v google-cli
-    return 0
-  fi
-
-  return 1
+  wfcr_resolve_binary \
+    "GOOGLE_CLI_BIN" \
+    "$script_dir/../bin/google-cli" \
+    "$repo_root/target/release/google-cli" \
+    "$repo_root/target/debug/google-cli" \
+    "google-cli binary not found (set GOOGLE_CLI_BIN or install nils-google-cli)"
 }
 
 read_default_account() {

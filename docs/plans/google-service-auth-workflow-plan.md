@@ -1,6 +1,7 @@
 # Plan: Google Service Workflow Auth (Login/Remove Multi-Account)
 
 ## Overview
+
 This plan introduces a new `google-service` Alfred workflow focused only on auth operations, aligned with
 `workflows/codex-cli` interaction patterns. Scope is intentionally narrow: implement `login` and `remove`, and add a
 workflow-owned active-account switch layer to support multi-account usage without relying on `save` or alias flows.
@@ -9,6 +10,7 @@ active account for command routing. Delivery is split into setup, auth flow impl
 the first release is testable and low-risk.
 
 ## Scope
+
 - In scope:
   - New `workflows/google-service` scaffold (manifest, plist template, scripts, smoke test, docs).
   - Auth command palette rows for `login` and `remove` only.
@@ -23,6 +25,7 @@ the first release is testable and low-risk.
   - Reworking native `google-cli` auth internals or storage schema.
 
 ## Assumptions
+
 1. Workflow ID and directory name will be `google-service` (`workflows/google-service`).
 2. `google-cli` binary is resolved from workflow packaged runtime or local workspace build, with `GOOGLE_CLI_BIN` as
    explicit override.
@@ -32,14 +35,17 @@ the first release is testable and low-risk.
    support `--manual` fallback.
 
 ## Sprint 1: Workflow Scaffold And Auth State Contract
+
 **Goal**: Create `google-service` workflow skeleton and lock auth state/action token contracts before implementing
 runtime behavior.
 **Demo/Validation**:
+
 - Command(s): `bash workflows/google-service/tests/smoke.sh`,
   `bash scripts/workflow-sync-script-filter-policy.sh --check --workflows google-service`
 - Verify: workflow scaffold passes shared-foundation checks and exposes deterministic action token grammar.
 
 ### Task 1.1: Scaffold `google-service` Workflow Baseline
+
 - **Location**:
   - `workflows/google-service/workflow.toml`
   - `workflows/google-service/src/info.plist.template`
@@ -59,6 +65,7 @@ runtime behavior.
   - `rg -n '^id[[:space:]]*=[[:space:]]*"google-service"$' workflows/google-service/workflow.toml`
 
 ### Task 1.2: Define Auth Query Grammar And Action Tokens
+
 - **Location**:
   - `workflows/google-service/scripts/script_filter.sh`
   - `workflows/google-service/README.md`
@@ -81,6 +88,7 @@ runtime behavior.
   - `rg -n "login::remote::step1|login::manual|switch::|remove::" workflows/google-service/scripts/script_filter.sh workflows/google-service/README.md`
 
 ### Task 1.3: Define Active-Account Persistence Contract
+
 - **Location**:
   - `workflows/google-service/scripts/script_filter.sh`
   - `workflows/google-service/scripts/action_open.sh`
@@ -100,13 +108,16 @@ runtime behavior.
   - `rg -n "active-account.v1.json|fallback|default_account" workflows/google-service/scripts/script_filter.sh workflows/google-service/README.md`
 
 ## Sprint 2: Implement Auth Login/Remove And Multi-Account Switching
+
 **Goal**: Implement end-to-end login/remove execution and account switching UX using `google-cli` auth commands.
 **Demo/Validation**:
+
 - Command(s): `bash workflows/google-service/tests/smoke.sh`,
   `bash scripts/workflow-test.sh --id google-service`
 - Verify: login/remove actions execute with expected command arguments and state transitions.
 
 ### Task 2.1: Implement Login Flows (Remote First, Manual Fallback)
+
 - **Location**:
   - `workflows/google-service/scripts/script_filter.sh`
   - `workflows/google-service/scripts/action_open.sh`
@@ -128,6 +139,7 @@ runtime behavior.
   - `rg -n "auth add .*--remote|auth add .*--manual|authorization_url|--state|--code" workflows/google-service/scripts/action_open.sh`
 
 ### Task 2.2: Implement Account Switch Rows (No `save/use`)
+
 - **Location**:
   - `workflows/google-service/scripts/script_filter.sh`
   - `workflows/google-service/scripts/action_open.sh`
@@ -144,6 +156,7 @@ runtime behavior.
   - `rg -n "auth list|switch::|active account|current" workflows/google-service/scripts/script_filter.sh workflows/google-service/scripts/action_open.sh`
 
 ### Task 2.3: Implement Remove Flow With Confirmation And Rebalance
+
 - **Location**:
   - `workflows/google-service/scripts/script_filter.sh`
   - `workflows/google-service/scripts/action_open.sh`
@@ -162,14 +175,17 @@ runtime behavior.
   - `shellcheck workflows/google-service/scripts/action_open.sh`
 
 ## Sprint 3: Hardening, Documentation, And Acceptance
+
 **Goal**: Lock behavior with smoke coverage and publish operator docs for first auth-only release.
 **Demo/Validation**:
+
 - Command(s): `bash workflows/google-service/tests/smoke.sh`,
   `bash scripts/workflow-test.sh --id google-service`,
   `bash scripts/workflow-pack.sh --id google-service`
 - Verify: workflow package is releasable and auth-only UX is documented.
 
 ### Task 3.1: Add Deterministic Smoke Coverage With Stub `google-cli`
+
 - **Location**:
   - `workflows/google-service/tests/smoke.sh`
   - `workflows/google-service/scripts/script_filter.sh`
@@ -187,6 +203,7 @@ runtime behavior.
   - `bash workflows/google-service/tests/smoke.sh`
 
 ### Task 3.2: Publish Auth-Only README And Troubleshooting
+
 - **Location**:
   - `workflows/google-service/README.md`
   - `workflows/google-service/TROUBLESHOOTING.md`
@@ -201,9 +218,11 @@ runtime behavior.
   - Troubleshooting includes `NILS_GOOGLE_005/006/008` handling.
   - Root workflow catalog includes `google-service` entry.
 - **Validation**:
-  - `rg -n "login|remove|switch|NILS_GOOGLE_005|NILS_GOOGLE_006|NILS_GOOGLE_008|no save|no alias" workflows/google-service/README.md workflows/google-service/TROUBLESHOOTING.md README.md`
+  - `rg -n "login|remove|switch|NILS_GOOGLE_005|NILS_GOOGLE_006|NILS_GOOGLE_008|no save|no alias" \`
+    `workflows/google-service/README.md workflows/google-service/TROUBLESHOOTING.md README.md`
 
 ## Testing Strategy
+
 - Unit:
   - Shell-level parser/normalization checks inside smoke assertions for query grammar and token construction.
 - Integration:
@@ -214,6 +233,7 @@ runtime behavior.
   - Multi-account scenario: login A, login B, switch active, remove B, verify fallback to A.
 
 ## Risks & gotchas
+
 - `google-cli auth add` loopback mode is not production-ready by default; workflow must avoid assuming browser callback
   capture is automatic.
 - Active-account workflow state can drift from native account metadata if external commands modify accounts; render
@@ -222,6 +242,7 @@ runtime behavior.
 - Confirmation dialogs may behave differently on non-macOS/headless runs; tests must include no-dialog fallback path.
 
 ## Rollback plan
+
 - Revert `workflows/google-service` additions and remove root README entry.
 - Keep `google-cli` crate untouched so rollback is workflow-only and low blast radius.
 - Validation after rollback:

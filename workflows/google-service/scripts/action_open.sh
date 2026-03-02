@@ -300,7 +300,7 @@ open_alfred_search_best_effort() {
     return 1
   fi
 
-  osascript -e "tell application \"Alfred 5\" to search \"$escaped\"" >/dev/null 2>&1 || \
+  osascript -e "tell application \"Alfred 5\" to search \"$escaped\"" >/dev/null 2>&1 ||
     osascript -e "tell application \"Alfred\" to search \"$escaped\"" >/dev/null 2>&1 || true
 }
 
