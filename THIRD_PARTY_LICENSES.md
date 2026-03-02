@@ -12,17 +12,17 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `988387eb580c57fe70dafade5f3bf0dc7c91cf8798650f3208c6aaf4d30686ca`
-- Runtime metadata fingerprint (SHA256): `616129fb27c5c71a54e19e14c8cc7ff30da3e56c1127424544d3a5b0c2aeafc5`
+- Data source fingerprint (SHA256): `bc2ff4d75f843134f3a7f2dd6e9d7407ff9c305b9725bd5f957b48ed134d26c5`
+- Runtime metadata fingerprint (SHA256): `f7aa5bd3c9211e5cf20732a2b6b50c623e3d4a114a4c10ca07bdbdb4206adcd0`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `8cd2e93eba8455a717aa03e349941e9a6280bf49f42877f959a55cae5ec778b6` | `cargo metadata --format-version 1 --locked` |
+| Cargo lockfile | `Cargo.lock` | `136faa6f19df1a2f085501fe7d7cad8abbbfd9f4c3ce8fb12632ccc7889a98ec` | `cargo metadata --format-version 1 --locked` |
 | Node lockfile | `package-lock.json` | `be2e0c0524580cd2d296f01a71f6f35c4efc14a8c22a1bb9625d043dd5d87bd8` | `jq package-lock extraction` |
-| Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `4c4d6e6e835e4bc22a6bc28fc9f0c47ae0da5a9458511939cb41a471fa08b709` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
-| Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.5.5> | `616129fb27c5c71a54e19e14c8cc7ff30da3e56c1127424544d3a5b0c2aeafc5` | `curl crates.io API plus jq normalized fields` |
+| Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `e4ad6f19724b46e8e8e874e20d53eb1859605b41c42070a43480ebee0d7fae4d` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
+| Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.6.2> | `f7aa5bd3c9211e5cf20732a2b6b50c623e3d4a114a4c10ca07bdbdb4206adcd0` | `curl crates.io API plus jq normalized fields` |
 
 ## Rust License Summary (323 crates)
 
@@ -186,8 +186,8 @@ Do not edit manually.
 | mime | 0.3.17 | MIT OR Apache-2.0 | <https://github.com/hyperium/mime> |
 | mime_guess | 2.0.5 | MIT | <https://github.com/abonander/mime_guess> |
 | mio | 1.1.1 | MIT | <https://github.com/tokio-rs/mio> |
-| nils-common | 0.6.0 | MIT | <https://github.com/graysurf/nils-cli> |
-| nils-memo-cli | 0.6.0 | MIT | <https://github.com/graysurf/nils-cli> |
+| nils-common | 0.6.2 | MIT | <https://github.com/sympoies/nils-cli> |
+| nils-memo-cli | 0.6.2 | MIT | <https://github.com/sympoies/nils-cli> |
 | num-conv | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/jhpratt/num-conv> |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 | <https://github.com/rust-num/num-traits> |
 | num_cpus | 1.17.0 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/num_cpus> |
@@ -392,7 +392,7 @@ Do not edit manually.
 
 | Crate | Version | License | Repository | Source |
 | --- | --- | --- | --- | --- |
-| nils-codex-cli | 0.5.5 | MIT | <https://github.com/graysurf/nils-cli> | <https://crates.io/api/v1/crates/nils-codex-cli/0.5.5> |
+| nils-codex-cli | 0.6.2 | MIT | <https://github.com/sympoies/nils-cli> | <https://crates.io/api/v1/crates/nils-codex-cli/0.6.2> |
 
 ## Regeneration
 
