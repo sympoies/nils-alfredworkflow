@@ -10,7 +10,7 @@ if [[ -z "${CODEX_CLI_CRATE:-}" && -n "${CODEX_CLI_PINNED_CRATE:-}" ]]; then
 fi
 
 if [[ -z "${CODEX_CLI_VERSION:-}" ]]; then
-  CODEX_CLI_VERSION="0.5.5"
+  CODEX_CLI_VERSION="0.6.2"
 fi
 
 if [[ -z "${CODEX_CLI_CRATE:-}" ]]; then

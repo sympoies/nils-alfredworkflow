@@ -24,7 +24,7 @@ codex_cli_runtime_source_version_contract() {
 
 if ! codex_cli_runtime_source_version_contract; then
   if [[ -z "${CODEX_CLI_VERSION:-}" ]]; then
-    CODEX_CLI_VERSION="0.5.5"
+    CODEX_CLI_VERSION="0.6.2"
   fi
 
   if [[ -z "${CODEX_CLI_CRATE:-}" ]]; then
