@@ -216,14 +216,14 @@ runtime_metadata_sha="$(printf '%s\n' \
   "version=$runtime_version" \
   "license=$runtime_license" \
   "repository=$runtime_repository" \
-  "source=$runtime_source_url" \
-  | sha256_stdin)"
+  "source=$runtime_source_url" |
+  sha256_stdin)"
 data_source_fingerprint="$(printf '%s\n' \
   "cargo_lock_sha=$cargo_lock_sha" \
   "package_lock_sha=$package_lock_sha" \
   "runtime_pin_script_sha=$runtime_pin_script_sha" \
-  "runtime_metadata_sha=$runtime_metadata_sha" \
-  | sha256_stdin)"
+  "runtime_metadata_sha=$runtime_metadata_sha" |
+  sha256_stdin)"
 
 rust_count="$(jq -r 'length' "$rust_packages_json")"
 node_count="$(jq -r 'length' "$node_packages_json")"
