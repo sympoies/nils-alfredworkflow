@@ -68,6 +68,164 @@ crate_fail() {
   hard_failures=$((hard_failures + 1))
 }
 
+collect_docs_freshness_findings() {
+  python3 - "$repo_root" <<'PY'
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+stale_root_doc_pattern = re.compile(
+    r"^docs/[^/]*(?:contract|expression-rules|port-parity)[^/]*\.md$",
+    re.IGNORECASE,
+)
+
+
+def list_markdown_files() -> list[str]:
+    output = subprocess.check_output(
+        ["git", "-C", str(repo_root), "ls-files", "*.md"],
+        text=True,
+    )
+    return sorted(path.strip() for path in output.splitlines() if path.strip())
+
+
+def parse_target(raw_target: str) -> str:
+    target = raw_target.strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+
+    match = re.match(r"^(\S+)\s+['\"(].*$", target)
+    if match:
+        target = match.group(1)
+    return target
+
+
+def resolve_local_target(source_file: Path, target: str) -> Path | None:
+    lowered = target.lower()
+    if (
+        not target
+        or target.startswith("#")
+        or lowered.startswith("http://")
+        or lowered.startswith("https://")
+        or lowered.startswith("mailto:")
+        or lowered.startswith("tel:")
+        or lowered.startswith("data:")
+        or lowered.startswith("ftp://")
+        or "://" in target
+    ):
+        return None
+
+    clean_target = target.split("#", 1)[0].split("?", 1)[0].strip()
+    if not clean_target:
+        return None
+
+    if clean_target.startswith("/"):
+        return (repo_root / clean_target.lstrip("/")).resolve()
+    return (source_file.parent / clean_target).resolve()
+
+
+def to_repo_relative(path: Path) -> str | None:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return None
+
+
+def collect_links_by_file(md_files: list[str]) -> dict[str, set[str]]:
+    links_by_file: dict[str, set[str]] = {}
+    for rel_path in md_files:
+        source_file = repo_root / rel_path
+        try:
+            lines = source_file.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            lines = source_file.read_text(errors="ignore").splitlines()
+
+        resolved_targets: set[str] = set()
+        for line in lines:
+            for match in link_pattern.finditer(line):
+                target = parse_target(match.group(1))
+                resolved = resolve_local_target(source_file, target)
+                if resolved is None:
+                    continue
+                rel_target = to_repo_relative(resolved)
+                if rel_target is not None:
+                    resolved_targets.add(rel_target)
+        links_by_file[rel_path] = resolved_targets
+    return links_by_file
+
+
+def main() -> None:
+    md_files = list_markdown_files()
+    md_set = set(md_files)
+    links_by_file = collect_links_by_file(md_files)
+
+    findings: list[tuple[str, str, str]] = []
+
+    allowed_root_docs = {"ARCHITECTURE.md", "RELEASE.md"}
+    allowed_docs_categories = {"plans", "reports", "specs"}
+    for rel_path in (path for path in md_files if path.startswith("docs/")):
+        parts = rel_path.split("/")
+        if len(parts) == 2 and parts[1] in allowed_root_docs:
+            continue
+        if len(parts) == 3 and parts[1] in allowed_docs_categories:
+            continue
+        findings.append(("orphan_root", rel_path, "docs-ownership"))
+
+    for rel_path in md_files:
+        match = re.match(r"^crates/([^/]+)/docs/[^/]+\.md$", rel_path)
+        if not match or rel_path.endswith("/docs/README.md"):
+            continue
+        crate_name = match.group(1)
+        crate_readme = f"crates/{crate_name}/README.md"
+        docs_readme = f"crates/{crate_name}/docs/README.md"
+        references = set()
+        references.update(links_by_file.get(crate_readme, set()))
+        references.update(links_by_file.get(docs_readme, set()))
+        if rel_path not in references:
+            findings.append(("orphan_crate", rel_path, crate_name))
+
+    for rel_path in md_files:
+        match = re.match(r"^workflows/([^/]+)/[^/]+\.md$", rel_path)
+        if not match or rel_path.endswith("/README.md"):
+            continue
+        workflow_id = match.group(1)
+        workflow_readme = f"workflows/{workflow_id}/README.md"
+        if workflow_readme not in md_set:
+            findings.append(("orphan_workflow", rel_path, workflow_id))
+            continue
+        if rel_path not in links_by_file.get(workflow_readme, set()):
+            findings.append(("orphan_workflow", rel_path, workflow_id))
+
+    for rel_path in md_files:
+        source_file = repo_root / rel_path
+        try:
+            lines = source_file.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            lines = source_file.read_text(errors="ignore").splitlines()
+
+        for line_no, line in enumerate(lines, start=1):
+            for match in link_pattern.finditer(line):
+                target = parse_target(match.group(1))
+                resolved = resolve_local_target(source_file, target)
+                if resolved is None:
+                    continue
+                rel_target = to_repo_relative(resolved)
+                if rel_target is None:
+                    continue
+                if stale_root_doc_pattern.match(rel_target):
+                    findings.append(("stale_link", f"{rel_path}:{line_no}", rel_target))
+
+    for finding in sorted(set(findings)):
+        print("\t".join(finding))
+
+
+if __name__ == "__main__":
+    main()
+PY
+}
+
 package_name_from_cargo() {
   local cargo_toml="$1"
 
@@ -192,6 +350,48 @@ done
 
 if [[ $crate_specific_root_detected -eq 0 ]]; then
   repo_pass "no crate-specific root docs detected"
+fi
+
+echo
+echo "== Docs freshness and reference drift =="
+
+docs_freshness_findings="$(collect_docs_freshness_findings)"
+orphan_docs_detected=0
+stale_reference_detected=0
+
+if [[ -n "$docs_freshness_findings" ]]; then
+  while IFS=$'\t' read -r finding_type finding_arg1 finding_arg2; do
+    [[ -n "$finding_type" ]] || continue
+    case "$finding_type" in
+    orphan_root)
+      orphan_docs_detected=1
+      repo_fail "orphan docs file path is outside canonical ownership paths: $finding_arg1 (allowed: docs/ARCHITECTURE.md, docs/RELEASE.md, docs/{plans,reports,specs}/*.md)"
+      ;;
+    orphan_crate)
+      orphan_docs_detected=1
+      crate_fail "$finding_arg2" "orphan crate docs file is not linked from crate entry docs: $finding_arg1 (link it from crates/$finding_arg2/README.md or crates/$finding_arg2/docs/README.md)"
+      ;;
+    orphan_workflow)
+      orphan_docs_detected=1
+      repo_fail "orphan workflow docs file is not linked from workflow README: $finding_arg1 (link it from workflows/$finding_arg2/README.md)"
+      ;;
+    stale_link)
+      stale_reference_detected=1
+      repo_fail "stale-to-canonical docs reference detected at $finding_arg1 -> $finding_arg2 (use canonical crates/<crate>/docs/... or docs/specs/... paths)"
+      ;;
+    *)
+      repo_fail "unknown docs freshness finding type '$finding_type'"
+      ;;
+    esac
+  done <<<"$docs_freshness_findings"
+fi
+
+if [[ $orphan_docs_detected -eq 0 ]]; then
+  repo_pass "no orphan docs detected in enforced ownership paths"
+fi
+
+if [[ $stale_reference_detected -eq 0 ]]; then
+  repo_pass "no stale-to-canonical docs reference drift detected"
 fi
 
 echo

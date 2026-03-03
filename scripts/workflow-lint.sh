@@ -50,7 +50,7 @@ done
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 "$repo_root/scripts/cli-standards-audit.sh"
-"$repo_root/scripts/docs-placement-audit.sh"
+"$repo_root/scripts/docs-placement-audit.sh" --strict
 bash "$repo_root/scripts/ci/markdownlint-audit.sh" --strict
 bash "$repo_root/scripts/workflow-shared-foundation-audit.sh" --check
 bash "$repo_root/scripts/workflow-cli-resolver-audit.sh" --check
