@@ -18,6 +18,16 @@ Shared foundation extraction boundary:
   - `bash scripts/workflow-shared-foundation-audit.sh --check`
   - `bash scripts/workflow-sync-script-filter-policy.sh --check`
 
+Documentation ownership boundaries:
+
+- Repository/global navigation: `README.md`
+- Architecture/runtime baseline: `docs/ARCHITECTURE.md`
+- CLI contract policy mapping: `docs/specs/cli-standards-mapping.md`
+- Native Google command contract + validation evidence:
+  - `docs/specs/google-cli-native-contract.md`
+  - `docs/reports/google-cli-native-validation-report.md`
+- Workflow runtime/operator behavior: `workflows/<workflow-id>/README.md`
+
 For operator standards and command gates, see:
 
 - `ALFRED_WORKFLOW_DEVELOPMENT.md`

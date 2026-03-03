@@ -52,6 +52,7 @@
 ### Documentation placement
 
 - Canonical policy: `docs/specs/crate-docs-placement-policy.md`
+- Ownership/retention matrix: `docs/reports/docs-ownership-matrix.md`
 - Required placement gate before commit: `bash scripts/docs-placement-audit.sh --strict`
 - Placement rule: crate-owned docs belong in `crates/<crate-name>/docs/`; workspace-level docs belong in allowed root
   `docs/` categories.

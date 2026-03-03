@@ -21,6 +21,15 @@ When using `.agents/skills/nils-alfredworkflow-release-workflow/scripts/nils-alf
 
 Artifacts are written to `dist/<workflow-id>/<version>/`.
 
+## Documentation freshness checks (before tag)
+
+1. Confirm documentation ownership/retention decisions are current:
+   - `docs/reports/docs-ownership-matrix.md`
+2. For native Google CLI scope changes, rerun and refresh:
+   - `docs/reports/google-cli-native-validation-report.md`
+3. For workflow behavior changes, rerun validation commands documented in:
+   - `workflows/<workflow-id>/README.md`
+
 ## CI release
 
 Tag push (`v*`) triggers `.github/workflows/release.yml` and uploads built `.alfredworkflow` artifacts and checksums.

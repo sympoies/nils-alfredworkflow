@@ -56,6 +56,7 @@ Out of scope:
 - Do not mirror workflow-specific details into this global file when the workflow-local docs already own them.
 - If content is stale, duplicated, or conflicts with workflow-local docs, remove it instead of copying it forward.
 - Reintroducing a central workflow-details encyclopedia is disallowed.
+- Keep file-level owner/retention decisions synchronized in `docs/reports/docs-ownership-matrix.md`.
 
 ## Troubleshooting Routing Policy
 

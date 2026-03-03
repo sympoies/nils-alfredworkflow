@@ -15,7 +15,7 @@ Shared open-project domain and output-contract utilities reused by workflow crat
 ## Contract References
 
 - Shared runtime contract: [`docs/specs/cli-shared-runtime-contract.md`](../../docs/specs/cli-shared-runtime-contract.md)
-- Legacy removal matrix: [`docs/reports/crate-legacy-removal-matrix.md`](../../docs/reports/crate-legacy-removal-matrix.md)
+- Compatibility debt matrix: [`docs/reports/crate-legacy-removal-matrix.md`](../../docs/reports/crate-legacy-removal-matrix.md)
 
 ## Documentation
 

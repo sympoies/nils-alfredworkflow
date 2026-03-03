@@ -27,7 +27,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `STEAM_SHOW_REGION_OPTIONS` | No | `0` | Show region switch rows (`1/true/yes/on` to enable). |
 | `STEAM_LANGUAGE` | No | `(empty)` | Steam search locale language (for example `english`, `tchinese`); leave empty for endpoint default locale behavior. |
 | `STEAM_MAX_RESULTS` | No | `10` | Max results per query. Effective range is clamped by `steam-cli`. |
-| `STEAM_SEARCH_API` | No | `search-suggestions` | Search backend selector: `search-suggestions` (default) or `storesearch` (legacy JSON API). |
+| `STEAM_SEARCH_API` | No | `search-suggestions` | Search backend selector: `search-suggestions` (default) or `storesearch` (alternate JSON endpoint). |
 
 ## Keyword
 
@@ -44,6 +44,14 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `STEAM_QUERY_CACHE_TTL_SECONDS` | Optional same-query cache TTL (seconds). Default `0` (disabled). |
 | `STEAM_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `0` for immediate responses. |
 | `STEAM_QUERY_COALESCE_RERUN_SECONDS` | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`. |
+
+## Validation
+
+- `shellcheck workflows/steam-search/scripts/script_filter.sh workflows/steam-search/scripts/action_open.sh`
+- `bash scripts/workflow-sync-script-filter-policy.sh --check --workflows steam-search`
+- `bash workflows/steam-search/tests/smoke.sh`
+- `scripts/workflow-test.sh --id steam-search`
+- `scripts/workflow-pack.sh --id steam-search`
 
 ## Troubleshooting
 

@@ -50,6 +50,12 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `BRAVE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `2`.                                         |
 | `BRAVE_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for async result. Default `0.4`.                   |
 
+## Validation
+
+- `bash workflows/google-search/tests/smoke.sh`
+- `bash scripts/workflow-sync-script-filter-policy.sh --check --workflows google-search`
+- `scripts/workflow-test.sh --id google-search`
+
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
