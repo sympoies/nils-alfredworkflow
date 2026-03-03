@@ -54,10 +54,10 @@ begin_items() {
   printf '{"items":['
 }
 
-emit_item() {
+emit_action_item() {
   local title="$1"
   local subtitle="$2"
-  local autocomplete="${3-}"
+  local arg="$3"
 
   [[ "${_items_started:-0}" -eq 1 ]] || return 1
 
@@ -65,15 +65,11 @@ emit_item() {
     printf ','
   fi
 
-  printf '{"title":"%s","subtitle":"%s","valid":false' \
+  printf '{"title":"%s","subtitle":"%s","valid":true,"arg":"%s"}' \
     "$(json_escape "$title")" \
-    "$(json_escape "$subtitle")"
+    "$(json_escape "$subtitle")" \
+    "$(json_escape "$arg")"
 
-  if [[ -n "$autocomplete" ]]; then
-    printf ',"autocomplete":"%s"' "$(json_escape "$autocomplete")"
-  fi
-
-  printf '}'
   _item_count=$((_item_count + 1))
 }
 
@@ -275,13 +271,13 @@ join_with_dot() {
 
 emit_all_accounts_unread_summary_row() {
   if ! command -v jq >/dev/null 2>&1; then
-    emit_item "Unread mail (all accounts): unavailable" "jq is required to parse google-cli output" "gsm unread"
+    emit_action_item "Unread mail (all accounts): unavailable" "jq is required to parse google-cli output" "prompt::mail-unread"
     return
   fi
 
   local google_cli
   if ! google_cli="$(resolve_google_cli 2>/dev/null)"; then
-    emit_item "Unread mail (all accounts): unavailable" "google-cli binary not found" "gsa "
+    emit_action_item "Unread mail (all accounts): unavailable" "google-cli binary not found" "prompt::auth"
     return
   fi
 
@@ -291,7 +287,7 @@ emit_all_accounts_unread_summary_row() {
     local message
     message="$(extract_error_message "$auth_output")"
     [[ -n "$message" ]] || message="failed to read account list"
-    emit_item "Unread mail (all accounts): unavailable" "$message" "gsa "
+    emit_action_item "Unread mail (all accounts): unavailable" "$message" "prompt::auth"
     return
   fi
 
@@ -299,7 +295,7 @@ emit_all_accounts_unread_summary_row() {
     local message
     message="$(extract_error_message "$auth_output")"
     [[ -n "$message" ]] || message="unexpected auth list response"
-    emit_item "Unread mail (all accounts): unavailable" "$message" "gsa "
+    emit_action_item "Unread mail (all accounts): unavailable" "$message" "prompt::auth"
     return
   fi
 
@@ -307,7 +303,7 @@ emit_all_accounts_unread_summary_row() {
   mapfile -t accounts < <(printf '%s\n' "$auth_output" | jq -r '.result.accounts[]?' 2>/dev/null || true)
 
   if [[ "${#accounts[@]}" -eq 0 ]]; then
-    emit_item "Unread mail (all accounts): 0" "No configured accounts" "gsa login "
+    emit_action_item "Unread mail (all accounts): 0" "No configured accounts" "prompt::login"
     return
   fi
 
@@ -342,20 +338,20 @@ emit_all_accounts_unread_summary_row() {
   subtitle="$(join_with_dot "${details[@]}")"
   [[ -n "$subtitle" ]] || subtitle="No unread summary available"
 
-  emit_item "Unread mail (all accounts): ${total_unread}" "$subtitle" "gsm unread"
+  emit_action_item "Unread mail (all accounts): ${total_unread}" "$subtitle" "prompt::mail-unread"
 }
 
 begin_items
 
 active_account="$(read_active_account || true)"
 if [[ -n "$active_account" ]]; then
-  emit_item "Current account: ${active_account}" "Workflow active account" "gsa switch "
+  emit_action_item "Current account: ${active_account}" "Workflow active account" "prompt::switch"
 else
   default_account="$(read_default_account || true)"
   if [[ -n "$default_account" ]]; then
-    emit_item "Current account: ${default_account}" "google-cli default account (active not set)" "gsa switch "
+    emit_action_item "Current account: ${default_account}" "google-cli default account (active not set)" "prompt::switch"
   else
-    emit_item "Current account: (none)" "Run gsa login or gsa switch to set account" "gsa "
+    emit_action_item "Current account: (none)" "Run gsa login or gsa switch to set account" "prompt::auth"
   fi
 fi
 

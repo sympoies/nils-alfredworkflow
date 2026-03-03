@@ -870,6 +870,9 @@ require_google_cli() {
 }
 
 case "$action_token" in
+prompt::auth)
+  open_alfred_search_best_effort "gsa "
+  ;;
 prompt::login)
   open_alfred_search_best_effort "gsa login "
   ;;
@@ -878,6 +881,9 @@ prompt::switch)
   ;;
 prompt::remove)
   open_alfred_search_best_effort "gsa remove "
+  ;;
+prompt::mail-unread)
+  open_alfred_search_best_effort "gsm unread"
   ;;
 switch::*)
   google_cli="$(require_google_cli)"

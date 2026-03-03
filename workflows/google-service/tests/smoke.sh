@@ -576,10 +576,12 @@ run_with_env() {
 root_json="$(run_with_env bash "$script_filter_empty" "")"
 assert_jq_json "$root_json" '.items | length == 1' "gs root query should emit one account status row"
 assert_jq_json "$root_json" '.items[0].title == "Current account: a@example.com"' "gs should show default account when active account is not set"
+assert_jq_json "$root_json" '.items[0].arg == "prompt::switch"' "gs current account row should route to switch prompt token"
 
 root_with_unread_json="$(env "${base_env[@]}" GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1 bash "$script_filter_empty" "")"
 assert_jq_json "$root_with_unread_json" '.items | length == 2' "gs root query should emit unread summary row when toggle enabled"
 assert_jq_json "$root_with_unread_json" '.items[1].title == "Unread mail (all accounts): 4"' "gs unread summary total mismatch"
+assert_jq_json "$root_with_unread_json" '.items[1].arg == "prompt::mail-unread"' "gs unread summary row should route to gsm unread prompt token"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("a@example.com:2")' "gs unread summary should include account a count"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("b@example.com:2")' "gs unread summary should include account b count"
 
@@ -657,8 +659,10 @@ login_manual_json="$(run_with_env bash "$script_filter" "login c@example.com --m
 assert_jq_json "$login_manual_json" '[.items[] | select(.arg == "login::manual::c@example.com::manual-code")] | length == 1' "manual login token mismatch"
 
 run_with_env bash "$action_open" "prompt::login" >/dev/null
+run_with_env bash "$action_open" "prompt::auth" >/dev/null
 run_with_env bash "$action_open" "prompt::switch" >/dev/null
 run_with_env bash "$action_open" "prompt::remove" >/dev/null
+run_with_env bash "$action_open" "prompt::mail-unread" >/dev/null
 
 run_with_env bash "$action_open" "switch::b@example.com" >/dev/null
 active_file="$smoke_tmp/data/active-account.v1.json"
