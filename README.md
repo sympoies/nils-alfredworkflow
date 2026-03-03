@@ -15,7 +15,7 @@ Alfred workflows for macOS users.
 | Workflow | Keyword(s) | What it does | Requires setup |
 | --- | --- | --- | --- |
 | [Google Search](workflows/google-search/README.md) | `gg`, `google` | Search web results (Brave backend) and open selected links. | `BRAVE_API_KEY` |
-| [Google Service](workflows/google-service/README.md) | `gs`, `gsa`, `gsd`, `gsm` | `gs` shows account status (optional all-account unread summary); `gsa` manages auth login/remove/switch; `gsd` supports Drive home/search/download; `gsm` supports Gmail unread/latest/search list. | OAuth credentials in `google-cli` auth store (runtime is bundled) |
+| [Google Service](workflows/google-service/README.md) | `gs`, `gsa`, `gsd`, `gsm` | `gs` shows account status (optional all-account unread summary); `gsa` manages auth login/remove/switch; `gsd` supports Drive home/search/download; `gsm` supports Gmail unread/latest/search list. | No |
 | [YouTube Search](workflows/youtube-search/README.md) | `yt`, `youtube` | Search YouTube videos and open selected videos in browser. | `YOUTUBE_API_KEY` |
 | [Netflix Search](workflows/netflix-search/README.md) | `nf`, `netflix` | Search Netflix title pages (`site:netflix.com/title`) and open selected links. | `BRAVE_API_KEY` |
 | [Spotify Search](workflows/spotify-search/README.md) | `sp`, `spotify` | Search Spotify tracks and open selected results in Spotify app. | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` |
