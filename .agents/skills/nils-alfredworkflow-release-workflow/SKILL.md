@@ -41,6 +41,7 @@ Outputs:
 - Regenerates tracked root `THIRD_PARTY_LICENSES.md` when its inputs changed.
 - Creates a version-bump commit when sync changes are needed.
 - Pushes the version-bump commit to the current upstream branch.
+- Waits until CI workflow (`.github/workflows/ci.yml`) for the release head commit is `success` (GitHub remotes).
 - Creates an annotated git tag (`Release <version>`).
 - Pushes tag to remote (`git push <remote> refs/tags/<version>`).
 - Waits until the release workflow run for the pushed tag is `success`.
@@ -64,6 +65,7 @@ Failure modes:
   - Use `--force-tag` when re-tagging an existing release version is intentional.
 - `origin` (or provided remote) not configured.
 - Push failed due to auth/permissions/network.
+- CI workflow run failed for the release head commit.
 - Release workflow run failed for the pushed tag.
 - Release page did not appear before timeout.
 
@@ -77,8 +79,9 @@ Failure modes:
 2. Validate version format and tag uniqueness (local + remote).
 3. Sync versions (`Cargo.toml` + workflow manifests + root `package*.json` + Bangumi User-Agent placeholder), refresh
    `Cargo.lock` and tracked `THIRD_PARTY_LICENSES.md` as needed, then commit/push when changes exist.
-4. Create annotated tag `Release <version>`.
-5. Push tag to remote.
-6. Wait release workflow for the tag to complete with `success`.
-7. Wait release page to appear for the tag.
-8. If release CI fails, fix root cause on branch, update/push fix commit, then recreate/re-push tag and repeat until green.
+4. Wait CI workflow (`.github/workflows/ci.yml`) for the release head commit to complete with `success`.
+5. Create annotated tag `Release <version>`.
+6. Push tag to remote.
+7. Wait release workflow for the tag to complete with `success`.
+8. Wait release page to appear for the tag.
+9. If CI/release workflow fails, fix root cause on branch, update/push fix commit, then recreate/re-push tag and repeat until green.

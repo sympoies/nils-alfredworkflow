@@ -170,6 +170,92 @@ wait_for_release_page() {
   done
 }
 
+wait_for_ci_workflow_success_for_sha() {
+  local repo_path="$1"
+  local head_sha="$2"
+  local poll_seconds="$3"
+  local max_wait_seconds="$4"
+  local start now elapsed run_json run_status run_conclusion run_url run_id
+  local ci_workflow_file=".github/workflows/ci.yml"
+
+  if [[ ! -f "$ci_workflow_file" ]]; then
+    echo "note: ${ci_workflow_file} not found; skipping CI wait gate"
+    return 0
+  fi
+
+  start="$(date +%s)"
+  while true; do
+    run_json="$(gh run list \
+      --repo "$repo_path" \
+      --workflow "$ci_workflow_file" \
+      --event push \
+      --commit "$head_sha" \
+      --limit 20 \
+      --json databaseId,status,conclusion,url \
+      --jq '.[0]')"
+
+    if [[ -n "$run_json" && "$run_json" != "null" ]]; then
+      run_id="$(gh run list \
+        --repo "$repo_path" \
+        --workflow "$ci_workflow_file" \
+        --event push \
+        --commit "$head_sha" \
+        --limit 20 \
+        --json databaseId \
+        --jq '.[0].databaseId')"
+      run_status="$(gh run list \
+        --repo "$repo_path" \
+        --workflow "$ci_workflow_file" \
+        --event push \
+        --commit "$head_sha" \
+        --limit 20 \
+        --json status \
+        --jq '.[0].status')"
+      run_conclusion="$(gh run list \
+        --repo "$repo_path" \
+        --workflow "$ci_workflow_file" \
+        --event push \
+        --commit "$head_sha" \
+        --limit 20 \
+        --json conclusion \
+        --jq '.[0].conclusion')"
+      run_url="$(gh run list \
+        --repo "$repo_path" \
+        --workflow "$ci_workflow_file" \
+        --event push \
+        --commit "$head_sha" \
+        --limit 20 \
+        --json url \
+        --jq '.[0].url')"
+
+      echo "ci workflow run: id=${run_id:-unknown} status=${run_status:-unknown} conclusion=${run_conclusion:-pending}"
+
+      if [[ "$run_status" == "completed" ]]; then
+        if [[ "$run_conclusion" == "success" ]]; then
+          echo "ok: CI workflow succeeded for commit ${head_sha}"
+          return 0
+        fi
+        echo "error: CI workflow failed for commit ${head_sha} (conclusion=${run_conclusion:-unknown})" >&2
+        if [[ -n "$run_url" && "$run_url" != "null" ]]; then
+          echo "error: failed CI run url: $run_url" >&2
+        fi
+        return 1
+      fi
+    else
+      echo "waiting: CI workflow run for commit ${head_sha} not found yet"
+    fi
+
+    now="$(date +%s)"
+    elapsed=$((now - start))
+    if (( elapsed >= max_wait_seconds )); then
+      echo "error: timed out waiting for CI workflow (elapsed=${elapsed}s, limit=${max_wait_seconds}s)" >&2
+      return 124
+    fi
+
+    sleep "$poll_seconds"
+  done
+}
+
 ensure_release_workflow_trigger() {
   local workflow_file=".github/workflows/release.yml"
   [[ -f "$workflow_file" ]] || fail 3 "missing release workflow: $workflow_file"
@@ -638,6 +724,11 @@ EOF
 
   git push "$remote" "HEAD:${RELEASE_UPSTREAM_BRANCH}"
   echo "ok: pushed version bump commit to $remote/${RELEASE_UPSTREAM_BRANCH}"
+fi
+
+if [[ -n "$github_repo_path" ]]; then
+  release_head_sha="$(git rev-parse HEAD)"
+  wait_for_ci_workflow_success_for_sha "$github_repo_path" "$release_head_sha" "$poll_seconds" "$max_wait_seconds"
 fi
 
 if [[ "$force_tag" -eq 1 ]]; then
