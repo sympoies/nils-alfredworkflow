@@ -6,7 +6,7 @@ This contract freezes Sprint 3 shared-lane behavior for Task 3.1, Task 3.2, and 
 
 - Build a workflow script inventory from workflow manifests.
 - Standardize shared helper-loader and script-filter runtime mechanics.
-- Delete approved orphan scripts and enforce non-orphan checks in lint.
+- Enforce non-orphan checks in lint while preserving required non-manifest hooks.
 
 ## Canonical Entrypoint Contract
 
@@ -40,23 +40,23 @@ This contract freezes Sprint 3 shared-lane behavior for Task 3.1, Task 3.2, and 
 - URL open actions must route through `scripts/lib/workflow_action_open_url.sh`.
 - Clipboard actions must route through `scripts/lib/workflow_action_copy.sh`.
 
-## Delete Contract (Task 3.4)
+## Required Non-Manifest Scripts (Task 3.4)
 
-The following files are explicitly marked delete-only and must remain absent:
+The following scripts are required by workflow packaging/tests and must remain present:
 
-| File | Delete reason | Non-usage evidence |
+| File | Required reason | Usage evidence |
 | --- | --- | --- |
-| `workflows/google-search/scripts/script_filter_direct.sh` | Legacy duplicate direct entrypoint outside canonical manifest routing. | `workflows/google-search/workflow.toml` defines `script_filter.sh` as the sole script-filter entrypoint. |
-| `workflows/codex-cli/scripts/prepare_package.sh` | Legacy workflow-local packaging hook; not part of runtime entrypoint contract. | `workflows/codex-cli/workflow.toml` defines only `script_filter.sh` + `action_open.sh` entrypoints. |
+| `workflows/google-search/scripts/script_filter_direct.sh` | Direct-search entrypoint is still wired in workflow plist and smoke coverage. | `workflows/google-search/src/info.plist.template` and `workflows/google-search/tests/smoke.sh` reference `script_filter_direct.sh`. |
+| `workflows/codex-cli/scripts/prepare_package.sh` | Packaging hook is consumed by workflow pack flow and codex-cli smoke tests. | `scripts/workflow-pack.sh` and `workflows/codex-cli/tests/smoke.sh` call `prepare_package.sh`. |
 
-Reintroduction of either file is a hard audit failure.
+Removing either file is a regression and must fail validation.
 
 ## Non-Orphan Enforcement
 
 `bash scripts/workflow-shared-foundation-audit.sh --check` is the enforcement gate and must:
 
 1. Validate shared-foundation wiring and driver usage for migrated scripts.
-2. Fail when deleted-orphan scripts are reintroduced.
+2. Fail when required non-manifest hook scripts are missing/non-executable.
 3. Fail when new orphan workflow scripts appear.
 4. Keep a documented exemption list for utility scripts that are intentionally non-runtime.
 

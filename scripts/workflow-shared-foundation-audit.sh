@@ -93,6 +93,7 @@ declare -ar migrated_additional_foundation_files=(
   "workflows/codex-cli/scripts/action_open.sh"
   "workflows/codex-cli/scripts/script_filter.sh"
   "workflows/codex-cli/scripts/script_filter_auth_current.sh"
+  "workflows/google-search/scripts/script_filter_direct.sh"
   "workflows/memo-add/scripts/action_run.sh"
   "workflows/memo-add/scripts/script_filter_copy.sh"
   "workflows/memo-add/scripts/script_filter_delete.sh"
@@ -106,13 +107,16 @@ declare -ar migrated_additional_foundation_files=(
   "workflows/weather/scripts/script_filter_today.sh"
 )
 
-declare -ar deleted_orphan_scripts=(
-  "workflows/google-search/scripts/script_filter_direct.sh"
+declare -ar required_hook_scripts=(
   "workflows/codex-cli/scripts/prepare_package.sh"
 )
 
 declare -ar orphan_script_exemptions=(
   "workflows/weather/scripts/generate_weather_icons.sh"
+)
+
+declare -ar orphan_hook_filenames=(
+  "prepare_package.sh"
 )
 
 declare -a migrated_files=(
@@ -202,20 +206,19 @@ run_check_non_search_driver_usage() {
   fi
 }
 
-run_check_deleted_orphan_absence() {
+run_check_required_hook_scripts() {
   local rel_path=""
-  local abs_path=""
   local initial_failures="$failures"
 
-  for rel_path in "${deleted_orphan_scripts[@]}"; do
-    abs_path="$repo_root/$rel_path"
-    if [[ -e "$abs_path" ]]; then
-      fail_file "$rel_path" "deleted orphan script was reintroduced; keep it deleted"
+  for rel_path in "${required_hook_scripts[@]}"; do
+    file_exists_or_fail "$rel_path" || continue
+    if [[ ! -x "$repo_root/$rel_path" ]]; then
+      fail_file "$rel_path" "required packaging/runtime hook exists but is not executable"
     fi
   done
 
   if [[ "$failures" -eq "$initial_failures" ]]; then
-    pass_check "deleted orphan scripts remain absent"
+    pass_check "required non-manifest hook scripts exist and are executable"
   fi
 }
 
@@ -225,13 +228,20 @@ run_check_no_orphan_workflow_scripts() {
   local rel_path=""
 
   orphan_output="$(
-    python3 - "$repo_root" "${orphan_script_exemptions[@]}" <<'PY'
+    python3 - "$repo_root" "${orphan_script_exemptions[@]}" --hooks "${orphan_hook_filenames[@]}" <<'PY'
 import pathlib
 import re
 import sys
 
 repo_root = pathlib.Path(sys.argv[1]).resolve()
-exempt = {value.strip() for value in sys.argv[2:] if value.strip()}
+args = [value.strip() for value in sys.argv[2:] if value.strip()]
+if "--hooks" in args:
+    split_idx = args.index("--hooks")
+    exempt = set(args[:split_idx])
+    hook_names = set(args[split_idx + 1 :])
+else:
+    exempt = set(args)
+    hook_names = set()
 orphan_paths = []
 
 for workflow_dir in sorted((repo_root / "workflows").iterdir()):
@@ -265,9 +275,18 @@ for workflow_dir in sorted((repo_root / "workflows").iterdir()):
         for match in re.finditer(r"/([A-Za-z0-9_.-]+\.sh)(?:[\"'\s]|$)", text):
             referenced.add(match.group(1))
 
+    tests_dir = workflow_dir / "tests"
+    if tests_dir.is_dir():
+        for test_script in tests_dir.glob("*.sh"):
+            text = test_script.read_text(encoding="utf-8", errors="ignore")
+            for match in re.finditer(r"scripts/([A-Za-z0-9_.-]+\.sh)", text):
+                referenced.add(match.group(1))
+
     for script_file in sorted(scripts_dir.glob("*.sh")):
         rel_path = script_file.relative_to(repo_root).as_posix()
         if rel_path in exempt:
+            continue
+        if script_file.name in hook_names:
             continue
         if script_file.name not in referenced:
             orphan_paths.append(rel_path)
@@ -335,7 +354,7 @@ echo
 run_check_resolve_helper_regression
 run_check_shared_loader_wiring
 run_check_non_search_driver_usage
-run_check_deleted_orphan_absence
+run_check_required_hook_scripts
 run_check_no_orphan_workflow_scripts
 run_check_prohibited_placeholders
 

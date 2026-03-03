@@ -4,7 +4,7 @@
 
 - Source of truth for canonical workflow entrypoint declarations: `workflows/*/workflow.toml`.
 - Inventory objective: map each manifest entrypoint to script files, then mark orphan/delete candidates.
-- Sprint 3 deletion outcome: approved orphan files removed and guarded by audit.
+- Sprint 3 outcome: true orphan scripts are blocked while required non-manifest hook scripts are preserved.
 
 ## Manifest Entrypoint Inventory
 
@@ -52,12 +52,12 @@
 
 | File | Classification before cleanup | Decision | Current state |
 | --- | --- | --- | --- |
-| `workflows/google-search/scripts/script_filter_direct.sh` | legacy direct script_filter path; non-canonical entrypoint | delete | deleted |
-| `workflows/codex-cli/scripts/prepare_package.sh` | workflow-local packaging hook; non-runtime entrypoint | delete | deleted |
+| `workflows/google-search/scripts/script_filter_direct.sh` | direct-search workflow entrypoint referenced by plist/tests | keep | retained |
+| `workflows/codex-cli/scripts/prepare_package.sh` | packaging hook script referenced by pack flow/tests | keep | retained |
 | `workflows/weather/scripts/generate_weather_icons.sh` | utility script outside runtime entrypoint graph | keep (explicit exemption) | retained |
 
 ## Non-Orphan Baseline
 
 - `scripts/workflow-shared-foundation-audit.sh --check` now enforces orphan detection.
 - New workflow scripts without a manifest/plist/script entrypoint reference fail lint.
-- Deleted files listed in this report are treated as must-not-exist and fail audit if reintroduced.
+- Required non-manifest hooks (`script_filter_direct.sh`, `prepare_package.sh`) must exist and stay executable.
