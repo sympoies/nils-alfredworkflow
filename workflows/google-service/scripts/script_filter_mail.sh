@@ -419,7 +419,8 @@ fetch_unread_count() {
 
 append_optional_terms() {
   local base_query="$1"
-  local extra_terms="$(sfqp_trim "${2-}")"
+  local extra_terms
+  extra_terms="$(sfqp_trim "${2-}")"
   if [[ -z "$extra_terms" ]]; then
     printf '%s\n' "$base_query"
   else
@@ -497,7 +498,7 @@ handle_mail_search() {
   if [[ -n "$active_account" ]]; then
     command_args+=(-a "$active_account")
   fi
-  command_args+=(gmail search --max "$search_max" --format metadata --headers Subject,From,Date --query "$search_query")
+  command_args+=(gmail search --max "$search_max" --format metadata --headers "Subject,From,Date" --query "$search_query")
 
   local output rc
   run_google_json_capture output rc "$google_cli" "${command_args[@]}"
