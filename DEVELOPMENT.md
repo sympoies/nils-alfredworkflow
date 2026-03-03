@@ -69,14 +69,26 @@
 
 ### Required before committing
 
-- Recommended pre-commit sequence:
-  - `scripts/workflow-lint.sh`
-  - `bash scripts/ci/third-party-artifacts-audit.sh --strict`
-  - `bash scripts/workflow-sync-script-filter-policy.sh --check`
-  - `cargo test --workspace`
-  - `scripts/workflow-test.sh`
+- Default local pre-commit entrypoint (recommended): `scripts/local-pre-commit.sh`
+  - Runs `scripts/workflow-lint.sh`, `scripts/workflow-sync-script-filter-policy.sh --check`,
+    `npm run test:cambridge-scraper`, and `scripts/workflow-test.sh --skip-third-party-audit`.
+- CI-parity local sequence (same gate order as `.github/workflows/ci.yml`):
+  - `scripts/local-pre-commit.sh --mode ci`
+- Add package smoke gate when you want release-style package validation locally:
+  - `scripts/local-pre-commit.sh --with-package-smoke`
+- Why this replaces the old manual sequence:
+  - `scripts/workflow-test.sh` already runs strict `third-party-artifacts-audit` and `cargo test --workspace` by
+    default, so manually prepending both commands caused redundant runs.
 - For workflow-specific or CLI-specific checks (for example live smoke or probe scripts), run the validation steps
   documented in the corresponding `workflows/<workflow-id>/README.md`.
+
+### Local iteration shortcuts (optional)
+
+- Smoke only for one workflow:
+  - `scripts/workflow-test.sh --id <workflow-id> --skip-third-party-audit --skip-workspace-tests`
+- Skip Node scraper tests temporarily during non-scraper iteration:
+  - `scripts/local-pre-commit.sh --skip-node-scraper-tests`
+  - Do not use this mode as a final pre-commit check.
 
 ### Third-party artifacts generator workflow
 

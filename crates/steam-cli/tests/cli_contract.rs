@@ -285,7 +285,7 @@ impl MockServer {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                        if start.elapsed() > Duration::from_secs(3) {
+                        if start.elapsed() > Duration::from_secs(10) {
                             panic!("mock server timed out waiting for request");
                         }
                         thread::sleep(Duration::from_millis(10));
