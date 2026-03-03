@@ -20,6 +20,12 @@ require_bin() {
   command -v "$binary" >/dev/null 2>&1 || fail "missing required binary: $binary"
 }
 
+require_bin shellcheck
+mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
+if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
+  shellcheck -e SC1091 "${shellcheck_targets[@]}"
+fi
+
 assert_file() {
   local path="$1"
   [[ -f "$path" ]] || fail "missing required file: $path"

@@ -5,6 +5,15 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
 
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "missing required binary: shellcheck" >&2
+  exit 1
+fi
+mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
+if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
+  shellcheck -e SC1091 "${shellcheck_targets[@]}"
+fi
+
 for required in \
   workflow.toml \
   src/info.plist.template \

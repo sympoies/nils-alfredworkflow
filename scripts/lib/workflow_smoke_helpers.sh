@@ -103,3 +103,35 @@ artifact_restore_file() {
 
   rm -f "$target_path"
 }
+
+workflow_smoke_auto_shellcheck() {
+  if [[ "${WORKFLOW_SMOKE_SKIP_SHELLCHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  local caller_script="${BASH_SOURCE[1]:-}"
+  case "$caller_script" in
+  */workflows/*/tests/smoke.sh)
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+
+  local workflow_dir
+  workflow_dir="$(cd "$(dirname "$caller_script")/.." && pwd)"
+  [[ -d "$workflow_dir" ]] || return 0
+
+  require_bin shellcheck
+
+  local -a shellcheck_targets=()
+  mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
+  if [[ "${#shellcheck_targets[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  # Some scripts source environment-specific paths dynamically (for example ~/.cargo/env).
+  shellcheck -e SC1091 "${shellcheck_targets[@]}"
+}
+
+workflow_smoke_auto_shellcheck

@@ -13,11 +13,31 @@ Usage:
 
 Notes:
   - Runs strict third-party artifacts freshness audit before tests.
+  - Runs shellcheck for workflow-local shell scripts before smoke.
 USAGE
+}
+
+run_workflow_shellcheck() {
+  local id="$1"
+  local workflow_root="$repo_root/workflows/$id"
+
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    echo "error: missing required binary: shellcheck" >&2
+    exit 1
+  fi
+
+  mapfile -t sh_files < <(find "$workflow_root" -type f -name '*.sh' | sort)
+  if [[ ${#sh_files[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  # setup-rust-tooling sources $HOME/.cargo/env dynamically in some environments.
+  shellcheck -e SC1091 "${sh_files[@]}"
 }
 
 run_smoke() {
   local id="$1"
+  run_workflow_shellcheck "$id"
   local smoke_script="$repo_root/workflows/$id/tests/smoke.sh"
   if [[ -x "$smoke_script" ]]; then
     "$smoke_script"

@@ -20,6 +20,14 @@ assert_exec() {
   [[ -x "$path" ]] || fail "script must be executable: $path"
 }
 
+if ! command -v shellcheck >/dev/null 2>&1; then
+  fail "missing required binary: shellcheck"
+fi
+mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
+if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
+  shellcheck -e SC1091 "${shellcheck_targets[@]}"
+fi
+
 toml_string() {
   local file="$1"
   local key="$2"
