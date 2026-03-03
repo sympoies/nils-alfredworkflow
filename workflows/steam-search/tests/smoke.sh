@@ -84,65 +84,22 @@ artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
 
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
-
 release_cli="$repo_root/target/release/steam-cli"
-release_backup=""
-if [[ -f "$release_cli" ]]; then
-  release_backup="$tmp_dir/steam-cli.release.backup"
-  cp "$release_cli" "$release_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
+release_backup="$(artifact_backup_file "$release_cli" "$tmp_dir" "steam-cli.release")"
 
 cleanup() {
-  if [[ -n "$release_backup" && -f "$release_backup" ]]; then
-    mkdir -p "$(dirname "$release_cli")"
-    cp "$release_backup" "$release_cli"
-  elif [[ -f "$release_cli" ]]; then
-    rm -f "$release_cli"
-  fi
-
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$release_cli" "$release_backup"
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
 mkdir -p "$tmp_dir/bin" "$tmp_dir/stubs"
-
-cat >"$tmp_dir/bin/open" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$1" >"$OPEN_STUB_OUT"
-EOS
-chmod +x "$tmp_dir/bin/open"
-
-set +e
-"$workflow_dir/scripts/action_open.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_open.sh without args must exit 2"
+workflow_smoke_write_open_stub "$tmp_dir/bin/open"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_open.sh"
 
 action_arg="https://store.steampowered.com/app/620/Portal_2/"
 OPEN_STUB_OUT="$tmp_dir/open-arg.txt" PATH="$tmp_dir/bin:$PATH" \

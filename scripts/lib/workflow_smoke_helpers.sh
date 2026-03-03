@@ -76,6 +76,44 @@ assert_jq_json() {
   fi
 }
 
+workflow_smoke_assert_action_requires_arg() {
+  local action_script="$1"
+  local expected_rc="${2:-2}"
+
+  set +e
+  "$action_script" >/dev/null 2>&1
+  local action_rc=$?
+  set -e
+
+  if [[ "$action_rc" -ne "$expected_rc" ]]; then
+    fail "$(basename "$action_script") without args must exit $expected_rc"
+  fi
+}
+
+workflow_smoke_write_open_stub() {
+  local stub_path="$1"
+  mkdir -p "$(dirname "$stub_path")"
+
+  cat >"$stub_path" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$1" >"$OPEN_STUB_OUT"
+EOS
+  chmod +x "$stub_path"
+}
+
+workflow_smoke_write_pbcopy_stub() {
+  local stub_path="$1"
+  mkdir -p "$(dirname "$stub_path")"
+
+  cat >"$stub_path" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+cat >"$PBCOPY_STUB_OUT"
+EOS
+  chmod +x "$stub_path"
+}
+
 artifact_backup_file() {
   local target_path="$1"
   local backup_dir="$2"

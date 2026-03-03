@@ -5,86 +5,18 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
 
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$smoke_helper"
+
 TODAY_UID="B1A11A4C-5F5D-4E8D-8E68-2AD5A95E95E1"
 WEEK_UID="8A72E2AF-189E-4A13-9A0E-B30FEAF37F9A"
 ACTION_UID="E7A2F2B8-9BB0-4F7A-A2A9-9074CBF90AA0"
-
-fail() {
-  echo "error: $*" >&2
-  exit 1
-}
-
-require_bin() {
-  local binary="$1"
-  command -v "$binary" >/dev/null 2>&1 || fail "missing required binary: $binary"
-}
-
-require_bin shellcheck
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
-fi
-
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "missing required file: $path"
-}
-
-assert_exec() {
-  local path="$1"
-  [[ -x "$path" ]] || fail "script must be executable: $path"
-}
-
-toml_string() {
-  local file="$1"
-  local key="$2"
-  awk -F'=' -v key="$key" '
-    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-      value=$2
-      sub(/^[[:space:]]*/, "", value)
-      sub(/[[:space:]]*$/, "", value)
-      gsub(/^"|"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-plist_to_json() {
-  local plist_file="$1"
-  if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o - "$plist_file"
-    return
-  fi
-
-  python3 - "$plist_file" <<'PY'
-import json
-import plistlib
-import sys
-
-with open(sys.argv[1], 'rb') as f:
-    payload = plistlib.load(f)
-print(json.dumps(payload))
-PY
-}
-
-assert_jq_file() {
-  local file="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" "$file" >/dev/null; then
-    fail "$message (jq: $filter)"
-  fi
-}
-
-assert_jq_json() {
-  local json_payload="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" >/dev/null <<<"$json_payload"; then
-    fail "$message (jq: $filter)"
-  fi
-}
 
 for required in \
   workflow.toml \
@@ -161,65 +93,22 @@ artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
 
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
-
 release_cli="$repo_root/target/release/weather-cli"
-release_backup=""
-if [[ -f "$release_cli" ]]; then
-  release_backup="$tmp_dir/weather-cli.release.backup"
-  cp "$release_cli" "$release_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
+release_backup="$(artifact_backup_file "$release_cli" "$tmp_dir" "weather-cli.release")"
 
 cleanup() {
-  if [[ -n "$release_backup" && -f "$release_backup" ]]; then
-    mkdir -p "$(dirname "$release_cli")"
-    cp "$release_backup" "$release_cli"
-  elif [[ -f "$release_cli" ]]; then
-    rm -f "$release_cli"
-  fi
-
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$release_cli" "$release_backup"
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
 mkdir -p "$tmp_dir/bin" "$tmp_dir/stubs"
-
-cat >"$tmp_dir/bin/pbcopy" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-cat >"$PBCOPY_STUB_OUT"
-EOS
-chmod +x "$tmp_dir/bin/pbcopy"
-
-set +e
-"$workflow_dir/scripts/action_copy.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_copy.sh without args must exit 2"
+workflow_smoke_write_pbcopy_stub "$tmp_dir/bin/pbcopy"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_copy.sh"
 
 copy_arg="2026-02-12 Sunny 12.0~18.0C rain:10%"
 PBCOPY_STUB_OUT="$tmp_dir/pbcopy-out.txt" PATH="$tmp_dir/bin:$PATH" \

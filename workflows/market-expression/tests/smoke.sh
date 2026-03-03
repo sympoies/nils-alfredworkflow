@@ -56,65 +56,22 @@ artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
 
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
-
 release_cli="$repo_root/target/release/market-cli"
-release_backup=""
-if [[ -f "$release_cli" ]]; then
-  release_backup="$tmp_dir/market-cli.release.backup"
-  cp "$release_cli" "$release_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
+release_backup="$(artifact_backup_file "$release_cli" "$tmp_dir" "market-cli.release")"
 
 cleanup() {
-  if [[ -n "$release_backup" && -f "$release_backup" ]]; then
-    mkdir -p "$(dirname "$release_cli")"
-    cp "$release_backup" "$release_cli"
-  elif [[ -f "$release_cli" ]]; then
-    rm -f "$release_cli"
-  fi
-
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$release_cli" "$release_backup"
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
 mkdir -p "$tmp_dir/bin" "$tmp_dir/stubs"
-
-cat >"$tmp_dir/bin/pbcopy" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-cat >"$PBCOPY_STUB_OUT"
-EOS
-chmod +x "$tmp_dir/bin/pbcopy"
-
-set +e
-"$workflow_dir/scripts/action_copy.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_copy.sh without args must exit 2"
+workflow_smoke_write_pbcopy_stub "$tmp_dir/bin/pbcopy"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_copy.sh"
 
 copy_arg="1 BTC + 2 ETH to USD"
 PBCOPY_STUB_OUT="$tmp_dir/pbcopy-out.txt" PATH="$tmp_dir/bin:$PATH" \
@@ -330,10 +287,14 @@ PATH="$tmp_dir/bin:$PATH" "$repo_root/scripts/workflow-pack.sh" --id market-expr
 workflow_test_root="$tmp_dir/workflow-test-entry"
 workflow_test_script="$workflow_test_root/scripts/workflow-test.sh"
 workflow_test_smoke="$workflow_test_root/workflows/market-expression/tests/smoke.sh"
+workflow_test_third_party_audit="$workflow_test_root/scripts/ci/third-party-artifacts-audit.sh"
 workflow_test_marker="$tmp_dir/workflow-test-smoke.marker"
 workflow_test_output="$tmp_dir/workflow-test.out"
 
-mkdir -p "$(dirname "$workflow_test_script")" "$(dirname "$workflow_test_smoke")"
+mkdir -p \
+  "$(dirname "$workflow_test_script")" \
+  "$(dirname "$workflow_test_smoke")" \
+  "$(dirname "$workflow_test_third_party_audit")"
 cp "$repo_root/scripts/workflow-test.sh" "$workflow_test_script"
 chmod +x "$workflow_test_script"
 
@@ -345,6 +306,13 @@ touch "$WORKFLOW_TEST_STUB_MARKER"
 echo "ok: workflow-test smoke stub"
 EOS
 chmod +x "$workflow_test_smoke"
+
+cat >"$workflow_test_third_party_audit" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "ok: third-party artifacts audit stub"
+EOS
+chmod +x "$workflow_test_third_party_audit"
 
 WORKFLOW_TEST_STUB_MARKER="$workflow_test_marker" PATH="$tmp_dir/bin:$PATH" \
   "$workflow_test_script" --id market-expression >"$workflow_test_output"

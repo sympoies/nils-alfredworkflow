@@ -5,52 +5,14 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
 
-fail() {
-  echo "error: $*" >&2
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
   exit 1
-}
-
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "missing required file: $path"
-}
-
-assert_exec() {
-  local path="$1"
-  [[ -x "$path" ]] || fail "script must be executable: $path"
-}
-
-if ! command -v shellcheck >/dev/null 2>&1; then
-  fail "missing required binary: shellcheck"
-fi
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
 fi
 
-toml_string() {
-  local file="$1"
-  local key="$2"
-  awk -F'=' -v key="$key" '
-    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-      value=$2
-      sub(/^[[:space:]]*/, "", value)
-      sub(/[[:space:]]*$/, "", value)
-      gsub(/^"|"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-assert_jq_json() {
-  local json_payload="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" >/dev/null <<<"$json_payload"; then
-    fail "$message (jq: $filter)"
-  fi
-}
+# shellcheck disable=SC1090
+source "$smoke_helper"
 
 for required in \
   workflow.toml \
@@ -84,8 +46,8 @@ for executable in \
   assert_exec "$workflow_dir/$executable"
 done
 
-command -v jq >/dev/null 2>&1 || fail "missing required binary: jq"
-command -v rg >/dev/null 2>&1 || fail "missing required binary: rg"
+require_bin jq
+require_bin rg
 
 manifest="$workflow_dir/workflow.toml"
 [[ "$(toml_string "$manifest" id)" == "memo-add" ]] || fail "workflow id mismatch"
@@ -103,11 +65,7 @@ rg -n '^MEMO_MAX_INPUT_BYTES[[:space:]]*=[[:space:]]*"4096"' "$manifest" >/dev/n
 rg -n '^MEMO_RECENT_LIMIT[[:space:]]*=[[:space:]]*"8"' "$manifest" >/dev/null || fail "MEMO_RECENT_LIMIT default mismatch"
 rg -n '^MEMO_SEARCH_MATCH[[:space:]]*=[[:space:]]*"fts"' "$manifest" >/dev/null || fail "MEMO_SEARCH_MATCH default mismatch"
 
-set +e
-"$workflow_dir/scripts/action_run.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_run.sh without args must exit 2"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_run.sh"
 
 tmp_dir="$(mktemp -d)"
 crud_tmp_dir="$(mktemp -d)"
