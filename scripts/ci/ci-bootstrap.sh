@@ -6,6 +6,16 @@ repo_root="$(cd "$script_dir/../.." && pwd)"
 
 context=""
 install_codex_cli=0
+apt_updated=0
+linux_id=""
+linux_like=""
+
+if [[ -f /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  linux_id="${ID:-}"
+  linux_like="${ID_LIKE:-}"
+fi
 
 usage() {
   cat <<'USAGE'
@@ -22,6 +32,126 @@ die() {
 require_cargo() {
   if ! command -v cargo >/dev/null 2>&1; then
     echo "error: missing required binary: cargo" >&2
+    exit 1
+  fi
+}
+
+run() {
+  local -a run_cmd=("$@")
+  echo "+ ${run_cmd[*]}"
+  "${run_cmd[@]}"
+}
+
+run_privileged() {
+  local -a privileged_cmd=("$@")
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    run "${privileged_cmd[@]}"
+    return
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    run sudo "${privileged_cmd[@]}"
+    return
+  fi
+
+  return 1
+}
+
+is_debian_family() {
+  [[ "$linux_id" == "ubuntu" || "$linux_id" == "debian" || "$linux_like" == *debian* ]]
+}
+
+ensure_apt_packages() {
+  local -a packages=("$@")
+
+  if ! command -v apt-get >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if [[ "$apt_updated" -eq 0 ]]; then
+    run_privileged apt-get update
+    apt_updated=1
+  fi
+
+  run_privileged apt-get install -y --no-install-recommends "${packages[@]}"
+}
+
+add_unique_item() {
+  local -n target_ref="$1"
+  local item="$2"
+  local existing
+
+  for existing in "${target_ref[@]}"; do
+    if [[ "$existing" == "$item" ]]; then
+      return
+    fi
+  done
+
+  target_ref+=("$item")
+}
+
+ensure_runtime_binaries() {
+  local -a required=(git jq rg curl zip unzip)
+  local -a missing=()
+  local -a packages=()
+  local required_cmd
+
+  if [[ "$context" == "ci" ]]; then
+    required+=(shellcheck shfmt)
+  fi
+
+  for required_cmd in "${required[@]}"; do
+    if ! command -v "$required_cmd" >/dev/null 2>&1; then
+      missing+=("$required_cmd")
+      case "$required_cmd" in
+      git)
+        add_unique_item packages git
+        ;;
+      jq)
+        add_unique_item packages jq
+        ;;
+      rg)
+        add_unique_item packages ripgrep
+        ;;
+      curl)
+        add_unique_item packages curl
+        add_unique_item packages ca-certificates
+        ;;
+      zip)
+        add_unique_item packages zip
+        ;;
+      unzip)
+        add_unique_item packages unzip
+        ;;
+      shellcheck)
+        add_unique_item packages shellcheck
+        ;;
+      shfmt)
+        add_unique_item packages shfmt
+        ;;
+      *) ;;
+      esac
+    fi
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  if is_debian_family && [[ "${#packages[@]}" -gt 0 ]]; then
+    ensure_apt_packages "${packages[@]}" || true
+  fi
+
+  missing=()
+  for required_cmd in "${required[@]}"; do
+    if ! command -v "$required_cmd" >/dev/null 2>&1; then
+      missing+=("$required_cmd")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    echo "error: missing required runtime binaries: ${missing[*]}" >&2
+    echo "hint: install dependencies from BINARY_DEPENDENCIES.md and rerun ci-bootstrap" >&2
     exit 1
   fi
 }
@@ -61,6 +191,7 @@ ci | release | publish-crates) ;;
 esac
 
 require_cargo
+ensure_runtime_binaries
 
 if [[ "$install_codex_cli" -eq 1 ]]; then
   install_codex_cli_runtime
