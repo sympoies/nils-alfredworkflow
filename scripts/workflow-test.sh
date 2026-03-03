@@ -10,6 +10,9 @@ usage() {
   cat <<USAGE
 Usage:
   scripts/workflow-test.sh [--id <workflow-id>]
+
+Notes:
+  - Runs strict third-party artifacts freshness audit before tests.
 USAGE
 }
 
@@ -44,6 +47,9 @@ while [[ $# -gt 0 ]]; do
     ;;
   esac
 done
+
+echo "== Third-party artifacts audit (strict) =="
+bash "$repo_root/scripts/ci/third-party-artifacts-audit.sh" --strict
 
 cargo test --workspace
 
