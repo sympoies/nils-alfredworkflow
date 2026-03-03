@@ -23,7 +23,8 @@ source "$workflow_helper_loader"
 load_helper_or_exit() {
   local helper_name="$1"
   local fallback="${2:-auto}"
-  if ! wfhl_source_required_helper "$script_dir" "$helper_name" "$fallback" "json"; then
+  if ! wfhl_source_helper "$script_dir" "$helper_name" "$fallback"; then
+    wfhl_emit_missing_helper_item_json "$helper_name"
     exit 0
   fi
 }
