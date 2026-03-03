@@ -75,5 +75,5 @@ Capture the wrapper-era baseline for `google-cli` and convert it into a native i
 
 ## Source references
 
-- Wrapper baseline report: `docs/reports/google-cli-validation-report.md`
+- Native baseline report: `docs/reports/google-cli-native-validation-report.md`
 - Existing crate command docs: `crates/google-cli/README.md`

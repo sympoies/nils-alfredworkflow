@@ -35,7 +35,7 @@ sprints.
 - TotalComplexity: 14
 - CriticalPathComplexity: 14
 - MaxBatchWidth: 1
-- OverlapHotspots: `docs/specs/google-cli-wrapper-contract.md` and `crates/google-cli/tests/common/mod.rs` are reused
+- OverlapHotspots: `docs/specs/google-cli-native-contract.md` and `crates/google-cli/tests/common/mod.rs` are reused
   across multiple tasks; keep sequencing strict to avoid churn.
 **Demo/Validation**:
 - Command(s): `plan-tooling validate --file docs/plans/google-cli-rust-wrapper-plan.md`, `cargo check -p nils-google-cli`
@@ -44,7 +44,7 @@ sprints.
 ### Task 1.1: Publish Wrapper Command And Runtime Contract
 
 - **Location**:
-  - `docs/specs/google-cli-wrapper-contract.md`
+  - `docs/specs/google-cli-native-contract.md`
   - `docs/specs/cli-standards-mapping.md`
 - **Description**: Define wrapper boundaries for `auth/gmail/drive`, command naming strategy, pass-through flag policy,
   JSON/text mode behavior, and wrapper-owned error taxonomy.
@@ -57,7 +57,7 @@ sprints.
     execution.
   - Error categories distinguish user input, missing `gog`, process failure, and invalid output decoding.
 - **Validation**:
-  - `rg -n "auth|gmail|drive|wrapper boundary|error taxonomy|pass-through" docs/specs/google-cli-wrapper-contract.md docs/specs/cli-standards-mapping.md`
+  - `rg -n "auth|gmail|drive|error|scope|contract" docs/specs/google-cli-native-contract.md docs/specs/cli-standards-mapping.md`
 
 ### Task 1.2: Scaffold `crates/google-cli` And Workspace Wiring
 
@@ -146,7 +146,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/docs/auth.md`
-  - `docs/specs/google-cli-wrapper-contract.md`
+  - `docs/specs/google-cli-native-contract.md`
 - **Description**: Finalize auth subcommand scope and option policy for this phase (`credentials`, `add`, `list`,
   `status`, `remove`, `alias`, `manage`).
 - **Dependencies**:
@@ -157,7 +157,7 @@ sprints.
   - Contract defines pass-through expectations for account/client/manual/remote auth options.
   - Validation and error behavior for auth command failures is documented.
 - **Validation**:
-  - `rg -n "credentials|add|list|status|remove|alias|manage|pass-through" crates/google-cli/docs/auth.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "credentials|add|list|status|remove|alias|manage|auth" crates/google-cli/docs/auth.md docs/specs/google-cli-native-contract.md`
 
 ### Task 2.2: Implement Auth Wrapper Commands
 
@@ -233,7 +233,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/docs/gmail.md`
-  - `docs/specs/google-cli-wrapper-contract.md`
+  - `docs/specs/google-cli-native-contract.md`
 - **Description**: Define scoped Gmail subcommands and option policy for the wrapper phase (query/list/get/send-focused
   command set).
 - **Dependencies**:
@@ -244,7 +244,7 @@ sprints.
   - Contract includes required account/client/pass-through handling for Gmail commands.
   - Output mode expectations (`--json`/`--plain`) are documented.
 - **Validation**:
-  - `rg -n "gmail|search|thread|get|send|json|plain|pass-through" crates/google-cli/docs/gmail.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "gmail|search|thread|get|send|json|plain|scope" crates/google-cli/docs/gmail.md docs/specs/google-cli-native-contract.md`
 
 ### Task 3.2: Implement Gmail Wrapper Commands
 
@@ -318,7 +318,7 @@ sprints.
 
 - **Location**:
   - `crates/google-cli/docs/drive.md`
-  - `docs/specs/google-cli-wrapper-contract.md`
+  - `docs/specs/google-cli-native-contract.md`
 - **Description**: Define scoped Drive subcommands and option policy for wrapper phase (`ls/search/get/download/upload`
   focused command set).
 - **Dependencies**:
@@ -329,7 +329,7 @@ sprints.
   - Contract defines forwarding behavior for path/id/query arguments and global flags.
   - Output handling expectations are documented for JSON/plain modes.
 - **Validation**:
-  - `rg -n "drive|ls|search|get|download|upload|json|plain|pass-through" crates/google-cli/docs/drive.md docs/specs/google-cli-wrapper-contract.md`
+  - `rg -n "drive|ls|search|get|download|upload|json|plain|scope" crates/google-cli/docs/drive.md docs/specs/google-cli-native-contract.md`
 
 ### Task 4.2: Implement Drive Wrapper Commands
 
@@ -461,7 +461,7 @@ documentation.
 ### Task 5.4: Record Final Validation Evidence And Release Readiness Notes
 
 - **Location**:
-  - `docs/reports/google-cli-validation-report.md`
+  - `docs/reports/google-cli-native-validation-report.md`
   - `crates/google-cli/README.md`
 - **Description**: Capture final command/test evidence and confirm crate-level docs are complete for handoff.
 - **Dependencies**:
@@ -472,7 +472,7 @@ documentation.
   - Crate README/docs contain runnable quickstart and verification commands.
   - Remaining known risks/limitations are explicitly listed.
 - **Validation**:
-  - `rg -n "Validation|Known limitations|Quickstart" docs/reports/google-cli-validation-report.md crates/google-cli/README.md`
+  - `rg -n "Automated native matrix|Live smoke checklist|Release readiness note" docs/reports/google-cli-native-validation-report.md crates/google-cli/README.md`
 
 ## Testing Strategy
 

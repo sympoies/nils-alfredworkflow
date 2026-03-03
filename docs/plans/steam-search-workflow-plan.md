@@ -316,7 +316,7 @@ docs/tests. **Parallelization**: Task 3.1 first, tasks 3.2 and 3.3 run in parall
 
 - **Location**:
   - `DEVELOPMENT.md`
-  - `docs/reports/steam-search-validation-report.md`
+  - `workflows/steam-search/README.md`
 - **Description**: Execute required lint/test/pack checks for `steam-search` and record concise validation evidence for
   release confidence.
 - **Dependencies**:

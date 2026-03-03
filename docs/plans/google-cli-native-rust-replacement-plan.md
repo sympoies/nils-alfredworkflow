@@ -60,7 +60,7 @@ one implementation contract.
 
 - **Location**:
   - `docs/reports/google-cli-native-gap-analysis.md`
-  - `docs/reports/google-cli-validation-report.md`
+  - `docs/reports/google-cli-native-validation-report.md`
   - `crates/google-cli/README.md`
 - **Description**: Convert the wrapper-era live findings into an implementation inventory: commands to preserve, known
   bugs to eliminate (`auth add --remote --step 2` state mismatch), and explicit non-goals such as the browser account
