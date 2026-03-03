@@ -1,7 +1,7 @@
 id = "memo-add"
 name = "Memo Add"
 bundle_id = "com.sympoies.memo-add"
-version = "1.2.0"
+version = "1.2.1"
 script_filter = "script_filter_entry.sh"
 action = "action_run.sh"
 rust_binary = "memo-workflow-cli"

@@ -1,7 +1,7 @@
 id = "codex-cli"
 name = "Codex CLI"
 bundle_id = "com.sympoies.codex-cli"
-version = "1.2.0"
+version = "1.2.1"
 readme_source = "README.md"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
