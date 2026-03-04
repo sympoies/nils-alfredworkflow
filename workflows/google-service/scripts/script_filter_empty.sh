@@ -309,6 +309,9 @@ emit_all_accounts_unread_summary_row() {
 
   local total_unread=0
   local -a details=()
+  local -a account_row_titles=()
+  local -a account_row_subtitles=()
+  local -a account_row_args=()
   local account
   for account in "${accounts[@]}"; do
     local search_output search_rc
@@ -316,11 +319,17 @@ emit_all_accounts_unread_summary_row() {
 
     if [[ "$search_rc" -ne 0 ]]; then
       details+=("${account}:err")
+      account_row_titles+=("Unread ${account}: unavailable")
+      account_row_subtitles+=("Count unavailable in summary · Open unread list for this account")
+      account_row_args+=("prompt::mail-unread-account::${account}")
       continue
     fi
 
     if ! printf '%s\n' "$search_output" | jq -e '.ok == true and (.result | type == "object")' >/dev/null 2>&1; then
       details+=("${account}:err")
+      account_row_titles+=("Unread ${account}: unavailable")
+      account_row_subtitles+=("Count unavailable in summary · Open unread list for this account")
+      account_row_args+=("prompt::mail-unread-account::${account}")
       continue
     fi
 
@@ -332,6 +341,11 @@ emit_all_accounts_unread_summary_row() {
 
     total_unread=$((total_unread + count))
     details+=("${account}:${count}")
+    if ((count > 0)); then
+      account_row_titles+=("Unread ${account}: ${count}")
+      account_row_subtitles+=("Open unread list for this account (current account unchanged)")
+      account_row_args+=("prompt::mail-unread-account::${account}")
+    fi
   done
 
   local subtitle
@@ -339,6 +353,14 @@ emit_all_accounts_unread_summary_row() {
   [[ -n "$subtitle" ]] || subtitle="No unread summary available"
 
   emit_action_item "Unread mail (all accounts): ${total_unread}" "$subtitle" "prompt::mail-unread"
+
+  local index
+  for index in "${!account_row_titles[@]}"; do
+    emit_action_item \
+      "${account_row_titles[$index]}" \
+      "${account_row_subtitles[$index]}" \
+      "${account_row_args[$index]}"
+  done
 }
 
 begin_items

@@ -13,17 +13,17 @@ Implemented now:
 - `login` (remote step 1/2 and manual mode)
 - `switch` (workflow-local active account)
 - `remove` (with optional confirmation)
-- `gs` optional all-accounts unread summary row (workflow toggle)
+- `gs` optional all-accounts unread summary + per-account unread rows for accounts with unread mail (workflow toggle)
 - `drive search` (keyword: `gsd`, Enter=download, Cmd+Enter=open Drive web search)
 - `open Drive home` from `gsd`
-- `gmail unread/latest/search` (keyword: `gsm`, Enter=open message, Cmd+Enter=open Gmail web search)
+- `gmail unread/latest/search` (keyword: `gsm`, Enter=open message, Cmd+Enter=open Gmail web search, optional explicit account for unread)
 - Docs Editors files are auto-exported on download (`document -> docx`, `spreadsheet -> xlsx`, `presentation -> pptx`).
 
 ## Keywords
 
 | Keyword | Behavior |
 | --- | --- |
-| `gs` | Show current account row (active account first, otherwise native default account). Optional all-accounts unread summary row is shown when `GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1`. |
+| `gs` | Show current account row (active account first, otherwise native default account). Optional all-accounts unread summary row and per-account unread rows (only for accounts with unread mail) are shown when `GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1`. |
 | `gsa` | Auth command menu with login/switch/remove rows, then account rows. |
 | `gsd` | Drive home row + Drive search rows (Enter download, Cmd+Enter open Drive web search). |
 | `gsm` | Gmail inbox home row + unread/latest/search rows (Enter open message, Cmd+Enter open Gmail web search). |
@@ -32,7 +32,7 @@ Implemented now:
 
 | Query | Result |
 | --- | --- |
-| `gs` | Show current account row. If `GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1`, also show all-accounts unread summary row. |
+| `gs` | Show current account row. If `GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1`, also show all-accounts unread summary row and one clickable unread row for each account with unread mail. |
 | `gsa` | Show command rows (`Google Service Auth Login/Switch/Remove`) and account rows. |
 | `gsa login you@example.com` | Run remote login step 1 (`auth add --remote --step 1`). |
 | `gsa login <callback-url>` | Finish remote login step 2 (account auto-resolved from saved state). |
@@ -46,6 +46,7 @@ Implemented now:
 | `gsd search keyboard` | Run `google-cli drive search keyboard`; Enter downloads selected file; Cmd+Enter opens Drive web search page. |
 | `gsm` | Show `Open Gmail Inbox` and unread/latest/search usage rows. |
 | `gsm unread` | Run `google-cli gmail search --query "in:inbox is:unread"` and list unread inbox messages. |
+| `gsm unread --account you@example.com` | Run unread search with explicit account override (`google-cli -a you@example.com ...`) without changing workflow current account. |
 | `gsm latest` | Run `google-cli gmail search --query "in:inbox"` and list latest inbox messages. |
 | `gsm search keyboard` | Run `google-cli gmail search --query "keyboard"` and list matches. |
 
@@ -64,6 +65,7 @@ Implemented now:
   2. else use native `default_account`
   3. else use first account in `auth list`
   4. else clear active pointer
+- `gsm unread --account <email>` and `gs` per-account unread rows only override account for that query; they do not mutate this active pointer.
 
 ## Runtime requirements
 

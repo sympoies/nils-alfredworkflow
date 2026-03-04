@@ -116,6 +116,7 @@ emit_mail_item() {
   local message_id="$6"
   local thread_id="$7"
   local mode_label="$8"
+  local resolved_account="$9"
   local modifier_arg="gmail-open-search::${search_query}"
   local modifier_subtitle="Open Gmail web search for ${search_query}"
 
@@ -125,7 +126,7 @@ emit_mail_item() {
     printf ','
   fi
 
-  printf '{"title":"%s","subtitle":"%s","valid":true,"arg":"%s","variables":{"GOOGLE_MAIL_SEARCH_RESULT_COUNT":"%s","GOOGLE_MAIL_MESSAGE_ID":"%s","GOOGLE_MAIL_MESSAGE_THREAD_ID":"%s","GOOGLE_MAIL_QUERY":"%s","GOOGLE_MAIL_QUERY_MODE":"%s"},"mods":{"cmd":{"valid":true,"arg":"%s","subtitle":"%s"}}}' \
+  printf '{"title":"%s","subtitle":"%s","valid":true,"arg":"%s","variables":{"GOOGLE_MAIL_SEARCH_RESULT_COUNT":"%s","GOOGLE_MAIL_MESSAGE_ID":"%s","GOOGLE_MAIL_MESSAGE_THREAD_ID":"%s","GOOGLE_MAIL_QUERY":"%s","GOOGLE_MAIL_QUERY_MODE":"%s","GOOGLE_MAIL_ACCOUNT":"%s"},"mods":{"cmd":{"valid":true,"arg":"%s","subtitle":"%s"}}}' \
     "$(json_escape "$title")" \
     "$(json_escape "$subtitle")" \
     "$(json_escape "$arg")" \
@@ -134,6 +135,7 @@ emit_mail_item() {
     "$(json_escape "$thread_id")" \
     "$(json_escape "$search_query")" \
     "$(json_escape "$mode_label")" \
+    "$(json_escape "$resolved_account")" \
     "$(json_escape "$modifier_arg")" \
     "$(json_escape "$modifier_subtitle")"
 
@@ -360,7 +362,7 @@ emit_help_items() {
 
   emit_unread_hint_item \
     "$unread_title" \
-    "Type: unread [optional query terms]" \
+    "Type: unread [--account <email>] [optional query terms]" \
     "$unread_count"
 
   emit_item \
@@ -428,6 +430,63 @@ append_optional_terms() {
   fi
 }
 
+parse_unread_query_options() {
+  local input="${1-}"
+  unread_query_account=""
+  unread_query_terms=""
+  unread_query_error=""
+
+  input="$(sfqp_trim "$input")"
+
+  local -a tokens=()
+  if [[ -n "$input" ]]; then
+    # shellcheck disable=SC2206
+    tokens=($input)
+  fi
+
+  local -a terms=()
+  local index=0
+  while ((index < ${#tokens[@]})); do
+    local token="${tokens[$index]}"
+    case "$token" in
+    --account)
+      index=$((index + 1))
+      if ((index >= ${#tokens[@]})); then
+        unread_query_error="missing value for --account"
+        return 1
+      fi
+      unread_query_account="$(sfqp_trim "${tokens[$index]}")"
+      if [[ -z "$unread_query_account" ]]; then
+        unread_query_error="missing value for --account"
+        return 1
+      fi
+      ;;
+    --account=*)
+      unread_query_account="$(sfqp_trim "${token#--account=}")"
+      if [[ -z "$unread_query_account" ]]; then
+        unread_query_error="missing value for --account"
+        return 1
+      fi
+      ;;
+    *)
+      terms+=("$token")
+      ;;
+    esac
+    index=$((index + 1))
+  done
+
+  local term
+  for term in "${terms[@]}"; do
+    if [[ -z "$unread_query_terms" ]]; then
+      unread_query_terms="$term"
+    else
+      unread_query_terms="${unread_query_terms} ${term}"
+    fi
+  done
+  unread_query_terms="$(sfqp_trim "$unread_query_terms")"
+  return 0
+}
+
 resolve_mail_limit_env() {
   local raw_value="${1-}"
   local default_value="${2-25}"
@@ -466,6 +525,7 @@ resolve_mail_result_max() {
 handle_mail_search() {
   local search_query="$1"
   local mode_label="$2"
+  local account_override="${3-}"
 
   if ! command -v jq >/dev/null 2>&1; then
     emit_item \
@@ -488,15 +548,19 @@ handle_mail_search() {
     return
   fi
 
-  local active_account=""
-  active_account="$(read_active_account || true)"
+  local effective_account=""
+  if [[ -n "$account_override" ]]; then
+    effective_account="$account_override"
+  else
+    effective_account="$(read_active_account || true)"
+  fi
 
   local search_max
   search_max="$(resolve_mail_result_max "$mode_label")"
 
   local -a command_args=()
-  if [[ -n "$active_account" ]]; then
-    command_args+=(-a "$active_account")
+  if [[ -n "$effective_account" ]]; then
+    command_args+=(-a "$effective_account")
   fi
   command_args+=(gmail search --max "$search_max" --format metadata --headers "Subject,From,Date" --query "$search_query")
 
@@ -528,6 +592,15 @@ handle_mail_search() {
     result_count="0"
   fi
 
+  local resolved_account=""
+  resolved_account="$(printf '%s\n' "$output" | jq -r '.result.account // empty' 2>/dev/null || true)"
+  if [[ -z "$resolved_account" && -n "$effective_account" ]]; then
+    resolved_account="$effective_account"
+  fi
+  if [[ -z "$resolved_account" ]]; then
+    resolved_account="(auto)"
+  fi
+
   local emitted=0
   while IFS=$'\t' read -r message_id thread_id subject from_header date_header snippet; do
     [[ -n "$message_id" ]] || continue
@@ -554,7 +627,7 @@ handle_mail_search() {
     if [[ -n "$snippet" ]]; then
       subtitle="${subtitle} · ${snippet}"
     fi
-    subtitle="${subtitle} · mode=${mode_label} · result.count=${result_count}"
+    subtitle="${subtitle} · mode=${mode_label} · account=${resolved_account} · result.count=${result_count}"
 
     emit_mail_item \
       "$title" \
@@ -564,7 +637,8 @@ handle_mail_search() {
       "$result_count" \
       "$message_id" \
       "$thread_id" \
-      "$mode_label"
+      "$mode_label" \
+      "$resolved_account"
 
     emitted=1
   done < <(printf '%s\n' "$output" | jq -r '.result.messages[]? | [.id // "", .thread_id // "", .headers.Subject // .headers.subject // "", .headers.From // .headers.from // "", .headers.Date // .headers.date // "", .snippet // ""] | @tsv')
@@ -572,7 +646,7 @@ handle_mail_search() {
   if [[ "$emitted" -eq 0 ]]; then
     emit_item \
       "No mail found" \
-      "query=${search_query} · mode=${mode_label} · result.count=${result_count}" \
+      "query=${search_query} · mode=${mode_label} · account=${resolved_account} · result.count=${result_count}" \
       "" \
       false \
       "search ${search_query}"
@@ -604,11 +678,23 @@ fi
 
 search_query=""
 mode_label="search"
+account_override=""
 
 if [[ "$lower_query" == unread* ]]; then
   mode_label="unread"
   extra_terms="$(printf '%s' "$trimmed_query" | sed -E 's/^[[:space:]]*unread[[:space:]]*//I')"
-  search_query="$(append_optional_terms "in:inbox is:unread" "$extra_terms")"
+  if ! parse_unread_query_options "$extra_terms"; then
+    emit_item \
+      "Unread query invalid" \
+      "$unread_query_error" \
+      "" \
+      false \
+      "unread "
+    end_items
+    exit 0
+  fi
+  account_override="$unread_query_account"
+  search_query="$(append_optional_terms "in:inbox is:unread" "$unread_query_terms")"
 elif [[ "$lower_query" == latest* ]]; then
   mode_label="latest"
   extra_terms="$(printf '%s' "$trimmed_query" | sed -E 's/^[[:space:]]*latest[[:space:]]*//I')"
@@ -629,5 +715,5 @@ if [[ -z "$search_query" ]]; then
   exit 0
 fi
 
-handle_mail_search "$search_query" "$mode_label"
+handle_mail_search "$search_query" "$mode_label" "$account_override"
 end_items

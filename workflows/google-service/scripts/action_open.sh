@@ -885,6 +885,14 @@ prompt::remove)
 prompt::mail-unread)
   open_alfred_search_best_effort "gsm unread"
   ;;
+prompt::mail-unread-account::*)
+  account="${action_token#prompt::mail-unread-account::}"
+  account="$(trim "$account")"
+  if [[ -z "$account" ]]; then
+    die_with_notify "mail unread account token is missing account email" 2
+  fi
+  open_alfred_search_best_effort "gsm unread --account ${account}"
+  ;;
 switch::*)
   google_cli="$(require_google_cli)"
   account="${action_token#switch::}"

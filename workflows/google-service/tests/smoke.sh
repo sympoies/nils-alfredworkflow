@@ -360,6 +360,10 @@ gmail)
       ) ]
     ' <<<"$gmail_fixture_json")"
 
+    if [[ "$require_unread" -eq 1 && "$selected_account" == "zero@example.com" ]]; then
+      filtered='[]'
+    fi
+
     # Simulate latest ordering by Date descending in fixture sequence.
     limited="$(jq -c --argjson max "$max" '.[0:$max]' <<<"$filtered")"
     count="$(jq 'length' <<<"$limited")"
@@ -579,11 +583,27 @@ assert_jq_json "$root_json" '.items[0].title == "Current account: a@example.com"
 assert_jq_json "$root_json" '.items[0].arg == "prompt::switch"' "gs current account row should route to switch prompt token"
 
 root_with_unread_json="$(env "${base_env[@]}" GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1 bash "$script_filter_empty" "")"
-assert_jq_json "$root_with_unread_json" '.items | length == 2' "gs root query should emit unread summary row when toggle enabled"
+assert_jq_json "$root_with_unread_json" '.items | length == 4' "gs root query should emit unread summary + per-account rows when toggle enabled"
 assert_jq_json "$root_with_unread_json" '.items[1].title == "Unread mail (all accounts): 4"' "gs unread summary total mismatch"
 assert_jq_json "$root_with_unread_json" '.items[1].arg == "prompt::mail-unread"' "gs unread summary row should route to gsm unread prompt token"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("a@example.com:2")' "gs unread summary should include account a count"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("b@example.com:2")' "gs unread summary should include account b count"
+assert_jq_json "$root_with_unread_json" '[.items[] | select(.title == "Unread a@example.com: 2" and .arg == "prompt::mail-unread-account::a@example.com")] | length == 1' "gs per-account unread row for account a missing"
+assert_jq_json "$root_with_unread_json" '[.items[] | select(.title == "Unread b@example.com: 2" and .arg == "prompt::mail-unread-account::b@example.com")] | length == 1' "gs per-account unread row for account b missing"
+
+cat >"$stub_accounts_file" <<'JSON'
+{"accounts":["a@example.com","b@example.com","zero@example.com"],"default_account":"a@example.com"}
+JSON
+
+root_with_zero_unread_json="$(env "${base_env[@]}" GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1 bash "$script_filter_empty" "")"
+assert_jq_json "$root_with_zero_unread_json" '.items | length == 4' "gs should not emit per-account unread row when account unread count is zero"
+assert_jq_json "$root_with_zero_unread_json" '.items[1].title == "Unread mail (all accounts): 4"' "gs unread summary total should ignore zero-count account"
+assert_jq_json "$root_with_zero_unread_json" '.items[1].subtitle | test("zero@example.com:0")' "gs unread summary should include zero-count account detail"
+assert_jq_json "$root_with_zero_unread_json" '[.items[] | select(.arg == "prompt::mail-unread-account::zero@example.com")] | length == 0' "gs should hide zero-count account unread row"
+
+cat >"$stub_accounts_file" <<'JSON'
+{"accounts":["a@example.com","b@example.com"],"default_account":"a@example.com"}
+JSON
 
 auth_root_json="$(run_with_env bash "$script_filter" "")"
 assert_jq_json "$auth_root_json" '.items | length >= 5' "gsa root query should emit command and account rows"
@@ -625,6 +645,17 @@ assert_jq_json "$mail_unread_json" '.items[0].variables.GOOGLE_MAIL_SEARCH_RESUL
 assert_jq_json "$mail_unread_json" '.items[0].variables.GOOGLE_MAIL_MESSAGE_ID == "msg-1"' "gsm unread should set message id variable"
 assert_jq_json "$mail_unread_json" '.items[0].variables.GOOGLE_MAIL_MESSAGE_THREAD_ID == "thread-1"' "gsm unread should set thread id variable"
 assert_jq_json "$mail_unread_json" '.items[0].variables.GOOGLE_MAIL_QUERY_MODE == "unread"' "gsm unread should set query mode variable"
+assert_jq_json "$mail_unread_json" '.items[0].variables.GOOGLE_MAIL_ACCOUNT == "a@example.com"' "gsm unread should expose resolved account variable"
+
+mail_unread_account_json="$(run_with_env bash "$script_filter_mail" "unread --account b@example.com")"
+assert_jq_json "$mail_unread_account_json" '.items | length == 2' "gsm unread --account should emit unread rows from fixture"
+assert_jq_json "$mail_unread_account_json" '.items[0].subtitle | test("account=b@example.com")' "gsm unread --account subtitle should include explicit account"
+assert_jq_json "$mail_unread_account_json" '.items[0].variables.GOOGLE_MAIL_ACCOUNT == "b@example.com"' "gsm unread --account should expose explicit account variable"
+
+mail_unread_invalid_query_json="$(run_with_env bash "$script_filter_mail" "unread --account")"
+assert_jq_json "$mail_unread_invalid_query_json" '.items | length == 1' "gsm unread invalid query should emit one guidance row"
+assert_jq_json "$mail_unread_invalid_query_json" '.items[0].title == "Unread query invalid"' "gsm unread invalid query title mismatch"
+assert_jq_json "$mail_unread_invalid_query_json" '.items[0].subtitle == "missing value for --account"' "gsm unread invalid query subtitle mismatch"
 
 mail_latest_json="$(run_with_env bash "$script_filter_mail" "latest")"
 assert_jq_json "$mail_latest_json" '.items | length == 3' "gsm latest should emit latest inbox rows from fixture"
@@ -663,6 +694,7 @@ run_with_env bash "$action_open" "prompt::auth" >/dev/null
 run_with_env bash "$action_open" "prompt::switch" >/dev/null
 run_with_env bash "$action_open" "prompt::remove" >/dev/null
 run_with_env bash "$action_open" "prompt::mail-unread" >/dev/null
+run_with_env bash "$action_open" "prompt::mail-unread-account::a@example.com" >/dev/null
 
 run_with_env bash "$action_open" "switch::b@example.com" >/dev/null
 active_file="$smoke_tmp/data/active-account.v1.json"
