@@ -19,6 +19,11 @@ command -v market-cli || true
 # Baseline expression should return Alfred JSON rows
 bash workflows/market-expression/scripts/script_filter.sh "1 BTC + 2 ETH to USD" | jq -e '.items | type == "array"'
 
+# Quote rows should surface cached icon paths when available
+MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
+  bash workflows/market-expression/scripts/script_filter.sh "1 BTC + 2 ETH to USD" \
+  | jq -r '.items[] | select(.icon.path? != null) | .title + " -> " + .icon.path'
+
 # Empty query should return one prompt row plus non-selectable favorites rows when enabled
 MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
 MARKET_FX_CACHE_TTL="1d" \
@@ -43,6 +48,8 @@ rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACH
 | Empty query falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY` | `MARKET_FAVORITE_LIST` is empty or delimiter-only | This is expected fallback behavior. Set a non-empty comma/newline list to override it. |
 | Empty query shows a generic `Market Expression error` row | `MARKET_FAVORITE_LIST` contains an invalid symbol token or `MARKET_DEFAULT_FIAT` is invalid | Use uppercase symbol tokens. Empty or delimiter-only input falls back automatically; malformed non-empty tokens do not. |
 | Empty query shows a raw symbol instead of `1 SYMBOL = ...` | Quote lookup for that favorite failed and the row degraded to hint mode | Retry after provider recovery, or inspect cache/provider connectivity if it persists for the same symbol. |
+| Quote rows show no icon | Cold icon cache, icon CDN issue, or symbol has no dedicated icon and generic fallback was unavailable | Retry once to allow cold-cache fill, then inspect the market cache tree under `market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`. Rows should still work without icons. |
+| First render feels slower than later renders | Cold icon cache download happened during row rendering | Re-run the same query once. Warm-cache renders should reuse the same cached icon path. |
 | `Unsupported operator` row | Asset expression used `*` or `/` | Use `+`/`-` for asset terms. Keep `*`/`/` for numeric-only expressions. |
 | `Invalid expression terms` row | Mixed raw numeric and asset terms in same expression | Use a single expression type per side (all numeric or all asset terms). |
 | `Invalid to-clause` row | Missing/incomplete `to <FIAT>` target | Use complete target clause, e.g. `1 BTC + 2 ETH to USD`. |
@@ -61,6 +68,9 @@ MARKET_FAVORITES_ENABLED="1" \
 MARKET_FAVORITE_LIST=$'ETH\nBTC,EUR,JPY' \
   bash workflows/market-expression/scripts/script_filter.sh "" \
   | jq -r '.items[] | [.title, .subtitle, (.valid|tostring)] | @tsv'
+
+# Maintainer cold/warm icon cache probe
+MARKET_CACHE_DIR="$(mktemp -d)" bash scripts/market-cli-live-smoke.sh
 ```
 
 ## Validation

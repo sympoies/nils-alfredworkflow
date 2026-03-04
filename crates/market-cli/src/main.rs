@@ -1,8 +1,7 @@
-use alfred_core::{Feedback, Item};
+use alfred_core::{Feedback, Item, ItemIcon};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use rust_decimal::Decimal;
-use serde_json::json;
 use workflow_common::{
     EnvelopePayloadKind, OutputMode, build_alfred_error_feedback, build_error_details_json,
     build_error_envelope, build_success_envelope, redact_sensitive, select_output_mode,
@@ -11,7 +10,7 @@ use workflow_common::{
 use market_cli::{
     config::RuntimeConfig,
     error::AppError,
-    expression,
+    expression, icons,
     model::{MarketKind, MarketRequest, normalize_fx_symbol},
     parse_favorites_list,
     providers::{HttpProviders, ProviderApi},
@@ -373,7 +372,7 @@ where
             ))
         }
         OutputMode::Human => Ok(format_market_human_output(&result)),
-        OutputMode::AlfredJson => render_market_alfred_output(&result),
+        OutputMode::AlfredJson => render_market_alfred_output(config, &result),
     }
 }
 
@@ -392,23 +391,24 @@ fn format_market_human_output(output: &market_cli::model::MarketOutput) -> Strin
 }
 
 fn render_market_alfred_output(
+    config: &RuntimeConfig,
     output: &market_cli::model::MarketOutput,
 ) -> Result<String, CliError> {
-    let payload = json!({
-        "items": [{
-            "title": format!("{} {} = {} {}", output.amount, output.base, output.converted, output.quote),
-            "subtitle": format!(
-                "price={} provider={} cache={}",
-                output.unit_price,
-                output.provider,
-                cache_status_label(output.cache.status)
-            ),
-            "arg": output.converted,
-            "valid": false
-        }]
-    });
+    let item = Item::new(format!(
+        "{} {} = {} {}",
+        output.amount, output.base, output.converted, output.quote
+    ))
+    .with_subtitle(format!(
+        "price={} provider={} cache={}",
+        output.unit_price,
+        output.provider,
+        cache_status_label(output.cache.status)
+    ))
+    .with_arg(output.converted.clone())
+    .with_valid(false);
+    let item = with_symbol_icon(item, config, &output.base);
 
-    serde_json::to_string(&payload).map_err(|error| {
+    Feedback::new(vec![item]).to_json().map_err(|error| {
         runtime_error(
             ERROR_CODE_RUNTIME_SERIALIZE,
             format!("failed to serialize Alfred output: {error}"),
@@ -471,22 +471,31 @@ where
     N: Fn() -> DateTime<Utc> + Copy,
 {
     if symbol == default_fiat {
-        return Item::new(format!("1 {symbol} = 1 {default_fiat}"))
-            .with_uid(favorite_item_uid(symbol, default_fiat))
-            .with_subtitle("provider: identity · freshness: fixed")
-            .with_valid(false);
+        return with_symbol_icon(
+            Item::new(format!("1 {symbol} = 1 {default_fiat}"))
+                .with_uid(favorite_item_uid(symbol, default_fiat))
+                .with_subtitle("provider: identity · freshness: fixed")
+                .with_valid(false),
+            config,
+            symbol,
+        );
     }
 
     match expression::resolve_symbol_output(config, providers, now_fn, symbol, default_fiat) {
-        Ok(output) => favorite_quote_success_item(symbol, default_fiat, &output),
-        Err(_) => Item::new(symbol)
-            .with_uid(favorite_item_uid(symbol, default_fiat))
-            .with_subtitle(FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE)
-            .with_valid(false),
+        Ok(output) => favorite_quote_success_item(config, symbol, default_fiat, &output),
+        Err(_) => with_symbol_icon(
+            Item::new(symbol)
+                .with_uid(favorite_item_uid(symbol, default_fiat))
+                .with_subtitle(FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE)
+                .with_valid(false),
+            config,
+            symbol,
+        ),
     }
 }
 
 fn favorite_quote_success_item(
+    config: &RuntimeConfig,
     symbol: &str,
     default_fiat: &str,
     output: &market_cli::model::MarketOutput,
@@ -497,14 +506,18 @@ fn favorite_quote_success_item(
         .map(expression::format_market_decimal)
         .unwrap_or_else(|_| output.unit_price.clone());
 
-    Item::new(format!("1 {symbol} = {rendered_price} {default_fiat}"))
-        .with_uid(favorite_item_uid(symbol, default_fiat))
-        .with_subtitle(format!(
-            "provider: {} · freshness: {}",
-            output.provider,
-            cache_status_label(output.cache.status)
-        ))
-        .with_valid(false)
+    with_symbol_icon(
+        Item::new(format!("1 {symbol} = {rendered_price} {default_fiat}"))
+            .with_uid(favorite_item_uid(symbol, default_fiat))
+            .with_subtitle(format!(
+                "provider: {} · freshness: {}",
+                output.provider,
+                cache_status_label(output.cache.status)
+            ))
+            .with_valid(false),
+        config,
+        symbol,
+    )
 }
 
 fn favorite_item_uid(symbol: &str, default_fiat: &str) -> String {
@@ -513,6 +526,14 @@ fn favorite_item_uid(symbol: &str, default_fiat: &str) -> String {
         symbol.to_ascii_lowercase(),
         default_fiat.to_ascii_lowercase()
     )
+}
+
+fn with_symbol_icon(item: Item, config: &RuntimeConfig, symbol: &str) -> Item {
+    if let Some(path) = icons::resolve_icon_path(config, symbol) {
+        return item.with_icon(ItemIcon::new(path.to_string_lossy().into_owned()));
+    }
+
+    item
 }
 
 fn format_expr_human_output(alfred_json: &str) -> Result<String, CliError> {
@@ -606,8 +627,15 @@ fn cache_status_label(status: market_cli::model::CacheStatus) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use chrono::TimeZone;
-    use market_cli::{model::MarketQuote, providers::ProviderError};
+    use market_cli::{
+        cache::{CacheRecord, cache_path, write_cache},
+        icon_asset_filename,
+        model::{MarketKind, MarketQuote},
+        providers::ProviderError,
+    };
     use serde_json::Value;
 
     use super::*;
@@ -722,17 +750,73 @@ mod tests {
     }
 
     fn config_in_tempdir() -> RuntimeConfig {
-        RuntimeConfig {
-            cache_dir: tempfile::tempdir().expect("tempdir").path().to_path_buf(),
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cache_dir = dir.path().to_path_buf();
+        std::mem::forget(dir);
+
+        let config = RuntimeConfig {
+            cache_dir,
             fx_cache_ttl_secs: market_cli::config::FX_TTL_SECS,
             crypto_cache_ttl_secs: market_cli::config::CRYPTO_TTL_SECS,
-        }
+        };
+        seed_icon_files(&config, &["BTC", "ETH", "USD", "JPY"]);
+        config
     }
 
     fn fixed_now() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 2, 10, 12, 5, 0)
             .single()
             .expect("time")
+    }
+
+    fn seed_icon_files(config: &RuntimeConfig, symbols: &[&str]) {
+        let icon_dir = config.icon_cache_dir();
+        fs::create_dir_all(&icon_dir).expect("create icon dir");
+        fs::write(
+            icon_dir.join(market_cli::config::ICON_GENERIC_BASENAME),
+            b"generic-icon",
+        )
+        .expect("write generic icon");
+
+        for symbol in symbols {
+            seed_icon_file_at(config, symbol);
+        }
+    }
+
+    fn seed_icon_file_at(config: &RuntimeConfig, symbol: &str) -> String {
+        let file_name = icon_asset_filename(symbol).expect("icon filename");
+        fs::write(
+            config.icon_cache_dir().join(&file_name),
+            format!("icon-{symbol}"),
+        )
+        .expect("write icon file");
+        file_name
+    }
+
+    fn seed_quote_cache(
+        config: &RuntimeConfig,
+        kind: MarketKind,
+        base: &str,
+        quote: &str,
+        provider: &str,
+        unit_price: &str,
+    ) {
+        let path = cache_path(config, kind, base, quote);
+        let record = CacheRecord {
+            base: base.to_string(),
+            quote: quote.to_string(),
+            provider: provider.to_string(),
+            unit_price: unit_price.to_string(),
+            fetched_at: Utc::now().to_rfc3339(),
+        };
+
+        write_cache(&path, &record).expect("write cache");
+    }
+
+    fn item_icon_path(item: &Value) -> Option<&str> {
+        item.get("icon")
+            .and_then(|icon| icon.get("path"))
+            .and_then(Value::as_str)
     }
 
     #[test]
@@ -914,6 +998,8 @@ mod tests {
 
     #[test]
     fn main_outputs_fx_alfred_json_mode_when_requested() {
+        let config = config_in_tempdir();
+        let expected_file = seed_icon_file_at(&config, "USD");
         let cli = Cli::parse_from([
             "market-cli",
             "fx",
@@ -926,8 +1012,7 @@ mod tests {
             "--output",
             "alfred-json",
         ]);
-        let output = run_with(cli, &config_in_tempdir(), &FakeProviders::ok(), fixed_now)
-            .expect("fx should pass");
+        let output = run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
         let json: Value = serde_json::from_str(&output).expect("json");
         let first_item = json
             .get("items")
@@ -936,6 +1021,63 @@ mod tests {
             .expect("first item");
 
         assert!(first_item.get("title").is_some());
+        let icon_path = item_icon_path(first_item).expect("icon path");
+        assert!(icon_path.ends_with(expected_file.as_str()));
+    }
+
+    #[test]
+    fn main_outputs_fx_alfred_json_with_generic_fallback_icon() {
+        let config = config_in_tempdir();
+        let cli = Cli::parse_from([
+            "market-cli",
+            "fx",
+            "--base",
+            "TWD",
+            "--quote",
+            "USD",
+            "--amount",
+            "100",
+            "--output",
+            "alfred-json",
+        ]);
+        let output = run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
+        let json: Value = serde_json::from_str(&output).expect("json");
+        let first_item = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.first())
+            .expect("first item");
+
+        let icon_path = item_icon_path(first_item).expect("icon path");
+        assert!(icon_path.ends_with(market_cli::config::ICON_GENERIC_BASENAME));
+    }
+
+    #[test]
+    fn main_outputs_crypto_alfred_json_with_symbol_icon() {
+        let config = config_in_tempdir();
+        let expected_file = seed_icon_file_at(&config, "BTC");
+        let cli = Cli::parse_from([
+            "market-cli",
+            "crypto",
+            "--base",
+            "BTC",
+            "--quote",
+            "USD",
+            "--amount",
+            "1",
+            "--output",
+            "alfred-json",
+        ]);
+        let output = run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("crypto");
+        let json: Value = serde_json::from_str(&output).expect("json");
+        let first_item = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.first())
+            .expect("first item");
+
+        let icon_path = item_icon_path(first_item).expect("icon path");
+        assert!(icon_path.ends_with(expected_file.as_str()));
     }
 
     #[test]
@@ -982,7 +1124,7 @@ mod tests {
     }
 
     #[test]
-    fn main_outputs_favorites_alfred_json_with_prompt_and_quote_rows() {
+    fn favorites_rows_include_icon_paths_for_supported_symbols() {
         let cli = Cli::parse_from([
             "market-cli",
             "favorites",
@@ -1028,6 +1170,11 @@ mod tests {
             Some("1 JPY = 0.01 USD")
         );
         assert!(items.iter().all(|item| item.get("uid").is_some()));
+        assert!(items[0].get("icon").is_none());
+        assert!(item_icon_path(&items[1]).is_some_and(|path| path.ends_with("btc.png")));
+        assert!(item_icon_path(&items[2]).is_some_and(|path| path.ends_with("eth.png")));
+        assert!(item_icon_path(&items[3]).is_some_and(|path| path.ends_with("usd.png")));
+        assert!(item_icon_path(&items[4]).is_some_and(|path| path.ends_with("jpy.png")));
         assert!(
             items
                 .iter()
@@ -1068,10 +1215,36 @@ mod tests {
             Some(FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE)
         );
         assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(false));
+        assert!(item_icon_path(&items[1]).is_some_and(|path| path.ends_with("btc.png")));
     }
 
     #[test]
     fn main_outputs_favorites_json_envelope_when_requested() {
+        let config = config_in_tempdir();
+        seed_quote_cache(
+            &config,
+            MarketKind::Crypto,
+            "BTC",
+            "USD",
+            "coinbase",
+            "68194",
+        );
+        seed_quote_cache(
+            &config,
+            MarketKind::Crypto,
+            "ETH",
+            "USD",
+            "coinbase",
+            "1980",
+        );
+        seed_quote_cache(
+            &config,
+            MarketKind::Fx,
+            "JPY",
+            "USD",
+            "frankfurter",
+            "0.0067",
+        );
         let alfred_cli = Cli::parse_from([
             "market-cli",
             "favorites",
@@ -1092,20 +1265,10 @@ mod tests {
             "--json",
         ]);
 
-        let direct = run_with(
-            alfred_cli,
-            &config_in_tempdir(),
-            &FavoritesProviders,
-            fixed_now,
-        )
-        .expect("favorites Alfred output should pass");
-        let envelope = run_with(
-            json_cli,
-            &config_in_tempdir(),
-            &FavoritesProviders,
-            fixed_now,
-        )
-        .expect("favorites JSON output should pass");
+        let direct = run_with(alfred_cli, &config, &FavoritesProviders, fixed_now)
+            .expect("favorites Alfred output should pass");
+        let envelope = run_with(json_cli, &config, &FavoritesProviders, fixed_now)
+            .expect("favorites JSON output should pass");
         let envelope_json: Value = serde_json::from_str(&envelope).expect("json");
         let direct_json: Value = serde_json::from_str(&direct).expect("json");
 

@@ -116,6 +116,9 @@ payload = {
             "subtitle": f"default fiat={default_fiat}",
             "arg": f"{item_title} => {default_fiat}",
             "valid": True,
+            "icon": {
+                "path": "cache/icons/query.png",
+            },
         }
     ]
 }
@@ -177,6 +180,9 @@ for symbol in symbols:
                 "title": f"1 {symbol} = 1 {default_fiat}",
                 "subtitle": "provider: identity · freshness: fixed",
                 "valid": False,
+                "icon": {
+                    "path": f"cache/icons/{symbol.lower()}.png",
+                },
             }
         )
         continue
@@ -188,6 +194,9 @@ for symbol in symbols:
             "title": f"1 {symbol} = {rendered} {default_fiat}",
             "subtitle": "provider: stub-provider · freshness: cache_fresh",
             "valid": False,
+            "icon": {
+                "path": f"cache/icons/{symbol.lower()}.png",
+            },
         }
     )
 
@@ -263,6 +272,7 @@ success_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_F
 assert_jq_json "$success_json" '.items | type == "array" and length == 1' "script_filter success must output one-item array"
 assert_jq_json "$success_json" '.items[0].title == "1 BTC + 2 ETH"' "script_filter should preserve query in success output"
 assert_jq_json "$success_json" '.items[0].subtitle == "default fiat=TWD"' "script_filter must pass MARKET_DEFAULT_FIAT to cli"
+assert_jq_json "$success_json" '.items[0].icon.path == "cache/icons/query.png"' "script_filter should preserve Alfred icon path"
 
 success_default_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="" "$workflow_dir/scripts/script_filter.sh" "BTC to"; })"
 assert_jq_json "$success_default_json" '.items[0].subtitle == "default fiat=USD"' "empty MARKET_DEFAULT_FIAT should fallback to USD"
@@ -272,10 +282,12 @@ assert_jq_json "$favorites_json" '.items | type == "array" and length == 5' "fav
 assert_jq_json "$favorites_json" '.items[0].title == "Enter a market expression"' "favorites query must include prompt row first"
 assert_jq_json "$favorites_json" '(.items[1:] | map(.title)) == ["1 ETH = 1980 USD","1 BTC = 68194 USD","1 USD = 1 USD","1 JPY = 0.01 USD"]' "favorites query must preserve configured order with quote rows"
 assert_jq_json "$favorites_json" '[.items[].valid] | all(. == false)' "favorites rows must be non-actionable"
+assert_jq_json "$favorites_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/eth.png","cache/icons/btc.png","cache/icons/usd.png","cache/icons/jpy.png"]' "favorites query should preserve icon paths for quote rows"
 
 favorites_default_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="TWD" MARKET_FAVORITE_LIST="" "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_default_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 TWD","1 ETH = 1980 TWD","1 TWD = 1 TWD","1 JPY = 0.01 TWD"]' "empty favorites list must fall back to default favorites set with quote rows"
 assert_jq_json "$favorites_default_json" '[.items[].valid] | all(. == false)' "fallback favorites rows must be non-actionable"
+assert_jq_json "$favorites_default_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/btc.png","cache/icons/eth.png","cache/icons/twd.png","cache/icons/jpy.png"]' "fallback favorites rows must preserve icon paths"
 
 favorites_delimiter_only_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST=", ,\n,," "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_delimiter_only_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 USD","1 ETH = 1980 USD","1 USD = 1 USD","1 JPY = 0.01 USD"]' "delimiter-only favorites list must fall back to default favorites set"

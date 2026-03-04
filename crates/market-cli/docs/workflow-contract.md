@@ -91,6 +91,20 @@ It also includes favorites-list output for the `market-expression` workflow empt
   - retryable: transport failures and HTTP `429`/`5xx`
   - non-retryable: invalid payload and unsupported pair errors (fail fast)
 
+## Alfred Icon Policy
+
+- Alfred row icons for supported market symbols are resolved inside `market-cli`, not in workflow shell scripts.
+- The pinned icon source is `cryptocurrency-icons@0.18.1` served via jsDelivr under `32/color/*.png`.
+- The version pin is intentional so cache paths and upstream asset names stay stable until maintainers explicitly upgrade the contract.
+- Cache root stays under the existing market cache directory and uses a versioned subtree:
+  - `<MARKET_CACHE_DIR>/market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`
+  - When Alfred variables are used, `ALFRED_WORKFLOW_CACHE` / `ALFRED_WORKFLOW_DATA` follow the same subtree rule.
+- Resolution is best-effort:
+  - supported symbol icon -> use the cached symbol PNG
+  - missing upstream icon / unsupported symbol -> fall back to cached `generic.png`
+  - download/cache failure -> keep the quote row and omit or degrade icon metadata rather than failing the command
+- This icon policy must not change FX/crypto quote cache semantics or provider fallback behavior.
+
 ## Output JSON Schema
 
 Successful output is one JSON object with this shape:
