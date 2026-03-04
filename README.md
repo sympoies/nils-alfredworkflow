@@ -45,13 +45,6 @@ Alfred workflows for macOS users.
 - Repository checkout helper (for maintainers):
   `scripts/workflow-clear-quarantine.sh --id <workflow-id>`
 
-## Canonical documentation map
-
-- Architecture/runtime boundaries: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- CLI shared runtime/output contract: [docs/specs/cli-shared-runtime-contract.md](docs/specs/cli-shared-runtime-contract.md)
-- Release/tagging flow and gates: [docs/RELEASE.md](docs/RELEASE.md)
-- Workflow-specific runtime/query/validation details: `workflows/<workflow-id>/README.md`
-
 ## Troubleshooting
 
 - Global standards and shared operator playbooks: [ALFRED_WORKFLOW_DEVELOPMENT.md](ALFRED_WORKFLOW_DEVELOPMENT.md)
