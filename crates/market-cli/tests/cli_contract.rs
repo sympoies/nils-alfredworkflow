@@ -3,7 +3,10 @@ use std::process::{Command, Output};
 
 use chrono::{TimeZone, Utc};
 use market_cli::cache::{CacheRecord, cache_path, write_cache};
-use market_cli::config::{MARKET_CACHE_DIR_ENV, RuntimeConfig};
+use market_cli::config::{
+    CRYPTO_TTL_SECS, FX_TTL_SECS, MARKET_CACHE_DIR_ENV, MARKET_CRYPTO_CACHE_TTL_ENV,
+    MARKET_FX_CACHE_TTL_ENV, RuntimeConfig,
+};
 use market_cli::model::{
     CacheMetadata, CacheStatus, MarketKind, MarketQuote, MarketRequest, build_output,
 };
@@ -506,6 +509,78 @@ fn cli_contract_favorites_json_envelope_matches_alfred_output() {
     assert_eq!(envelope.get("result"), Some(&direct));
 }
 
+#[test]
+fn cli_contract_fx_cache_ttl_override_applies_to_cached_fx_json_output() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "USD",
+        "TWD",
+        "frankfurter",
+        "32.1",
+    );
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "fx", "--base", "USD", "--quote", "TWD", "--amount", "100", "--json",
+        ],
+        &[
+            (MARKET_CACHE_DIR_ENV, cache_dir_value.as_str()),
+            (MARKET_FX_CACHE_TTL_ENV, "15m"),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
+    assert_eq!(envelope.get("ok").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        envelope
+            .get("result")
+            .and_then(|result| result.get("cache"))
+            .and_then(|cache| cache.get("ttl_secs"))
+            .and_then(Value::as_u64),
+        Some(900)
+    );
+}
+
+#[test]
+fn cli_contract_crypto_cache_ttl_override_applies_to_cached_crypto_json_output() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "BTC",
+        "USD",
+        "coinbase",
+        "68194",
+    );
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "crypto", "--base", "BTC", "--quote", "USD", "--amount", "1", "--json",
+        ],
+        &[
+            (MARKET_CACHE_DIR_ENV, cache_dir_value.as_str()),
+            (MARKET_CRYPTO_CACHE_TTL_ENV, "1h"),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
+    assert_eq!(envelope.get("ok").and_then(Value::as_bool), Some(true));
+    assert_eq!(
+        envelope
+            .get("result")
+            .and_then(|result| result.get("cache"))
+            .and_then(|cache| cache.get("ttl_secs"))
+            .and_then(Value::as_u64),
+        Some(3600)
+    );
+}
+
 fn favorites_human_output(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
@@ -541,6 +616,8 @@ fn seed_cache_record(
 ) {
     let config = RuntimeConfig {
         cache_dir: cache_dir.to_path_buf(),
+        fx_cache_ttl_secs: FX_TTL_SECS,
+        crypto_cache_ttl_secs: CRYPTO_TTL_SECS,
     };
     let path = cache_path(&config, kind, base, quote);
     let record = CacheRecord {

@@ -14,6 +14,8 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 ## Environment Variables
 
 - Optional cache override: `MARKET_CACHE_DIR`
+- Optional FX cache TTL override: `MARKET_FX_CACHE_TTL` (supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `1d` default)
+- Optional crypto cache TTL override: `MARKET_CRYPTO_CACHE_TTL` (supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `5m` default)
 - Alfred fallback cache paths: `ALFRED_WORKFLOW_CACHE`, `ALFRED_WORKFLOW_DATA`
 - Workflow favorites source: `MARKET_FAVORITE_LIST` (typically passed to `market-cli favorites --list`)
 - Workflow toggle: `MARKET_FAVORITES_ENABLED` controls whether
@@ -37,8 +39,10 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 
 ### Provider stack (no API key)
 
-- FX: Frankfurter (`24h` TTL)
-- Crypto: Coinbase primary + Kraken fallback (`5m` TTL)
+- FX: Frankfurter (`24h` TTL by default)
+- Crypto: Coinbase primary + Kraken fallback (`5m` TTL by default)
+- `MARKET_FX_CACHE_TTL` overrides only FX TTL
+- `MARKET_CRYPTO_CACHE_TTL` overrides only crypto TTL
 - Freshness states: `live`, `cache_fresh`, `cache_stale_fallback`
 
 ## Standards Status

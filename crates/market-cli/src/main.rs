@@ -724,6 +724,8 @@ mod tests {
     fn config_in_tempdir() -> RuntimeConfig {
         RuntimeConfig {
             cache_dir: tempfile::tempdir().expect("tempdir").path().to_path_buf(),
+            fx_cache_ttl_secs: market_cli::config::FX_TTL_SECS,
+            crypto_cache_ttl_secs: market_cli::config::CRYPTO_TTL_SECS,
         }
     }
 

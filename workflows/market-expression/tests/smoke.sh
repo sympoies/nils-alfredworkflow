@@ -48,6 +48,12 @@ fi
 if ! rg -n '^MARKET_DEFAULT_FIAT[[:space:]]*=[[:space:]]*"USD"' "$manifest" >/dev/null; then
   fail "MARKET_DEFAULT_FIAT default must be USD"
 fi
+if ! rg -n '^MARKET_FX_CACHE_TTL[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "MARKET_FX_CACHE_TTL default must be empty"
+fi
+if ! rg -n '^MARKET_CRYPTO_CACHE_TTL[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "MARKET_CRYPTO_CACHE_TTL default must be empty"
+fi
 if ! rg -n '^MARKET_FAVORITES_ENABLED[[:space:]]*=[[:space:]]*"1"' "$manifest" >/dev/null; then
   fail "MARKET_FAVORITES_ENABLED default must be 1"
 fi
@@ -465,9 +471,11 @@ assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.type == 8' "action node must be external script type=8"
 assert_jq_file "$packaged_json_file" '.connections["96AC3342-84A9-449E-B0AB-114E2068FC34"] | any(.destinationuid == "70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10" and .modifiers == 0)' "missing hotkey to script-filter connection"
 assert_jq_file "$packaged_json_file" '.connections["70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10"] | any(.destinationuid == "D7E624DB-D4AB-4D53-8C03-D051A1A97A4A" and .modifiers == 0)' "missing script-filter to action connection"
-assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_DEFAULT_FIAT","MARKET_FAVORITES_ENABLED","MARKET_FAVORITE_LIST"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_CRYPTO_CACHE_TTL","MARKET_DEFAULT_FIAT","MARKET_FAVORITES_ENABLED","MARKET_FAVORITE_LIST","MARKET_FX_CACHE_TTL"]' "user configuration variables mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_CLI_BIN") | .config.default == ""' "MARKET_CLI_BIN default must be empty string"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_DEFAULT_FIAT") | .config.default == "USD"' "MARKET_DEFAULT_FIAT default must be USD"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FX_CACHE_TTL") | .config.default == ""' "MARKET_FX_CACHE_TTL default must be empty string"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_CRYPTO_CACHE_TTL") | .config.default == ""' "MARKET_CRYPTO_CACHE_TTL default must be empty string"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FAVORITES_ENABLED") | .config.default == "1"' "MARKET_FAVORITES_ENABLED default must be 1"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FAVORITE_LIST") | .config.default == "BTC,ETH,EUR,JPY"' "MARKET_FAVORITE_LIST default must be BTC,ETH,EUR,JPY"
 

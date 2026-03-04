@@ -74,11 +74,13 @@ It also includes favorites-list output for the `market-expression` workflow empt
 - No API key is required for any command path.
 - FX provider stack:
   - `Frankfurter` (single provider)
-  - Fixed TTL: `86400` seconds (`24h`)
+  - Default TTL: `86400` seconds (`24h`)
+  - Optional override: `MARKET_FX_CACHE_TTL` (`1s`, `1m`, `1h`, `1d`)
 - Crypto provider stack:
   - Primary: `Coinbase`
   - Fallback: `Kraken`
-  - Fixed TTL: `300` seconds (`5m`)
+  - Default TTL: `300` seconds (`5m`)
+  - Optional override: `MARKET_CRYPTO_CACHE_TTL` (`1s`, `1m`, `1h`, `1d`)
 - Freshness states:
   - `live`: freshly fetched from provider
   - `cache_fresh`: served from cache within TTL
@@ -175,7 +177,7 @@ Field requirements:
 | `cache` | object | Cache metadata block |
 | `cache.status` | string | `live`, `cache_fresh`, or `cache_stale_fallback` |
 | `cache.key` | string | Stable cache key (`<kind>-<base>-<quote>`) |
-| `cache.ttl_secs` | number | Fixed per market kind (`86400` or `300`) |
+| `cache.ttl_secs` | number | Effective TTL in seconds. Defaults to `86400` for FX or `300` for crypto, unless `MARKET_FX_CACHE_TTL` or `MARKET_CRYPTO_CACHE_TTL` overrides the corresponding market kind. |
 | `cache.age_secs` | number | Cache age in seconds at response time |
 
 Favorites row requirements:
@@ -196,6 +198,10 @@ Favorites row requirements:
 - Workflow variable `MARKET_FAVORITES_ENABLED` defaults to enabled;
   `0`, `false`, `no`, or `off` should disable favorite quote rows
   and keep only the prompt row.
+- Workflow variable `MARKET_FX_CACHE_TTL` may be passed through environment;
+  empty keeps the built-in FX default, values like `15m` or `1d` override FX cache TTL only.
+- Workflow variable `MARKET_CRYPTO_CACHE_TTL` may be passed through environment;
+  empty keeps the built-in crypto default, values like `30s` or `1h` override crypto cache TTL only.
 - Workflow variable `MARKET_FAVORITE_LIST` should be passed to `--list`; empty or delimiter-only config falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
 - For non-zero exits, script filter should render one fallback item with `valid: false`.
 

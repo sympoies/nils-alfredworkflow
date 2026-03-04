@@ -693,6 +693,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         RuntimeConfig {
             cache_dir: dir.path().to_path_buf(),
+            fx_cache_ttl_secs: crate::config::FX_TTL_SECS,
+            crypto_cache_ttl_secs: crate::config::CRYPTO_TTL_SECS,
         }
     }
 

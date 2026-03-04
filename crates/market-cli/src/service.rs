@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 
 use crate::cache::{
     CacheRecord, cache_key, cache_path, evaluate_freshness, parse_fetched_at, read_cache,
-    ttl_for_kind, write_cache,
+    write_cache,
 };
 use crate::config::RuntimeConfig;
 use crate::error::AppError;
@@ -25,7 +25,7 @@ where
     let now = now_fn();
     let path = cache_path(config, request.kind, &request.base, &request.quote);
     let key = cache_key(request.kind, &request.base, &request.quote);
-    let ttl_secs = ttl_for_kind(request.kind);
+    let ttl_secs = config.cache_ttl_secs_for_kind(request.kind);
 
     let cached = read_cache(&path).map_err(|error| AppError::runtime(error.to_string()))?;
     let cached_state = cached
@@ -241,7 +241,11 @@ mod tests {
     }
 
     fn fixture_config(cache_dir: PathBuf) -> RuntimeConfig {
-        RuntimeConfig { cache_dir }
+        RuntimeConfig {
+            cache_dir,
+            fx_cache_ttl_secs: crate::config::FX_TTL_SECS,
+            crypto_cache_ttl_secs: crate::config::CRYPTO_TTL_SECS,
+        }
     }
 
     fn fixed_now() -> DateTime<Utc> {

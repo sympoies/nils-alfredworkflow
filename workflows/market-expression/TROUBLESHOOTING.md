@@ -21,13 +21,15 @@ bash workflows/market-expression/scripts/script_filter.sh "1 BTC + 2 ETH to USD"
 
 # Empty query should return one prompt row plus non-selectable favorites rows when enabled
 MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
+MARKET_FX_CACHE_TTL="1d" \
+MARKET_CRYPTO_CACHE_TTL="5m" \
 MARKET_FAVORITES_ENABLED="1" \
 MARKET_FAVORITE_LIST="BTC,ETH,EUR,JPY" \
   bash workflows/market-expression/scripts/script_filter.sh "" \
   | jq -e '.items | length == 5 and .[0].title == "Enter a market expression" and all(.[]; .valid == false)'
 
 # Confirm defaults in workflow manifest
-rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FAVORITES_ENABLED|MARKET_FAVORITE_LIST" workflows/market-expression/workflow.toml
+rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACHE_TTL|MARKET_FAVORITES_ENABLED|MARKET_FAVORITE_LIST" workflows/market-expression/workflow.toml
 ```
 
 ## Common failures and actions
@@ -35,6 +37,7 @@ rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FAVORITES_ENABLED|MARKET_FAVORI
 | Symptom | Likely cause | Action |
 | ---------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `market-cli binary not found` row | Binary is absent in all lookup paths | Package workflow again or set `MARKET_CLI_BIN` to executable absolute path. |
+| FX or crypto cache feels too fresh/stale | `MARKET_FX_CACHE_TTL` or `MARKET_CRYPTO_CACHE_TTL` is unset, too small, too large, or invalid | Leave them empty for defaults, or set explicit durations like `15m`, `1h`, or `1d`. Invalid values fall back to the built-in defaults. |
 | Empty query shows only the prompt row | `MARKET_FAVORITES_ENABLED` is disabled | Set `MARKET_FAVORITES_ENABLED` to `1`, `true`, or `on` if you want favorite quotes below the prompt. |
 | Empty query shows unexpected order or missing favorites | `MARKET_FAVORITE_LIST` contains duplicates, different order, or custom separators | `MARKET_FAVORITE_LIST` preserves first-occurrence order after trimming comma/newline tokens. Re-check the configured list exactly as entered. |
 | Empty query falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY` | `MARKET_FAVORITE_LIST` is empty or delimiter-only | This is expected fallback behavior. Set a non-empty comma/newline list to override it. |
@@ -52,6 +55,8 @@ bash workflows/market-expression/scripts/script_filter.sh "1 BTC * 2 ETH" | jq -
 
 # Empty query probe (prompt row + favorites rows should stay non-selectable)
 MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
+MARKET_FX_CACHE_TTL="1d" \
+MARKET_CRYPTO_CACHE_TTL="5m" \
 MARKET_FAVORITES_ENABLED="1" \
 MARKET_FAVORITE_LIST=$'ETH\nBTC,EUR,JPY' \
   bash workflows/market-expression/scripts/script_filter.sh "" \
@@ -71,6 +76,7 @@ scripts/workflow-pack.sh --id market-expression
 1. Re-install the previous known-good package from `dist/market-expression/<version>/`.
 2. Restore workflow variables to defaults
    (`MARKET_CLI_BIN=""`, `MARKET_DEFAULT_FIAT="USD"`,
+   `MARKET_FX_CACHE_TTL=""`, `MARKET_CRYPTO_CACHE_TTL=""`,
    `MARKET_FAVORITES_ENABLED="1"`, `MARKET_FAVORITE_LIST="BTC,ETH,EUR,JPY"`)
    and retest.
 3. If issue persists, roll back only `workflows/market-expression/` on a branch, then run all Validation commands before

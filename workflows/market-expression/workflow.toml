@@ -12,6 +12,10 @@ assets = ["src/assets/icon.png"]
 MARKET_CLI_BIN = ""
 # Default fiat used by market-cli expr when target fiat is omitted in query.
 MARKET_DEFAULT_FIAT = "USD"
+# Optional FX cache TTL. Empty keeps the built-in 1d default.
+MARKET_FX_CACHE_TTL = ""
+# Optional crypto cache TTL. Empty keeps the built-in 5m default.
+MARKET_CRYPTO_CACHE_TTL = ""
 # Toggle empty-query favorites rows. Set 0/false/off to show only the prompt row.
 MARKET_FAVORITES_ENABLED = "1"
 # Ordered favorites list shown when query is empty. Supports comma/newline separated symbols.

@@ -221,6 +221,48 @@
       <key>config</key>
       <dict>
         <key>default</key>
+        <string></string>
+        <key>placeholder</key>
+        <string>1d</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional FX cache TTL for market-cli. Use values like 30s, 15m, 1h, or 1d. Empty keeps the built-in 1d default.</string>
+      <key>label</key>
+      <string>MARKET_FX_CACHE_TTL</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>MARKET_FX_CACHE_TTL</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
+        <string></string>
+        <key>placeholder</key>
+        <string>5m</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional crypto cache TTL for market-cli. Use values like 30s, 15m, 1h, or 1d. Empty keeps the built-in 5m default.</string>
+      <key>label</key>
+      <string>MARKET_CRYPTO_CACHE_TTL</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>MARKET_CRYPTO_CACHE_TTL</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
         <string>1</string>
         <key>placeholder</key>
         <string>1</string>

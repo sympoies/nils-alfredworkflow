@@ -29,6 +29,8 @@ Set these via Alfred's "Configure Workflow..." UI:
 | --- | --- | --- | --- |
 | `MARKET_CLI_BIN` | No | (empty) | Optional absolute path override for `market-cli`. |
 | `MARKET_DEFAULT_FIAT` | No | `USD` | Default fiat passed to `market-cli expr --default-fiat` when query omits fiat target. |
+| `MARKET_FX_CACHE_TTL` | No | (empty) | Optional FX cache TTL. Supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `1d` default. |
+| `MARKET_CRYPTO_CACHE_TTL` | No | (empty) | Optional crypto cache TTL. Supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `5m` default. |
 | `MARKET_FAVORITES_ENABLED` | No | `1` | Toggle empty-query favorite quote rows. Use `0`/`false`/`off` to keep only the prompt row. |
 | `MARKET_FAVORITE_LIST` | No | `BTC,ETH,EUR,JPY` | Ordered comma/newline favorites list used for empty query. |
 
