@@ -221,6 +221,27 @@
       <key>config</key>
       <dict>
         <key>default</key>
+        <string>1</string>
+        <key>placeholder</key>
+        <string>1</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Toggle empty-query favorite quotes. Use 1/true/on to enable, 0/false/off to show only the prompt row.</string>
+      <key>label</key>
+      <string>MARKET_FAVORITES_ENABLED</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>MARKET_FAVORITES_ENABLED</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
         <string>BTC,ETH,EUR,JPY</string>
         <key>placeholder</key>
         <string>BTC,ETH,EUR,JPY</string>

@@ -48,6 +48,9 @@ fi
 if ! rg -n '^MARKET_DEFAULT_FIAT[[:space:]]*=[[:space:]]*"USD"' "$manifest" >/dev/null; then
   fail "MARKET_DEFAULT_FIAT default must be USD"
 fi
+if ! rg -n '^MARKET_FAVORITES_ENABLED[[:space:]]*=[[:space:]]*"1"' "$manifest" >/dev/null; then
+  fail "MARKET_FAVORITES_ENABLED default must be 1"
+fi
 if ! rg -n '^MARKET_FAVORITE_LIST[[:space:]]*=[[:space:]]*"BTC,ETH,EUR,JPY"' "$manifest" >/dev/null; then
   fail "MARKET_FAVORITE_LIST default must be BTC,ETH,EUR,JPY"
 fi
@@ -271,6 +274,12 @@ assert_jq_json "$favorites_default_json" '[.items[].valid] | all(. == false)' "f
 favorites_delimiter_only_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST=", ,\n,," "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_delimiter_only_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 USD","1 ETH = 1980 USD","1 USD = 1 USD","1 JPY = 0.01 USD"]' "delimiter-only favorites list must fall back to default favorites set"
 
+favorites_disabled_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="EUR" MARKET_FAVORITES_ENABLED="0" MARKET_FAVORITE_LIST=$'ETH\nBTC,EUR,JPY' "$workflow_dir/scripts/script_filter.sh" ""; })"
+assert_jq_json "$favorites_disabled_json" '.items | type == "array" and length == 1' "disabled favorites toggle must show only prompt row"
+assert_jq_json "$favorites_disabled_json" '.items[0].title == "Enter a market expression"' "disabled favorites toggle must preserve prompt title"
+assert_jq_json "$favorites_disabled_json" '.items[0].subtitle == "Example: 1 BTC + 3 ETH to JPY (default fiat: EUR)"' "disabled favorites toggle must preserve prompt subtitle"
+assert_jq_json "$favorites_disabled_json" '.items[0].valid == false' "disabled favorites toggle prompt row must be non-actionable"
+
 unsupported_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-unsupported-op" "$workflow_dir/scripts/script_filter.sh" "1 BTC * 2"; })"
 assert_jq_json "$unsupported_json" '.items[0].title == "Unsupported operator"' "unsupported operator title mapping mismatch"
 assert_jq_json "$unsupported_json" '.items[0].valid == false' "unsupported operator fallback item must be invalid"
@@ -456,9 +465,10 @@ assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.type == 8' "action node must be external script type=8"
 assert_jq_file "$packaged_json_file" '.connections["96AC3342-84A9-449E-B0AB-114E2068FC34"] | any(.destinationuid == "70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10" and .modifiers == 0)' "missing hotkey to script-filter connection"
 assert_jq_file "$packaged_json_file" '.connections["70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10"] | any(.destinationuid == "D7E624DB-D4AB-4D53-8C03-D051A1A97A4A" and .modifiers == 0)' "missing script-filter to action connection"
-assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_DEFAULT_FIAT","MARKET_FAVORITE_LIST"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_DEFAULT_FIAT","MARKET_FAVORITES_ENABLED","MARKET_FAVORITE_LIST"]' "user configuration variables mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_CLI_BIN") | .config.default == ""' "MARKET_CLI_BIN default must be empty string"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_DEFAULT_FIAT") | .config.default == "USD"' "MARKET_DEFAULT_FIAT default must be USD"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FAVORITES_ENABLED") | .config.default == "1"' "MARKET_FAVORITES_ENABLED default must be 1"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FAVORITE_LIST") | .config.default == "BTC,ETH,EUR,JPY"' "MARKET_FAVORITE_LIST default must be BTC,ETH,EUR,JPY"
 
 echo "ok: market-expression smoke test"

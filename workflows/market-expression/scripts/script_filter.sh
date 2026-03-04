@@ -110,11 +110,43 @@ execute_market_favorites() {
   "$market_cli" favorites --list "$favorite_list" --default-fiat "$default_fiat"
 }
 
+favorites_enabled() {
+  local raw_value="${MARKET_FAVORITES_ENABLED:-1}"
+  local normalized=""
+
+  normalized="$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+
+  case "$normalized" in
+  "" | 1 | true | yes | on)
+    return 0
+    ;;
+  0 | false | no | off)
+    return 1
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
+
+print_prompt_item() {
+  local default_fiat="$1"
+  sfej_emit_single_item_json \
+    "Enter a market expression" \
+    "Example: 1 BTC + 3 ETH to JPY (default fiat: ${default_fiat})" \
+    false
+}
+
 query="${1:-}"
 default_fiat="${MARKET_DEFAULT_FIAT:-USD}"
 favorite_list="${MARKET_FAVORITE_LIST:-}"
 
 if [[ -z "$(printf '%s' "$query" | sed 's/[[:space:]]//g')" ]]; then
+  if ! favorites_enabled; then
+    print_prompt_item "$default_fiat"
+    exit 0
+  fi
+
   sfcd_run_cli_flow \
     "execute_market_favorites" \
     "print_error_item" \

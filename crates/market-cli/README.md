@@ -16,6 +16,8 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - Optional cache override: `MARKET_CACHE_DIR`
 - Alfred fallback cache paths: `ALFRED_WORKFLOW_CACHE`, `ALFRED_WORKFLOW_DATA`
 - Workflow favorites source: `MARKET_FAVORITE_LIST` (typically passed to `market-cli favorites --list`)
+- Workflow toggle: `MARKET_FAVORITES_ENABLED` controls whether
+  the Alfred workflow calls `market-cli favorites` for empty query
 - Favorites list semantics: comma/newline ordered input, trim per token, preserve first occurrence.
   Empty or delimiter-only input falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`
 
@@ -26,7 +28,9 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - `favorites` output starts with a non-actionable prompt row, then one non-actionable quote row per favorite symbol.
 - Favorite quote rows render `1 <SYMBOL> = <PRICE> <DEFAULT_FIAT>` when pricing succeeds.
 - If a favorite quote cannot be resolved, that row degrades to a symbol hint instead of failing the whole empty-query payload.
-- `favorites` is the empty-query companion to `expr`: workflow `mx` calls `favorites`, while `mx <expression>` still calls `expr`.
+- `favorites` is the empty-query companion to `expr`:
+  when `MARKET_FAVORITES_ENABLED` is on, workflow `mx` calls `favorites`;
+  `mx <expression>` still calls `expr`.
 - `favorites --json` returns the service envelope with the Alfred payload nested under `result`.
 - `stderr`: user/runtime error text.
 - Exit codes: `0` success, `1` runtime/provider error, `2` user/input error.

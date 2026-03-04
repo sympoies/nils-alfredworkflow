@@ -50,7 +50,9 @@ It also includes favorites-list output for the `market-expression` workflow empt
   - `--output`: explicit output mode override (`human`, `json`, `alfred-json`)
   - `--json`: shorthand for service-envelope JSON output
 - Favorites behavior:
-  - Empty-query workflow state should call `market-cli favorites`; non-empty query should continue calling `market-cli expr`
+  - Empty-query workflow state may call `market-cli favorites`
+    when workflow variable `MARKET_FAVORITES_ENABLED` is enabled;
+    otherwise the workflow may render only the prompt row locally
   - Successful output is Alfred Script Filter JSON by default
   - Favorites output always starts with a non-actionable prompt row, followed by one non-actionable row per favorite symbol
   - Quote rows render `1 <SYMBOL> = <PRICE> <DEFAULT_FIAT>` when pricing succeeds
@@ -187,8 +189,13 @@ Favorites row requirements:
 
 ## `script_filter.sh` Integration Notes
 
-- `market-expression` workflow calls `market-cli favorites` for `mx` empty query and passes through Alfred JSON.
+- `market-expression` workflow calls `market-cli favorites`
+  for `mx` empty query only when `MARKET_FAVORITES_ENABLED` is enabled,
+  then passes through Alfred JSON.
 - `market-expression` workflow calls `market-cli expr` for `mx <expression>` and passes through Alfred JSON.
+- Workflow variable `MARKET_FAVORITES_ENABLED` defaults to enabled;
+  `0`, `false`, `no`, or `off` should disable favorite quote rows
+  and keep only the prompt row.
 - Workflow variable `MARKET_FAVORITE_LIST` should be passed to `--list`; empty or delimiter-only config falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
 - For non-zero exits, script filter should render one fallback item with `valid: false`.
 
