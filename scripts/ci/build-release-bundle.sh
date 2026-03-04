@@ -124,17 +124,26 @@ mkdir -p "$bundle_dir"
 bundle_name="workflows-${release_tag}.zip"
 bundle_path="$bundle_dir/$bundle_name"
 
-mapfile -t bundle_inputs < <(
+bundle_input_count=0
+while IFS= read -r bundle_input; do
+  [[ -n "$bundle_input" ]] || continue
+  bundle_input_count=$((bundle_input_count + 1))
+done < <(
   find "$dist_dir" -type f \( -name '*.alfredworkflow' -o -name '*.alfredworkflow.sha256' \) | sort
 )
-if [[ "${#bundle_inputs[@]}" -eq 0 ]]; then
+
+if [[ "$bundle_input_count" -eq 0 ]]; then
   echo "error: no workflow artifacts found under $dist_dir" >&2
   exit 1
 fi
 
 (
   cd "$dist_dir"
-  mapfile -t rel_inputs < <(find . -type f \( -name '*.alfredworkflow' -o -name '*.alfredworkflow.sha256' \) | sort)
+  rel_inputs=()
+  while IFS= read -r rel_input; do
+    [[ -n "$rel_input" ]] || continue
+    rel_inputs+=("$rel_input")
+  done < <(find . -type f \( -name '*.alfredworkflow' -o -name '*.alfredworkflow.sha256' \) | sort)
   zip -q -r "$bundle_path" "${rel_inputs[@]}"
 )
 write_sha256 "$bundle_path" "$bundle_path.sha256"
