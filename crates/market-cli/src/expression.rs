@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use alfred_core::{Feedback, Item};
+use alfred_core::{Feedback, Item, ItemIcon};
 use chrono::{DateTime, Utc};
 use rust_decimal::{Decimal, RoundingStrategy};
 
 use crate::config::RuntimeConfig;
 use crate::error::AppError;
+use crate::icons;
 use crate::model::{
     CacheStatus, MarketKind, MarketOutput, MarketRequest, decimal_to_string, normalize_fx_symbol,
 };
@@ -233,12 +234,14 @@ where
             cache_status_label(quote.cache_status)
         );
 
-        items.push(
+        items.push(with_symbol_icon(
             Item::new(title)
                 .with_subtitle(subtitle)
                 .with_arg(format!("{rendered_price} {}", parsed.target_fiat))
                 .with_valid(true),
-        );
+            config,
+            &symbol,
+        ));
     }
 
     let (total, formula) = evaluate_asset_total(&asset_terms, &parsed.operators, &quotes);
@@ -255,6 +258,14 @@ where
     );
 
     Ok(Feedback::new(items))
+}
+
+fn with_symbol_icon(item: Item, config: &RuntimeConfig, symbol: &str) -> Item {
+    if let Some(path) = icons::resolve_icon_path(config, symbol) {
+        return item.with_icon(ItemIcon::new(path.to_string_lossy().into_owned()));
+    }
+
+    item
 }
 
 fn evaluate_asset_total(
@@ -583,10 +594,12 @@ impl<'a> ExpressionParser<'a> {
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
+    use std::fs;
 
     use chrono::TimeZone;
 
     use super::*;
+    use crate::icon_asset_filename;
     use crate::providers::ProviderError;
 
     #[derive(Debug)]
@@ -691,11 +704,40 @@ mod tests {
 
     fn config_in_tempdir() -> RuntimeConfig {
         let dir = tempfile::tempdir().expect("tempdir");
-        RuntimeConfig {
-            cache_dir: dir.path().to_path_buf(),
+        let cache_dir = dir.path().to_path_buf();
+        std::mem::forget(dir);
+
+        let config = RuntimeConfig {
+            cache_dir,
             fx_cache_ttl_secs: crate::config::FX_TTL_SECS,
             crypto_cache_ttl_secs: crate::config::CRYPTO_TTL_SECS,
+        };
+        seed_icon_files(&config, &["BTC", "ETH", "USD", "JPY"]);
+        config
+    }
+
+    fn seed_icon_files(config: &RuntimeConfig, symbols: &[&str]) {
+        fs::create_dir_all(config.icon_cache_dir()).expect("create icon dir");
+        fs::write(
+            config
+                .icon_cache_dir()
+                .join(crate::config::ICON_GENERIC_BASENAME),
+            b"generic-icon",
+        )
+        .expect("write generic");
+
+        for symbol in symbols {
+            let file_name = icon_asset_filename(symbol).expect("icon filename");
+            fs::write(
+                config.icon_cache_dir().join(file_name),
+                format!("icon-{symbol}"),
+            )
+            .expect("write icon");
         }
+    }
+
+    fn icon_path(item: &Item) -> Option<&str> {
+        item.icon.as_ref().map(|icon| icon.path.as_str())
     }
 
     #[test]
@@ -729,7 +771,7 @@ mod tests {
     }
 
     #[test]
-    fn expression_asset_mode_outputs_unit_rows_then_total() {
+    fn asset_expression_rows_include_icon_paths_for_supported_symbols() {
         let providers = FakeProviders::new();
         let feedback = evaluate_query(
             &config_in_tempdir(),
@@ -744,6 +786,9 @@ mod tests {
         assert_eq!(feedback.items[0].title, "1 BTC = 10000000 JPY");
         assert_eq!(feedback.items[1].title, "1 ETH = 350000 JPY");
         assert_eq!(feedback.items[2].title, "Total = 11050000 JPY");
+        assert!(icon_path(&feedback.items[0]).is_some_and(|path| path.ends_with("btc.png")));
+        assert!(icon_path(&feedback.items[1]).is_some_and(|path| path.ends_with("eth.png")));
+        assert_eq!(icon_path(&feedback.items[2]), None);
     }
 
     #[test]
@@ -762,6 +807,9 @@ mod tests {
         assert_eq!(feedback.items[0].title, "1 BTC = 10000000 JPY");
         assert_eq!(feedback.items[1].title, "1 ETH = 350000 JPY");
         assert_eq!(feedback.items[2].title, "Total = 11050000 JPY");
+        assert!(icon_path(&feedback.items[0]).is_some_and(|path| path.ends_with("btc.png")));
+        assert!(icon_path(&feedback.items[1]).is_some_and(|path| path.ends_with("eth.png")));
+        assert_eq!(icon_path(&feedback.items[2]), None);
     }
 
     #[test]
@@ -779,6 +827,8 @@ mod tests {
         assert_eq!(feedback.items.len(), 2);
         assert_eq!(feedback.items[0].title, "1 BTC = 60000 USD");
         assert_eq!(feedback.items[1].title, "Total = 240000 USD");
+        assert!(icon_path(&feedback.items[0]).is_some_and(|path| path.ends_with("btc.png")));
+        assert_eq!(icon_path(&feedback.items[1]), None);
         assert_eq!(providers.coinbase_calls.get(), 1);
     }
 

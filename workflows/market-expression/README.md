@@ -12,6 +12,7 @@ Evaluate market expressions and show favorite market symbols when the query is e
 - Empty query always shows a prompt row first.
   When favorites are enabled, it then shows favorite symbols converted into the configured
   default fiat as non-selectable rows.
+- Favorite quote rows and expression asset rows may show cached local symbol icons resolved by `market-cli`.
 - Calls `market-cli expr --query <query> --default-fiat <MARKET_DEFAULT_FIAT>`.
 - Calls `market-cli favorites --list <MARKET_FAVORITE_LIST> --default-fiat <MARKET_DEFAULT_FIAT>` for empty query only when favorites are enabled.
 - Supports `+ - * /` for numeric-only expressions and `+ -` for asset expressions, with target fiat syntax `to <FIAT>`
@@ -48,6 +49,14 @@ Favorite quote rows render `1 <SYMBOL> = <PRICE> <MARKET_DEFAULT_FIAT>` when pri
 succeeds. If a symbol cannot be priced, that row falls back to a non-selectable
 symbol hint so the empty-query page still renders.
 
+Cached icon notes:
+
+- Icon fetch/cache happens inside `market-cli`, not in `script_filter.sh`.
+- Icon cache lives under the normal market cache root in a versioned subtree:
+  `market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`
+- First render for a symbol may be slower on a cold cache because the icon is downloaded on demand.
+- If icon fetch fails, rows still render without breaking the workflow.
+
 ## Keyword
 
 | Keyword | Behavior |
@@ -64,7 +73,7 @@ symbol hint so the empty-query page still renders.
 ## Optional live smoke (maintainer)
 
 - `bash scripts/market-cli-live-smoke.sh`
-- This live check is optional maintainer validation for provider freshness/contract behavior.
+- This live check is optional maintainer validation for provider freshness, icon cold/warm cache behavior, and output contract behavior.
 - It is not required for commit gates or CI pass/fail.
 
 ## Troubleshooting

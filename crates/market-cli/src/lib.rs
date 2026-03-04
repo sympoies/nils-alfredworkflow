@@ -6,11 +6,17 @@ pub mod cache;
 pub mod config;
 pub mod error;
 pub mod expression;
+pub mod icons;
 pub mod model;
 pub mod providers;
 pub mod service;
 
 use crate::model::{ValidationError, normalize_crypto_symbol, normalize_fx_symbol};
+
+pub fn icon_asset_filename(symbol: &str) -> Result<String, ValidationError> {
+    let normalized = normalize_crypto_symbol(symbol, "icon_symbol")?;
+    Ok(format!("{}.png", normalized.to_ascii_lowercase()))
+}
 
 const DEFAULT_FAVORITE_SYMBOLS: [&str; 3] = ["BTC", "ETH", "JPY"];
 
@@ -59,4 +65,20 @@ fn default_favorites(default_fiat: &str) -> Result<Vec<String>, ValidationError>
     }
 
     Ok(defaults)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn icon_asset_filename_normalizes_symbol_to_lowercase_png() {
+        assert_eq!(icon_asset_filename(" btc ").as_deref(), Ok("btc.png"));
+    }
+
+    #[test]
+    fn icon_asset_filename_rejects_invalid_symbol() {
+        let err = icon_asset_filename("eth!");
+        assert!(err.is_err());
+    }
 }

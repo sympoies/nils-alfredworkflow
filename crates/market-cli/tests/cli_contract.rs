@@ -12,6 +12,9 @@ use market_cli::model::{
 };
 use serde_json::Value;
 
+const BTC_ICON_FIXTURE: &[u8] = include_bytes!("fixtures/icons/btc.png");
+const GENERIC_ICON_FIXTURE: &[u8] = include_bytes!("fixtures/icons/generic.png");
+
 fn run_cli(args: &[&str], envs: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(resolve_cli_path());
     cmd.args(args);
@@ -19,6 +22,25 @@ fn run_cli(args: &[&str], envs: &[(&str, &str)]) -> Output {
         cmd.env(key, value);
     }
     cmd.output().expect("run market-cli")
+}
+
+#[test]
+fn config_icon_cache_dir_is_versioned() {
+    let config = RuntimeConfig {
+        cache_dir: PathBuf::from("/tmp/market-cache"),
+        fx_cache_ttl_secs: FX_TTL_SECS,
+        crypto_cache_ttl_secs: CRYPTO_TTL_SECS,
+    };
+
+    assert_eq!(
+        config.icon_cache_dir(),
+        PathBuf::from("/tmp/market-cache")
+            .join("market-cli")
+            .join("icons")
+            .join("cryptocurrency-icons")
+            .join("0.18.1")
+            .join("32/color")
+    );
 }
 
 #[test]
@@ -158,6 +180,41 @@ fn service_json_error_envelope_redacts_secret_like_input() {
 }
 
 #[test]
+fn cli_contract_fx_alfred_row_falls_back_to_generic_icon_when_symbol_icon_missing() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "TWD",
+        "USD",
+        "frankfurter",
+        "0.031",
+    );
+    seed_icon_cache(cache_dir.path(), "generic.png", GENERIC_ICON_FIXTURE);
+
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "fx",
+            "--base",
+            "TWD",
+            "--quote",
+            "USD",
+            "--amount",
+            "100",
+            "--output",
+            "alfred-json",
+        ],
+        &[(MARKET_CACHE_DIR_ENV, cache_dir_value.as_str())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    let items = alfred_items(&output);
+    assert_eq!(items.len(), 1);
+    assert_icon_path_suffix(&items[0], "/generic.png");
+}
+
+#[test]
 fn cli_contract_favorites_human_output_preserves_mixed_separator_order() {
     let output = run_cli(
         &[
@@ -190,6 +247,8 @@ fn cli_contract_favorites_alfred_rows_include_prompt_and_quotes() {
         "frankfurter",
         "0.0067",
     );
+    seed_icon_cache(cache_dir.path(), "usd.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "jpy.png", BTC_ICON_FIXTURE);
     let cache_dir_value = cache_dir.path().display().to_string();
     let output = run_cli(
         &[
@@ -216,6 +275,115 @@ fn cli_contract_favorites_alfred_rows_include_prompt_and_quotes() {
     for item in favorite_items(&output) {
         assert_eq!(item.get("valid").and_then(Value::as_bool), Some(false));
     }
+    let items = favorite_items(&output);
+    assert!(items[0].get("icon").is_none());
+    assert_icon_path_suffix(&items[1], "/usd.png");
+    assert_icon_path_suffix(&items[2], "/jpy.png");
+}
+
+#[test]
+fn favorites_rows_include_icon_paths_for_supported_symbols() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "BTC",
+        "USD",
+        "coinbase",
+        "68194",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "ETH",
+        "USD",
+        "coinbase",
+        "1980",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "JPY",
+        "USD",
+        "frankfurter",
+        "0.0067",
+    );
+    seed_icon_cache(cache_dir.path(), "btc.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "eth.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "usd.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "jpy.png", BTC_ICON_FIXTURE);
+
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "favorites",
+            "--list",
+            "btc,eth,usd,jpy",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "alfred-json",
+        ],
+        &[(MARKET_CACHE_DIR_ENV, cache_dir_value.as_str())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    let items = favorite_items(&output);
+    assert_icon_path_suffix(&items[1], "/btc.png");
+    assert_icon_path_suffix(&items[2], "/eth.png");
+    assert_icon_path_suffix(&items[3], "/usd.png");
+    assert_icon_path_suffix(&items[4], "/jpy.png");
+}
+
+#[test]
+fn asset_expression_rows_include_icon_paths_for_supported_symbols() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "BTC",
+        "USD",
+        "coinbase",
+        "68194",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "ETH",
+        "USD",
+        "coinbase",
+        "1980",
+    );
+    seed_icon_cache(cache_dir.path(), "btc.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "eth.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "generic.png", GENERIC_ICON_FIXTURE);
+
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "expr",
+            "--query",
+            "1 btc + 3 eth to usd",
+            "--output",
+            "alfred-json",
+        ],
+        &[(MARKET_CACHE_DIR_ENV, cache_dir_value.as_str())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
+    let items = json
+        .get("items")
+        .and_then(Value::as_array)
+        .expect("items should be array");
+
+    assert_icon_path_suffix(&items[0], "/btc.png");
+    assert_icon_path_suffix(&items[1], "/eth.png");
+    assert!(
+        items[2].get("icon").is_none(),
+        "total row should not have icon"
+    );
 }
 
 #[test]
@@ -458,12 +626,32 @@ fn cli_contract_favorites_json_envelope_matches_alfred_output() {
     let cache_dir = tempfile::tempdir().expect("tempdir");
     seed_cache_record(
         cache_dir.path(),
+        MarketKind::Crypto,
+        "BTC",
+        "USD",
+        "coinbase",
+        "68194",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Crypto,
+        "ETH",
+        "USD",
+        "coinbase",
+        "1980",
+    );
+    seed_cache_record(
+        cache_dir.path(),
         MarketKind::Fx,
         "JPY",
         "USD",
         "frankfurter",
         "0.0067",
     );
+    seed_icon_cache(cache_dir.path(), "btc.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "eth.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "usd.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "jpy.png", BTC_ICON_FIXTURE);
     let cache_dir_value = cache_dir.path().display().to_string();
     let alfred_output = run_cli(
         &[
@@ -597,13 +785,29 @@ fn favorite_item_titles(output: &Output) -> Vec<String> {
         .collect()
 }
 
-fn favorite_items(output: &Output) -> Vec<Value> {
+fn alfred_items(output: &Output) -> Vec<Value> {
     let json: Value = serde_json::from_slice(&output.stdout).expect("stdout should be json");
 
     json.get("items")
         .and_then(Value::as_array)
         .expect("items should be array")
         .to_vec()
+}
+
+fn favorite_items(output: &Output) -> Vec<Value> {
+    alfred_items(output)
+}
+
+fn assert_icon_path_suffix(item: &Value, expected_suffix: &str) {
+    let path = item
+        .get("icon")
+        .and_then(|icon| icon.get("path"))
+        .and_then(Value::as_str)
+        .expect("icon.path should exist");
+    assert!(
+        path.ends_with(expected_suffix),
+        "expected icon path to end with {expected_suffix}, got {path}"
+    );
 }
 
 fn seed_cache_record(
@@ -629,6 +833,18 @@ fn seed_cache_record(
     };
 
     write_cache(&path, &record).expect("write cache");
+}
+
+fn seed_icon_cache(cache_dir: &Path, filename: &str, bytes: &[u8]) {
+    let config = RuntimeConfig {
+        cache_dir: cache_dir.to_path_buf(),
+        fx_cache_ttl_secs: FX_TTL_SECS,
+        crypto_cache_ttl_secs: CRYPTO_TTL_SECS,
+    };
+    let path = config.icon_cache_dir().join(filename);
+    let parent = path.parent().expect("icon cache path parent");
+    std::fs::create_dir_all(parent).expect("create icon cache dir");
+    std::fs::write(path, bytes).expect("write icon cache");
 }
 
 fn resolve_cli_path() -> PathBuf {

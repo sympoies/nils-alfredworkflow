@@ -17,6 +17,7 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - Optional FX cache TTL override: `MARKET_FX_CACHE_TTL` (supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `1d` default)
 - Optional crypto cache TTL override: `MARKET_CRYPTO_CACHE_TTL` (supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `5m` default)
 - Alfred fallback cache paths: `ALFRED_WORKFLOW_CACHE`, `ALFRED_WORKFLOW_DATA`
+- Icon cache subtree: `<cache>/market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`
 - Workflow favorites source: `MARKET_FAVORITE_LIST` (typically passed to `market-cli favorites --list`)
 - Workflow toggle: `MARKET_FAVORITES_ENABLED` controls whether
   the Alfred workflow calls `market-cli favorites` for empty query
@@ -30,6 +31,9 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - `favorites` output starts with a non-actionable prompt row, then one non-actionable quote row per favorite symbol.
 - Favorite quote rows render `1 <SYMBOL> = <PRICE> <DEFAULT_FIAT>` when pricing succeeds.
 - If a favorite quote cannot be resolved, that row degrades to a symbol hint instead of failing the whole empty-query payload.
+- `fx` / `crypto` Alfred rows, favorite quote rows, and asset-expression quote rows
+  may include Alfred `icon.path` values pointing at cached local PNG files.
+- Icon resolution is best-effort: cached symbol icon first, then cached/downloaded `generic.png`, otherwise no icon field.
 - `favorites` is the empty-query companion to `expr`:
   when `MARKET_FAVORITES_ENABLED` is on, workflow `mx` calls `favorites`;
   `mx <expression>` still calls `expr`.
@@ -44,6 +48,13 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - `MARKET_FX_CACHE_TTL` overrides only FX TTL
 - `MARKET_CRYPTO_CACHE_TTL` overrides only crypto TTL
 - Freshness states: `live`, `cache_fresh`, `cache_stale_fallback`
+
+### Icon source policy
+
+- Pinned icon source: `cryptocurrency-icons@0.18.1` via jsDelivr `32/color/*.png`
+- Cache ownership: `market-cli`, not workflow shell scripts
+- Missing upstream icon or unsupported symbol: fall back to `generic.png`
+- Icon fetch/cache failure: keep quote rows and omit icon metadata instead of failing the command
 
 ## Standards Status
 

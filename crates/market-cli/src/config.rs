@@ -1,10 +1,17 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::model::MarketKind;
+use crate::icon_asset_filename;
+use crate::model::{MarketKind, ValidationError};
 
 pub const FX_TTL_SECS: u64 = 24 * 60 * 60;
 pub const CRYPTO_TTL_SECS: u64 = 5 * 60;
+pub const ICON_SOURCE_PACKAGE: &str = "cryptocurrency-icons";
+pub const ICON_SOURCE_VERSION: &str = "0.18.1";
+pub const ICON_SOURCE_CDN_BASE_URL: &str =
+    "https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1";
+pub const ICON_PNG_VARIANT_DIR: &str = "32/color";
+pub const ICON_GENERIC_BASENAME: &str = "generic.png";
 
 pub const MARKET_CACHE_DIR_ENV: &str = "MARKET_CACHE_DIR";
 pub const MARKET_FX_CACHE_TTL_ENV: &str = "MARKET_FX_CACHE_TTL";
@@ -55,6 +62,30 @@ impl RuntimeConfig {
             MarketKind::Fx => self.fx_cache_ttl_secs,
             MarketKind::Crypto => self.crypto_cache_ttl_secs,
         }
+    }
+
+    pub fn market_cache_dir(&self) -> PathBuf {
+        self.cache_dir.join("market-cli")
+    }
+
+    pub fn icon_cache_dir(&self) -> PathBuf {
+        self.market_cache_dir()
+            .join("icons")
+            .join(ICON_SOURCE_PACKAGE)
+            .join(ICON_SOURCE_VERSION)
+            .join(ICON_PNG_VARIANT_DIR)
+    }
+
+    pub fn icon_cache_path(&self, asset_filename: &str) -> PathBuf {
+        self.icon_cache_dir().join(asset_filename)
+    }
+
+    pub fn icon_cache_path_for_symbol(&self, symbol: &str) -> Result<PathBuf, ValidationError> {
+        Ok(self.icon_cache_path(&icon_asset_filename(symbol)?))
+    }
+
+    pub fn generic_icon_cache_path(&self) -> PathBuf {
+        self.icon_cache_path(ICON_GENERIC_BASENAME)
     }
 }
 
@@ -197,6 +228,41 @@ mod tests {
         ]);
 
         assert_eq!(config.cache_dir, PathBuf::from("/tmp/home/.cache/market"));
+    }
+
+    #[test]
+    fn config_icon_cache_dir_is_versioned() {
+        let config = RuntimeConfig::from_pairs(vec![(MARKET_CACHE_DIR_ENV, "/tmp/market-cache")]);
+
+        assert_eq!(
+            config.icon_cache_dir(),
+            PathBuf::from("/tmp/market-cache")
+                .join("market-cli")
+                .join("icons")
+                .join(ICON_SOURCE_PACKAGE)
+                .join(ICON_SOURCE_VERSION)
+                .join(ICON_PNG_VARIANT_DIR)
+        );
+    }
+
+    #[test]
+    fn config_icon_cache_paths_are_deterministic() {
+        let config = RuntimeConfig::from_pairs(vec![(MARKET_CACHE_DIR_ENV, "/tmp/market-cache")]);
+        let expected_icon_dir = PathBuf::from("/tmp/market-cache")
+            .join("market-cli")
+            .join("icons")
+            .join(ICON_SOURCE_PACKAGE)
+            .join(ICON_SOURCE_VERSION)
+            .join(ICON_PNG_VARIANT_DIR);
+
+        assert_eq!(
+            config.icon_cache_path_for_symbol(" btc "),
+            Ok(expected_icon_dir.join("btc.png"))
+        );
+        assert_eq!(
+            config.generic_icon_cache_path(),
+            expected_icon_dir.join(ICON_GENERIC_BASENAME)
+        );
     }
 
     #[test]
