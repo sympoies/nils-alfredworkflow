@@ -77,17 +77,16 @@ ensure_apt_packages() {
 }
 
 add_unique_item() {
-  local -n target_ref="$1"
+  local target_name="$1"
   local item="$2"
-  local existing
+  local existing_items=""
 
-  for existing in "${target_ref[@]}"; do
-    if [[ "$existing" == "$item" ]]; then
-      return
-    fi
-  done
+  eval "existing_items=\" \${${target_name}[*]-} \""
+  case "$existing_items" in
+  *" $item "*) return 0 ;;
+  esac
 
-  target_ref+=("$item")
+  eval "${target_name}+=(\"\$item\")"
 }
 
 ensure_runtime_binaries() {
