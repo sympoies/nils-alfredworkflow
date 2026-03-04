@@ -1012,7 +1012,8 @@ mod tests {
             "--output",
             "alfred-json",
         ]);
-        let output = run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
+        let output =
+            run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
         let json: Value = serde_json::from_str(&output).expect("json");
         let first_item = json
             .get("items")
@@ -1040,7 +1041,8 @@ mod tests {
             "--output",
             "alfred-json",
         ]);
-        let output = run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
+        let output =
+            run_with(cli, &config, &FakeProviders::ok(), fixed_now).expect("fx should pass");
         let json: Value = serde_json::from_str(&output).expect("json");
         let first_item = json
             .get("items")
