@@ -326,6 +326,12 @@ assert_jq_json "$week_city_picker_json" '.items[0].title == "Taipei"' "week stag
 assert_jq_json "$week_city_picker_json" '.items[0].valid == false' "week stage one item must be non-actionable city picker row"
 assert_jq_json "$week_city_picker_json" '.items[0].autocomplete == "city::Taipei"' "week stage one should emit city token autocomplete"
 
+week_env_query_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" alfred_workflow_query="Taipei" "$workflow_dir/scripts/script_filter_week.sh"; })"
+assert_jq_json "$week_env_query_json" '.items[0].title == "Taipei"' "week stage one should support Alfred query via env fallback"
+
+week_stdin_query_json="$(printf 'Taipei' | WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_week.sh")"
+assert_jq_json "$week_stdin_query_json" '.items[0].title == "Taipei"' "week stage one should support query via stdin fallback"
+
 week_default_picker_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_DEFAULT_CITIES="Tokyo,Osaka" "$workflow_dir/scripts/script_filter_week.sh" "  "; })"
 assert_jq_json "$week_default_picker_json" '.items | type == "array" and length == 2' "week empty query should list default cities"
 assert_jq_json "$week_default_picker_json" '.items[0].title == "Tokyo"' "week default picker should include Tokyo"

@@ -5,6 +5,27 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CITY_FALLBACK="Tokyo"
 CITY_TOKEN_PREFIX="city::"
 
+workflow_helper_loader="$script_dir/lib/workflow_helper_loader.sh"
+if [[ ! -f "$workflow_helper_loader" ]]; then
+  workflow_helper_loader="$script_dir/../../../scripts/lib/workflow_helper_loader.sh"
+fi
+if [[ ! -f "$workflow_helper_loader" ]]; then
+  git_repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$git_repo_root" && -f "$git_repo_root/scripts/lib/workflow_helper_loader.sh" ]]; then
+    workflow_helper_loader="$git_repo_root/scripts/lib/workflow_helper_loader.sh"
+  fi
+fi
+if [[ ! -f "$workflow_helper_loader" ]]; then
+  printf '{"items":[{"title":"Workflow helper missing","subtitle":"Cannot locate workflow_helper_loader.sh runtime helper.","valid":false}]}\n'
+  exit 0
+fi
+# shellcheck disable=SC1090
+source "$workflow_helper_loader"
+
+if ! wfhl_source_required_helper "$script_dir" "script_filter_query_policy.sh" auto "json"; then
+  exit 0
+fi
+
 trim_query() {
   local value="${1-}"
   printf '%s' "$value" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
@@ -128,7 +149,7 @@ emit_city_picker_items() {
   printf ']}\n'
 }
 
-query="${1:-}"
+query="$(sfqp_resolve_query_input "${1:-}")"
 trimmed_query="$(trim_query "$query")"
 
 if [[ "$trimmed_query" == "${CITY_TOKEN_PREFIX}"* ]]; then
