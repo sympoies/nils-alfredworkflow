@@ -586,6 +586,7 @@ root_with_unread_json="$(env "${base_env[@]}" GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD
 assert_jq_json "$root_with_unread_json" '.items | length == 4' "gs root query should emit unread summary + per-account rows when toggle enabled"
 assert_jq_json "$root_with_unread_json" '.items[1].title == "Unread mail (all accounts): 4"' "gs unread summary total mismatch"
 assert_jq_json "$root_with_unread_json" '.items[1].arg == "prompt::mail-unread"' "gs unread summary row should route to gsm unread prompt token"
+assert_jq_json "$root_with_unread_json" '.items[1].subtitle == "a@example.com:2 · b@example.com:2"' "gs unread summary subtitle should use dot separators"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("a@example.com:2")' "gs unread summary should include account a count"
 assert_jq_json "$root_with_unread_json" '.items[1].subtitle | test("b@example.com:2")' "gs unread summary should include account b count"
 assert_jq_json "$root_with_unread_json" '[.items[] | select(.title == "Unread a@example.com: 2" and .arg == "prompt::mail-unread-account::a@example.com")] | length == 1' "gs per-account unread row for account a missing"
@@ -598,6 +599,7 @@ JSON
 root_with_zero_unread_json="$(env "${base_env[@]}" GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD=1 bash "$script_filter_empty" "")"
 assert_jq_json "$root_with_zero_unread_json" '.items | length == 4' "gs should not emit per-account unread row when account unread count is zero"
 assert_jq_json "$root_with_zero_unread_json" '.items[1].title == "Unread mail (all accounts): 4"' "gs unread summary total should ignore zero-count account"
+assert_jq_json "$root_with_zero_unread_json" '.items[1].subtitle == "a@example.com:2 · b@example.com:2 · zero@example.com:0"' "gs unread summary subtitle should keep ordered dot-separated account details"
 assert_jq_json "$root_with_zero_unread_json" '.items[1].subtitle | test("zero@example.com:0")' "gs unread summary should include zero-count account detail"
 assert_jq_json "$root_with_zero_unread_json" '[.items[] | select(.arg == "prompt::mail-unread-account::zero@example.com")] | length == 0' "gs should hide zero-count account unread row"
 

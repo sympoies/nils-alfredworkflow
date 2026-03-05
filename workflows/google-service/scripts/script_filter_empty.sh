@@ -265,8 +265,15 @@ read_default_account() {
 }
 
 join_with_dot() {
-  local IFS=' · '
-  printf '%s' "$*"
+  local joined=""
+  local part
+  for part in "$@"; do
+    if [[ -n "$joined" ]]; then
+      joined+=" · "
+    fi
+    joined+="$part"
+  done
+  printf '%s' "$joined"
 }
 
 emit_all_accounts_unread_summary_row() {
