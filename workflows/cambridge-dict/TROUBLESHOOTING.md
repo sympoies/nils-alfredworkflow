@@ -27,6 +27,8 @@ Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md
 - `Installing Cambridge runtime...`: workflow-local Playwright/Chromium runtime is being bootstrapped automatically
   after first-use runtime detection.
   Action: wait for Alfred auto-rerun; if it does not finish, inspect the workflow cache log.
+- `Searching Cambridge...`: query coalescing is waiting for the latest query to stabilize before dispatching the backend.
+  Action: pause typing briefly and let Alfred auto-rerun complete the final query.
 - `Automatic Cambridge runtime setup failed`: auto-bootstrap ran but `npm install` or
   `playwright install chromium` failed.
   Action: check the bootstrap log in Alfred cache, fix Node/npm/network access, then retry.

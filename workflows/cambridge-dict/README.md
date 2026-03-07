@@ -16,8 +16,7 @@ detail and suggestion views.
 - Detail stage renders definitions and example sentences from the selected entry.
 - Press `Enter` on detail rows to open the entry URL from `arg`.
 - Short query guard: `<2` characters shows `Keep typing (2+ chars)` and skips backend calls.
-- Script-level guardrails: short TTL cache and optional coalescing controls are available, but Cambridge now defaults to
-  immediate backend dispatch instead of the old extra settle wait.
+- Script-level guardrails: short TTL cache and default query coalescing reduce transient prefix lookups while typing.
 - Runtime orchestration is shared via `scripts/lib/script_filter_search_driver.sh`; Cambridge-specific fetch/error
   mapping remains local.
 - Uses `cambridge-cli` as the Alfred bridge and Playwright scraper backend.
@@ -48,7 +47,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `CAMBRIDGE_CLI_BIN`                       | Optional absolute executable path override for `cambridge-cli`.                                 |
 | `CAMBRIDGE_SCRAPER_SCRIPT`                | Exported by `script_filter.sh` to point to bundled `scripts/cambridge_scraper.mjs`.             |
 | `CAMBRIDGE_QUERY_CACHE_TTL_SECONDS`       | Optional same-query cache TTL (seconds). Default `0` (disabled to avoid stale mid-typing hits). |
-| `CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `0` for immediate dispatch.                  |
+| `CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `1`.                                         |
 | `CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.               |
 | `CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER`      | Optional override for the bundled runtime bootstrap helper; mainly for testing.                 |
 

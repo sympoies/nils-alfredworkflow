@@ -205,9 +205,9 @@ if sfqp_is_short_query "$query" 2; then
   exit 0
 fi
 
-# Keep Steam scaffold immediate by default while preserving optional env overrides.
+# Keep Steam search responsive while avoiding transient prefix queries.
 : "${STEAM_QUERY_CACHE_TTL_SECONDS:=0}"
-: "${STEAM_QUERY_COALESCE_SETTLE_SECONDS:=0}"
+: "${STEAM_QUERY_COALESCE_SETTLE_SECONDS:=1}"
 : "${STEAM_QUERY_COALESCE_RERUN_SECONDS:=0.4}"
 
 # Shared driver owns cache/coalesce orchestration only.

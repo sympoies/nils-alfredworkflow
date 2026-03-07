@@ -69,7 +69,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BANGUMI_CLI_BIN`                       | Optional absolute executable override for `bangumi-cli`.                                                                                                                   |
 | `BANGUMI_QUERY_CACHE_TTL_SECONDS`       | Optional same-query cache TTL (seconds). Default `0` (disabled to avoid stale mid-typing hits).                                                                            |
-| `BANGUMI_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `2`. Shared coalesce helper uses non-blocking stability checks so queued typing does not dispatch prefix queries early. |
+| `BANGUMI_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `1`. Shared coalesce helper uses non-blocking stability checks so queued typing does not dispatch prefix queries early. |
 | `BANGUMI_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.                                                                                          |
 | `BANGUMI_SCRAPER_ENABLE`                | Future bridge feature flag. Default disabled; do not enable in production yet.                                                                                             |
 

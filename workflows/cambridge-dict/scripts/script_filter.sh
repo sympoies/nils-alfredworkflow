@@ -411,7 +411,7 @@ fi
 
 cli_query="$(prepare_cli_query_input "$query")"
 
-: "${CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS:=0}"
+: "${CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS:=1}"
 
 if query_has_explicit_mode_prefix "$cli_query"; then
   emit_direct_query_result "$cli_query"

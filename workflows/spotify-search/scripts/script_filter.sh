@@ -153,14 +153,23 @@ fi
 
 query="$(sfqp_resolve_query_input "${1:-}")"
 trimmed_query="$(sfqp_trim "$query")"
+query="$trimmed_query"
 if [[ -z "$trimmed_query" ]]; then
   emit_error_item "Enter a search query" "Type keywords after sp to search Spotify tracks."
   exit 0
 fi
 
-# Keep Spotify search immediate by default while preserving optional env overrides.
+if sfqp_is_short_query "$query" 2; then
+  sfqp_emit_short_query_item_json \
+    2 \
+    "Keep typing (2+ chars)" \
+    "Type at least %s characters before searching Spotify."
+  exit 0
+fi
+
+# Keep Spotify search responsive while avoiding transient prefix queries.
 : "${SPOTIFY_QUERY_CACHE_TTL_SECONDS:=0}"
-: "${SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS:=0}"
+: "${SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS:=1}"
 : "${SPOTIFY_QUERY_COALESCE_RERUN_SECONDS:=0.4}"
 
 # Shared driver owns cache/coalesce orchestration only.

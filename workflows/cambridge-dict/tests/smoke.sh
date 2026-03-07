@@ -385,6 +385,18 @@ assert_jq_json "$short_query_json" '.items[0].title == "Keep typing (2+ chars)"'
 assert_jq_json "$short_query_json" '.items[0].subtitle | contains("2")' "short query guidance subtitle must mention minimum length"
 [[ ! -s "$short_query_log" ]] || fail "short query should not invoke cambridge-cli backend"
 
+coalesce_probe_log="$tmp_dir/cambridge-coalesce.log"
+coalesce_pending_a="$({ CAMBRIDGE_STUB_LOG="$coalesce_probe_log" env -u CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS CAMBRIDGE_QUERY_CACHE_TTL_SECONDS=0 CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "sym"; })"
+coalesce_pending_b="$({ CAMBRIDGE_STUB_LOG="$coalesce_probe_log" env -u CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS CAMBRIDGE_QUERY_CACHE_TTL_SECONDS=0 CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "symphony"; })"
+sleep 1.1
+coalesce_result="$({ CAMBRIDGE_STUB_LOG="$coalesce_probe_log" env -u CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS CAMBRIDGE_QUERY_CACHE_TTL_SECONDS=0 CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "symphony"; })"
+
+assert_jq_json "$coalesce_pending_a" '.items[0].title == "Searching Cambridge..." and .items[0].valid == false' "coalesce first pending item mismatch"
+assert_jq_json "$coalesce_pending_b" '.items[0].title == "Searching Cambridge..." and .items[0].valid == false' "coalesce second pending item mismatch"
+assert_jq_json "$coalesce_result" '.items[0].title == "open - Cambridge"' "coalesce final result mismatch"
+[[ "$(grep -c -- '--input sym --mode alfred' "$coalesce_probe_log" || true)" -eq 0 ]] || fail "coalesce should avoid sym backend invocation"
+[[ "$(grep -c -- '--input symphony --mode alfred' "$coalesce_probe_log" || true)" -eq 1 ]] || fail "coalesce should invoke symphony exactly once"
+
 default_cache_log="$tmp_dir/cambridge-default-cache.log"
 {
   CAMBRIDGE_STUB_LOG="$default_cache_log" CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" \
