@@ -90,6 +90,30 @@ workflow_smoke_assert_action_requires_arg() {
   fi
 }
 
+workflow_smoke_wait_for_file_contains() {
+  local file="$1"
+  local pattern="$2"
+  local timeout_seconds="${3:-5}"
+  local waited=0
+
+  while [[ "$waited" -lt "$timeout_seconds" ]]; do
+    if [[ -f "$file" ]]; then
+      if command -v rg >/dev/null 2>&1; then
+        if rg -n --fixed-strings "$pattern" "$file" >/dev/null 2>&1; then
+          return 0
+        fi
+      elif grep -F -- "$pattern" "$file" >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  return 1
+}
+
 workflow_smoke_write_open_stub() {
   local stub_path="$1"
   mkdir -p "$(dirname "$stub_path")"

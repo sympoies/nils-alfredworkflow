@@ -5,73 +5,15 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
 
-fail() {
-  echo "error: $*" >&2
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
+
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
   exit 1
-}
-
-require_bin() {
-  local binary="$1"
-  command -v "$binary" >/dev/null 2>&1 || fail "missing required binary: $binary"
-}
-
-require_bin shellcheck
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
 fi
 
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "missing required file: $path"
-}
-
-assert_exec() {
-  local path="$1"
-  [[ -x "$path" ]] || fail "script must be executable: $path"
-}
-
-toml_string() {
-  local file="$1"
-  local key="$2"
-  awk -F'=' -v key="$key" '
-    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-      value=$2
-      sub(/^[[:space:]]*/, "", value)
-      sub(/[[:space:]]*$/, "", value)
-      gsub(/^"|"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-plist_to_json() {
-  local plist_file="$1"
-  if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o - "$plist_file"
-    return
-  fi
-
-  python3 - "$plist_file" <<'PY'
-import json
-import plistlib
-import sys
-
-with open(sys.argv[1], 'rb') as f:
-    payload = plistlib.load(f)
-print(json.dumps(payload))
-PY
-}
-
-assert_jq_json() {
-  local json_payload="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" >/dev/null <<<"$json_payload"; then
-    fail "$message (jq: $filter)"
-  fi
-}
+# shellcheck disable=SC1090
+source "$smoke_helper"
 
 for required in \
   workflow.toml \
@@ -113,46 +55,18 @@ artifact_version="$(toml_string "$manifest" version)"
 artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
-
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
 
 cleanup() {
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
 mkdir -p "$tmp_dir/bin"
-
-cat >"$tmp_dir/bin/open" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$1" >"$OPEN_STUB_OUT"
-EOS
-chmod +x "$tmp_dir/bin/open"
+workflow_smoke_write_open_stub "$tmp_dir/bin/open"
 
 cat >"$tmp_dir/suggest-ok.json" <<'EOF_JSON'
 {
@@ -178,11 +92,7 @@ cat >"$tmp_dir/suggest-invalid.json" <<'EOF_BAD'
 {"broken":
 EOF_BAD
 
-set +e
-"$workflow_dir/scripts/action_open.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_open.sh without args must exit 2"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_open.sh"
 
 action_arg="https://www.imdb.com/title/tt0133093/"
 OPEN_STUB_OUT="$tmp_dir/open-arg.txt" PATH="$tmp_dir/bin:$PATH" \

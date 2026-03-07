@@ -28,6 +28,43 @@ wfc_list_workflow_ids() {
     ! -name '_template' -exec basename {} \; | sort
 }
 
+wfc_manifest_path() {
+  local repo_root="$1"
+  local workflow_id="$2"
+  printf '%s\n' "$repo_root/workflows/$workflow_id/workflow.toml"
+}
+
+wfc_bundle_id_for_workflow_id() {
+  local repo_root="$1"
+  local workflow_id="$2"
+  local manifest
+
+  manifest="$(wfc_manifest_path "$repo_root" "$workflow_id")"
+  [[ -f "$manifest" ]] || return 1
+
+  wfc_toml_string "$manifest" bundle_id
+}
+
+wfc_find_installed_workflow_dir_by_bundle_id() {
+  local prefs_root="$1"
+  local bundle_id="$2"
+  local info bid
+
+  command -v plutil >/dev/null 2>&1 || return 1
+  [[ -d "$prefs_root" ]] || return 1
+
+  for info in "$prefs_root"/*/info.plist; do
+    [[ -f "$info" ]] || continue
+    bid="$(plutil -extract bundleid raw -o - "$info" 2>/dev/null || true)"
+    if [[ "$bid" == "$bundle_id" ]]; then
+      dirname "$info"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 wfc_dist_latest_artifact() {
   local repo_root="$1"
   local workflow_id="$2"

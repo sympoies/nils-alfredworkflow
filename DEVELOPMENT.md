@@ -157,6 +157,12 @@
   - `scripts/workflow-pack.sh --id <workflow-id> --install`
 - Install latest already-built artifact only (skip rebuild):
   - `scripts/workflow-pack.sh --id <workflow-id> --install-only`
+- Background-update every tracked workflow that is already installed in Alfred:
+  - `scripts/workflow-reinstall.sh`
+- Background-update all installed tracked workflows explicitly:
+  - `scripts/workflow-reinstall.sh --all`
+- Use Alfred's native update/import UI for one workflow:
+  - `scripts/workflow-reinstall.sh --id <workflow-id> --ui`
 - Pack all workflows:
   - `scripts/workflow-pack.sh --all`
 

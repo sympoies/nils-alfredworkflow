@@ -40,23 +40,7 @@ USAGE
 
 has_workflow_manifest() {
   local id="$1"
-  [[ -f "$repo_root/workflows/$id/workflow.toml" ]]
-}
-
-find_installed_workflow_dir_by_bundle_id() {
-  local bundle_id="$1"
-  local info bid
-
-  for info in "$prefs_root"/*/info.plist; do
-    [[ -f "$info" ]] || continue
-    bid="$(plutil -extract bundleid raw -o - "$info" 2>/dev/null || true)"
-    if [[ "$bid" == "$bundle_id" ]]; then
-      dirname "$info"
-      return 0
-    fi
-  done
-
-  return 1
+  [[ -f "$(wfc_manifest_path "$repo_root" "$id")" ]]
 }
 
 add_target_id() {
@@ -133,15 +117,15 @@ for id in "${requested_ids[@]}"; do
     continue
   fi
 
-  manifest="$repo_root/workflows/$id/workflow.toml"
-  bundle_id="$(wfc_toml_string "$manifest" bundle_id)"
+  manifest="$(wfc_manifest_path "$repo_root" "$id")"
+  bundle_id="$(wfc_bundle_id_for_workflow_id "$repo_root" "$id" || true)"
   if [[ -z "$bundle_id" ]]; then
     echo "warn: missing bundle_id in $manifest"
     fail_count=$((fail_count + 1))
     continue
   fi
 
-  workflow_dir="$(find_installed_workflow_dir_by_bundle_id "$bundle_id" || true)"
+  workflow_dir="$(wfc_find_installed_workflow_dir_by_bundle_id "$prefs_root" "$bundle_id" || true)"
   if [[ -z "$workflow_dir" ]]; then
     echo "skip: not installed ($id, $bundle_id)"
     skip_count=$((skip_count + 1))

@@ -4,15 +4,15 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
 
-if ! command -v shellcheck >/dev/null 2>&1; then
-  echo "missing required binary: shellcheck" >&2
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
   exit 1
 fi
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
-fi
+
+# shellcheck disable=SC1090
+source "$smoke_helper"
 
 for required in \
   workflow.toml \
@@ -22,10 +22,7 @@ for required in \
   scripts/action_open.sh \
   scripts/action_record_usage.sh \
   scripts/action_open_github.sh; do
-  if [[ ! -f "$workflow_dir/$required" ]]; then
-    echo "missing required file: $workflow_dir/$required" >&2
-    exit 1
-  fi
+  assert_file "$workflow_dir/$required"
 done
 
 for executable in \
@@ -34,36 +31,12 @@ for executable in \
   scripts/action_open.sh \
   scripts/action_record_usage.sh \
   scripts/action_open_github.sh; do
-  if [[ ! -x "$workflow_dir/$executable" ]]; then
-    echo "script must be executable: $workflow_dir/$executable" >&2
-    exit 1
-  fi
+  assert_exec "$workflow_dir/$executable"
 done
 
 for required_bin in jq git; do
-  if ! command -v "$required_bin" >/dev/null 2>&1; then
-    echo "missing required binary: $required_bin" >&2
-    exit 1
-  fi
+  require_bin "$required_bin"
 done
-
-plist_to_json() {
-  local plist_file="$1"
-  if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o - "$plist_file"
-    return
-  fi
-
-  python3 - "$plist_file" <<'PY'
-import json
-import plistlib
-import sys
-
-with open(sys.argv[1], 'rb') as f:
-    payload = plistlib.load(f)
-print(json.dumps(payload))
-PY
-}
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT

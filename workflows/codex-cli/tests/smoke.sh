@@ -4,32 +4,15 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
 
-fail() {
-  echo "error: $*" >&2
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
   exit 1
-}
-
-require_bin() {
-  local binary="$1"
-  command -v "$binary" >/dev/null 2>&1 || fail "missing required binary: $binary"
-}
-
-require_bin shellcheck
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
 fi
 
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "missing required file: $path"
-}
-
-assert_exec() {
-  local path="$1"
-  [[ -x "$path" ]] || fail "script must be executable: $path"
-}
+# shellcheck disable=SC1090
+source "$smoke_helper"
 
 runtime_meta="$workflow_dir/scripts/lib/codex_cli_runtime.sh"
 assert_file "$runtime_meta"
@@ -39,72 +22,6 @@ codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
 codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 export CODEX_CLI_PINNED_VERSION="$codex_cli_pinned_version"
 export CODEX_CLI_PINNED_CRATE="$codex_cli_pinned_crate"
-
-toml_string() {
-  local file="$1"
-  local key="$2"
-  awk -F'=' -v key="$key" '
-    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-      value=$2
-      sub(/^[[:space:]]*/, "", value)
-      sub(/[[:space:]]*$/, "", value)
-      gsub(/^"|"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-plist_to_json() {
-  local plist_file="$1"
-  if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o - "$plist_file"
-    return
-  fi
-
-  python3 - "$plist_file" <<'PY'
-import json
-import plistlib
-import sys
-
-with open(sys.argv[1], 'rb') as f:
-    payload = plistlib.load(f)
-print(json.dumps(payload))
-PY
-}
-
-assert_jq_file() {
-  local file="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" "$file" >/dev/null; then
-    fail "$message (jq: $filter)"
-  fi
-}
-
-assert_jq_json() {
-  local json_payload="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" >/dev/null <<<"$json_payload"; then
-    fail "$message (jq: $filter)"
-  fi
-}
-
-wait_for_file_contains() {
-  local file="$1"
-  local pattern="$2"
-  local timeout_seconds="${3:-5}"
-  local waited=0
-  while [[ "$waited" -lt "$timeout_seconds" ]]; do
-    if [[ -f "$file" ]] && rg -n --fixed-strings "$pattern" "$file" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-  return 1
-}
 
 for required in \
   workflow.toml \
@@ -173,34 +90,12 @@ artifact_version="$(toml_string "$manifest" version)"
 artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
-
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
 
 cleanup() {
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
@@ -965,7 +860,7 @@ alias_diag_plain_log="$tmp_dir/diag-plain.log"
 alias_diag_plain_json="$({ CODEX_STUB_LOG="$alias_diag_plain_log" ALFRED_WORKFLOW_CACHE="$alias_diag_plain_cache_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-diag-plain" "$workflow_dir/scripts/script_filter_diag.sh" ""; })"
 assert_jq_json "$alias_diag_plain_json" '(.items | any(.title == "Rate limits remaining")) | not' "cxd wrapper should hide plain-text rate-limits heading row"
 assert_jq_json "$alias_diag_plain_json" '.items | any(.title | test("^auth \\| 5h 84% \\([^)]*\\) \\| weekly 65% \\([^)]*\\)$"))' "cxd wrapper should parse single-account json rows"
-wait_for_file_contains "$alias_diag_plain_log" "diag rate-limits --json" 5 || fail "cxd wrapper should refresh default diag cache via --json"
+workflow_smoke_wait_for_file_contains "$alias_diag_plain_log" "diag rate-limits --json" 5 || fail "cxd wrapper should refresh default diag cache via --json"
 
 alias_diag_all_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter_diag_all.sh" ""; })"
 assert_jq_json "$alias_diag_all_json" '.items[0].arg == "diag::all-json"' "cxda wrapper should map empty query to diag all-json"
@@ -979,8 +874,8 @@ CODEX_STUB_LOG="$diag_auto_log" ALFRED_WORKFLOW_CACHE="$diag_auto_cache_dir" COD
   "$workflow_dir/scripts/script_filter_diag.sh" "" >/dev/null
 
 diag_auto_meta="$diag_auto_cache_dir/diag-rate-limits.last.meta"
-wait_for_file_contains "$diag_auto_meta" "mode=default" 5 || fail "cxd should block-refresh default diag cache"
-wait_for_file_contains "$diag_auto_log" "diag rate-limits --json" 5 || fail "cxd block-refresh should run diag rate-limits --json"
+workflow_smoke_wait_for_file_contains "$diag_auto_meta" "mode=default" 5 || fail "cxd should block-refresh default diag cache"
+workflow_smoke_wait_for_file_contains "$diag_auto_log" "diag rate-limits --json" 5 || fail "cxd block-refresh should run diag rate-limits --json"
 
 diag_auto_diag_count_before="$(rg -c '^diag rate-limits --json$' "$diag_auto_log" 2>/dev/null || true)"
 CODEX_STUB_LOG="$diag_auto_log" ALFRED_WORKFLOW_CACHE="$diag_auto_cache_dir" CODEX_DIAG_CACHE_TTL_SECONDS=300 CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
@@ -997,8 +892,8 @@ CODEX_SECRET_DIR="$use_secret_dir" CODEX_STUB_LOG="$diag_auto_all_log" ALFRED_WO
   "$workflow_dir/scripts/script_filter_diag_all.sh" "" >/dev/null
 
 diag_auto_all_meta="$diag_auto_all_cache_dir/diag-rate-limits.last.meta"
-wait_for_file_contains "$diag_auto_all_meta" "mode=all-json" 5 || fail "cxda should block-refresh all-json cache"
-wait_for_file_contains "$diag_auto_all_log" "diag rate-limits --all --json" 5 || fail "cxda block-refresh should run diag rate-limits --all --json"
+workflow_smoke_wait_for_file_contains "$diag_auto_all_meta" "mode=all-json" 5 || fail "cxda should block-refresh all-json cache"
+workflow_smoke_wait_for_file_contains "$diag_auto_all_log" "diag rate-limits --all --json" 5 || fail "cxda block-refresh should run diag rate-limits --all --json"
 
 diag_auto_all_fallback_cache_dir="$tmp_dir/diag-auto-all-fallback-cache"
 diag_auto_all_fallback_log="$tmp_dir/diag-auto-all-fallback.log"
@@ -1008,8 +903,8 @@ CODEX_SECRET_DIR="$tmp_dir/missing-secrets-for-diag" CODEX_STUB_LOG="$diag_auto_
   "$workflow_dir/scripts/script_filter_diag_all.sh" "" >/dev/null
 
 diag_auto_all_fallback_meta="$diag_auto_all_fallback_cache_dir/diag-rate-limits.last.meta"
-wait_for_file_contains "$diag_auto_all_fallback_meta" "command=diag rate-limits --json" 5 || fail "cxda block-refresh should fallback to current-auth --json when no saved secrets"
-wait_for_file_contains "$diag_auto_all_fallback_log" "diag rate-limits --json" 5 || fail "cxda fallback should run diag rate-limits --json"
+workflow_smoke_wait_for_file_contains "$diag_auto_all_fallback_meta" "command=diag rate-limits --json" 5 || fail "cxda block-refresh should fallback to current-auth --json when no saved secrets"
+workflow_smoke_wait_for_file_contains "$diag_auto_all_fallback_log" "diag rate-limits --json" 5 || fail "cxda fallback should run diag rate-limits --json"
 
 auth_only_cache_home="$tmp_dir/home-auth-cache"
 mkdir -p "$auth_only_cache_home/.config/codex-kit"
@@ -1038,11 +933,7 @@ assert_jq_json "$alias_remove_yes_json" '.items[0].arg == "remove::team-alpha.js
 unknown_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "totally-unknown-command"; })"
 assert_jq_json "$unknown_json" '.items[0].title | startswith("Unknown command:")' "unknown query should show guidance"
 
-set +e
-CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/action_open.sh" >/dev/null 2>&1
-action_noarg_rc=$?
-set -e
-[[ "$action_noarg_rc" -eq 2 ]] || fail "action_open.sh without args must exit 2"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_open.sh"
 
 action_log="$tmp_dir/action.log"
 cat >"$tmp_dir/bin/osascript" <<'EOS'

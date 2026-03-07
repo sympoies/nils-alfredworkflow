@@ -10,82 +10,15 @@ TYPE_UID="C2F5E113-7D3B-49CC-8F95-5E8B0A9BB5C1"
 VALUES_UID="A5F5D9EC-6344-47B3-9A0A-5F7DFB0D5132"
 ACTION_UID="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A"
 
-fail() {
-  echo "error: $*" >&2
+smoke_helper="$repo_root/scripts/lib/workflow_smoke_helpers.sh"
+
+if [[ ! -f "$smoke_helper" ]]; then
+  echo "missing required helper: $smoke_helper" >&2
   exit 1
-}
-
-require_bin() {
-  local binary="$1"
-  command -v "$binary" >/dev/null 2>&1 || fail "missing required binary: $binary"
-}
-
-require_bin shellcheck
-mapfile -t shellcheck_targets < <(find "$workflow_dir" -type f -name '*.sh' | sort)
-if [[ "${#shellcheck_targets[@]}" -gt 0 ]]; then
-  shellcheck -e SC1091 "${shellcheck_targets[@]}"
 fi
 
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "missing required file: $path"
-}
-
-assert_exec() {
-  local path="$1"
-  [[ -x "$path" ]] || fail "script must be executable: $path"
-}
-
-toml_string() {
-  local file="$1"
-  local key="$2"
-  awk -F'=' -v key="$key" '
-    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
-      value=$2
-      sub(/^[[:space:]]*/, "", value)
-      sub(/[[:space:]]*$/, "", value)
-      gsub(/^"|"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
-}
-
-plist_to_json() {
-  local plist_file="$1"
-  if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o - "$plist_file"
-    return
-  fi
-
-  python3 - "$plist_file" <<'PY'
-import json
-import plistlib
-import sys
-
-with open(sys.argv[1], 'rb') as f:
-    payload = plistlib.load(f)
-print(json.dumps(payload))
-PY
-}
-
-assert_jq_file() {
-  local file="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" "$file" >/dev/null; then
-    fail "$message (jq: $filter)"
-  fi
-}
-
-assert_jq_json() {
-  local json_payload="$1"
-  local filter="$2"
-  local message="$3"
-  if ! jq -e "$filter" >/dev/null <<<"$json_payload"; then
-    fail "$message (jq: $filter)"
-  fi
-}
+# shellcheck disable=SC1090
+source "$smoke_helper"
 
 for required in \
   workflow.toml \
@@ -129,65 +62,22 @@ artifact_name="$(toml_string "$manifest" name)"
 artifact_path="$repo_root/dist/$artifact_id/$artifact_version/${artifact_name}.alfredworkflow"
 artifact_sha_path="${artifact_path}.sha256"
 
-artifact_backup=""
-if [[ -f "$artifact_path" ]]; then
-  artifact_backup="$tmp_dir/$(basename "$artifact_path").backup"
-  cp "$artifact_path" "$artifact_backup"
-fi
-
-artifact_sha_backup=""
-if [[ -f "$artifact_sha_path" ]]; then
-  artifact_sha_backup="$tmp_dir/$(basename "$artifact_sha_path").backup"
-  cp "$artifact_sha_path" "$artifact_sha_backup"
-fi
-
 release_cli="$repo_root/target/release/randomer-cli"
-release_backup=""
-if [[ -f "$release_cli" ]]; then
-  release_backup="$tmp_dir/randomer-cli.release.backup"
-  cp "$release_cli" "$release_backup"
-fi
+artifact_backup="$(artifact_backup_file "$artifact_path" "$tmp_dir" "$(basename "$artifact_path")")"
+artifact_sha_backup="$(artifact_backup_file "$artifact_sha_path" "$tmp_dir" "$(basename "$artifact_sha_path")")"
+release_backup="$(artifact_backup_file "$release_cli" "$tmp_dir" "randomer-cli.release")"
 
 cleanup() {
-  if [[ -n "$release_backup" && -f "$release_backup" ]]; then
-    mkdir -p "$(dirname "$release_cli")"
-    cp "$release_backup" "$release_cli"
-  elif [[ -f "$release_cli" ]]; then
-    rm -f "$release_cli"
-  fi
-
-  if [[ -n "$artifact_backup" && -f "$artifact_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_path")"
-    cp "$artifact_backup" "$artifact_path"
-  else
-    rm -f "$artifact_path"
-  fi
-
-  if [[ -n "$artifact_sha_backup" && -f "$artifact_sha_backup" ]]; then
-    mkdir -p "$(dirname "$artifact_sha_path")"
-    cp "$artifact_sha_backup" "$artifact_sha_path"
-  else
-    rm -f "$artifact_sha_path"
-  fi
-
+  artifact_restore_file "$release_cli" "$release_backup"
+  artifact_restore_file "$artifact_path" "$artifact_backup"
+  artifact_restore_file "$artifact_sha_path" "$artifact_sha_backup"
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
 mkdir -p "$tmp_dir/bin" "$tmp_dir/stubs"
-
-cat >"$tmp_dir/bin/pbcopy" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-cat >"$PBCOPY_STUB_OUT"
-EOS
-chmod +x "$tmp_dir/bin/pbcopy"
-
-set +e
-"$workflow_dir/scripts/action_open.sh" >/dev/null 2>&1
-action_rc=$?
-set -e
-[[ "$action_rc" -eq 2 ]] || fail "action_open.sh without args must exit 2"
+workflow_smoke_write_pbcopy_stub "$tmp_dir/bin/pbcopy"
+workflow_smoke_assert_action_requires_arg "$workflow_dir/scripts/action_open.sh"
 
 action_arg='550e8400-e29b-41d4-a716-446655440000'
 printf '%s' "$action_arg" >"$tmp_dir/expected-copy.txt"
