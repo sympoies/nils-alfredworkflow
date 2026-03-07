@@ -58,7 +58,17 @@ if ! rg -n '^SPOTIFY_MAX_RESULTS[[:space:]]*=[[:space:]]*"10"' "$manifest" >/dev
   fail "SPOTIFY_MAX_RESULTS default must be 10"
 fi
 
+plist_json="$(plist_to_json "$workflow_dir/src/info.plist.template")"
+script_filter_uid="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10"
+
+assert_jq_json "$plist_json" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.scriptfile == \"./scripts/script_filter.sh\"" "script_filter scriptfile wiring mismatch"
+assert_jq_json "$plist_json" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.keyword == \"sp||spotify\"" "keyword trigger must be sp"
+assert_jq_json "$plist_json" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelaycustom == 1" "queue delay custom mismatch"
+assert_jq_json "$plist_json" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelaymode == 0" "queue delay mode mismatch"
+assert_jq_json "$plist_json" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelayimmediatelyinitially == false" "queue immediate policy mismatch"
+
 tmp_dir="$(mktemp -d)"
+export ALFRED_WORKFLOW_CACHE="$tmp_dir/cache"
 artifact_id="$(toml_string "$manifest" id)"
 artifact_version="$(toml_string "$manifest" version)"
 artifact_name="$(toml_string "$manifest" name)"
@@ -148,6 +158,9 @@ set -euo pipefail
 [[ "${1:-}" == "search" ]] || exit 9
 [[ "${2:-}" == "--query" ]] || exit 9
 query="${3:-}"
+if [[ -n "${SPOTIFY_STUB_LOG:-}" ]]; then
+  printf '%s\n' "$*" >>"$SPOTIFY_STUB_LOG"
+fi
 printf '{"items":[{"title":"stub-result","subtitle":"query=%s","arg":"https://open.spotify.com/track/stub","valid":true}]}' "$query"
 printf '\n'
 EOS
@@ -185,34 +198,52 @@ exit 4
 EOS
 chmod +x "$tmp_dir/stubs/spotify-cli-invalid-config"
 
-success_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
+success_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
 assert_jq_json "$success_json" '.items | type == "array" and length == 1' "script_filter success must output items array"
 assert_jq_json "$success_json" '.items[0].title == "stub-result"' "script_filter should forward successful JSON"
 
-env_query_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" alfred_workflow_query="city pop" "$workflow_dir/scripts/script_filter.sh"; })"
+env_query_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" alfred_workflow_query="city pop" "$workflow_dir/scripts/script_filter.sh"; })"
 assert_jq_json "$env_query_json" '.items[0].subtitle == "query=city pop"' "script_filter must support Alfred query via env fallback"
 
-stdin_query_json="$(printf 'focus music' | SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh")"
+stdin_query_json="$(printf 'focus music' | SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh")"
 assert_jq_json "$stdin_query_json" '.items[0].subtitle == "query=focus music"' "script_filter must support query via stdin fallback"
 
-rate_limit_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-rate-limit" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
+rate_limit_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-rate-limit" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
 assert_jq_json "$rate_limit_json" '.items | type == "array" and length == 1' "rate limit fallback must output single item"
 assert_jq_json "$rate_limit_json" '.items[0].valid == false' "rate limit fallback item must be invalid"
 assert_jq_json "$rate_limit_json" '.items[0].title == "Spotify API rate limited"' "rate limit error title mapping mismatch"
 
-missing_credentials_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-missing-credentials" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
+missing_credentials_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-missing-credentials" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
 assert_jq_json "$missing_credentials_json" '.items[0].title == "Spotify credentials are missing"' "missing credentials title mapping mismatch"
 assert_jq_json "$missing_credentials_json" '.items[0].subtitle | contains("SPOTIFY_CLIENT_ID") and contains("SPOTIFY_CLIENT_SECRET")' "missing credentials subtitle should guide configuration"
 
-unavailable_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-unavailable" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
+unavailable_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-unavailable" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
 assert_jq_json "$unavailable_json" '.items[0].title == "Spotify API unavailable"' "unavailable title mapping mismatch"
 
-invalid_config_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-invalid-config" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
+invalid_config_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-invalid-config" "$workflow_dir/scripts/script_filter.sh" "ambient"; })"
 assert_jq_json "$invalid_config_json" '.items[0].title == "Invalid Spotify workflow config"' "invalid config title mapping mismatch"
 
-empty_query_json="$({ SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "   "; })"
+empty_query_json="$({ SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "   "; })"
 assert_jq_json "$empty_query_json" '.items[0].title == "Enter a search query"' "empty query guidance title mismatch"
 assert_jq_json "$empty_query_json" '.items[0].valid == false' "empty query item must be invalid"
+
+short_query_log="$tmp_dir/spotify-short-query.log"
+short_query_json="$({ SPOTIFY_STUB_LOG="$short_query_log" SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "s"; })"
+assert_jq_json "$short_query_json" '.items[0].title == "Keep typing (2+ chars)"' "short query guidance title mismatch"
+assert_jq_json "$short_query_json" '.items[0].subtitle | contains("2")' "short query guidance subtitle must mention minimum length"
+[[ ! -s "$short_query_log" ]] || fail "short query should not invoke spotify-cli backend"
+
+coalesce_probe_log="$tmp_dir/spotify-coalesce.log"
+coalesce_pending_a="$({ SPOTIFY_STUB_LOG="$coalesce_probe_log" env -u SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS SPOTIFY_QUERY_CACHE_TTL_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "sym"; })"
+coalesce_pending_b="$({ SPOTIFY_STUB_LOG="$coalesce_probe_log" env -u SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS SPOTIFY_QUERY_CACHE_TTL_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "symphony"; })"
+sleep 1.1
+coalesce_result="$({ SPOTIFY_STUB_LOG="$coalesce_probe_log" env -u SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS SPOTIFY_QUERY_CACHE_TTL_SECONDS=0 SPOTIFY_CLI_BIN="$tmp_dir/stubs/spotify-cli-ok" "$workflow_dir/scripts/script_filter.sh" "symphony"; })"
+
+assert_jq_json "$coalesce_pending_a" '.items[0].title == "Searching Spotify..." and .items[0].valid == false' "coalesce first pending item mismatch"
+assert_jq_json "$coalesce_pending_b" '.items[0].title == "Searching Spotify..." and .items[0].valid == false' "coalesce second pending item mismatch"
+assert_jq_json "$coalesce_result" '.items[0].subtitle == "query=symphony"' "coalesce final query mismatch"
+[[ "$(grep -c -- '--query sym --mode' "$coalesce_probe_log" || true)" -eq 0 ]] || fail "coalesce should avoid sym backend invocation"
+[[ "$(grep -c -- '--query symphony --mode' "$coalesce_probe_log" || true)" -eq 1 ]] || fail "coalesce should invoke symphony exactly once"
 
 make_layout_cli() {
   local target="$1"
@@ -253,7 +284,7 @@ run_layout_check() {
   esac
 
   local output
-  output="$($copied_script "demo")"
+  output="$(SPOTIFY_QUERY_COALESCE_SETTLE_SECONDS=0 "$copied_script" "demo")"
   assert_jq_json "$output" ".items[0].title == \"$marker\"" "script_filter failed to resolve $mode spotify-cli path"
 }
 
@@ -305,10 +336,13 @@ plist_to_json "$packaged_plist" >"$packaged_json_file"
 assert_jq_file "$packaged_json_file" '.objects | length > 0' "packaged plist missing objects"
 assert_jq_file "$packaged_json_file" '.connections | length > 0' "packaged plist missing connections"
 assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workflow.input.scriptfilter") | .config.type] | all(. == 8)' "script filter objects must be external script type=8"
-assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptfile == "./scripts/script_filter.sh"' "script filter scriptfile wiring mismatch"
-assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.keyword == "sp||spotify"' "keyword trigger must be sp"
-assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptargtype == 1' "script filter must pass query via argv"
-assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.alfredfiltersresults == false' "script filter must disable Alfred local filtering"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.scriptfile == \"./scripts/script_filter.sh\"" "script filter scriptfile wiring mismatch"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.keyword == \"sp||spotify\"" "keyword trigger must be sp"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.scriptargtype == 1" "script filter must pass query via argv"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.alfredfiltersresults == false" "script filter must disable Alfred local filtering"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelaycustom == 1" "script filter queue delay custom mismatch"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelaymode == 0" "script filter queue delay mode mismatch"
+assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$script_filter_uid\") | .config.queuedelayimmediatelyinitially == false" "script filter immediate queue policy mismatch"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="B8F6A479-8A88-4515-9D4D-6A0422CFEA2D") | .type == "alfred.workflow.trigger.hotkey"' "hotkey trigger node missing"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="B8F6A479-8A88-4515-9D4D-6A0422CFEA2D") | .config.hotkey == 0 and .config.hotmod == 0' "hotkey trigger must ship unassigned for user customization"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.scriptfile == "./scripts/action_open.sh"' "action scriptfile wiring mismatch"

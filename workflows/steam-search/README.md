@@ -42,7 +42,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `STEAM_CLI_BIN` | Optional override path for `steam-cli` (useful for local debugging). |
 | `STEAM_REQUERY_COMMAND` | Optional override command used by `action_open.sh` to trigger Alfred requery (test/debug helper). |
 | `STEAM_QUERY_CACHE_TTL_SECONDS` | Optional same-query cache TTL (seconds). Default `0` (disabled). |
-| `STEAM_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `0` for immediate responses. |
+| `STEAM_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `1`. |
 | `STEAM_QUERY_COALESCE_RERUN_SECONDS` | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`. |
 
 ## Validation

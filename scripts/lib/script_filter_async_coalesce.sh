@@ -91,6 +91,28 @@ sfac_now_epoch_seconds() {
   date +%s
 }
 
+sfac_now_epoch_millis() {
+  if command -v perl >/dev/null 2>&1; then
+    perl -MTime::HiRes=time -e 'printf "%.0f\n", time() * 1000'
+    return 0
+  fi
+
+  printf '%s000\n' "$(sfac_now_epoch_seconds)"
+}
+
+sfac_normalize_epoch_millis() {
+  local raw="${1:-}"
+  [[ "$raw" =~ ^[0-9]+$ ]] || return 1
+
+  # Backward compatibility: older request files stored whole seconds.
+  if [[ "${#raw}" -le 10 ]]; then
+    printf '%s000\n' "$raw"
+    return 0
+  fi
+
+  printf '%s\n' "$raw"
+}
+
 sfac_init_context() {
   SFAC_WORKFLOW_KEY="$(sfac_sanitize_component "$1")"
   SFAC_WORKFLOW_CACHE_FALLBACK="${2:-nils-script-filter-workflow}"
@@ -146,12 +168,12 @@ sfac_write_latest_request() {
   local request_file
   request_file="$(sfac_request_file_path)" || return 1
 
-  local seq now tmp_file
-  now="$(sfac_now_epoch_seconds)"
-  seq="${now}.$$.$RANDOM"
+  local seq now_ms tmp_file
+  now_ms="$(sfac_now_epoch_millis)"
+  seq="${now_ms}.$$.$RANDOM"
   tmp_file="${request_file}.tmp.$$.$RANDOM"
 
-  printf '%s\n%s\n%s\n' "$seq" "$now" "$query" >"$tmp_file"
+  printf '%s\n%s\n%s\n' "$seq" "$now_ms" "$query" >"$tmp_file"
   mv "$tmp_file" "$request_file"
   printf '%s\n' "$seq"
 }
@@ -161,17 +183,19 @@ sfac_read_latest_request() {
   request_file="$(sfac_request_file_path)" || return 1
   [[ -f "$request_file" ]] || return 1
 
-  local seq updated query
+  local seq updated query normalized_updated
   seq="$(sed -n '1p' "$request_file")"
   updated="$(sed -n '2p' "$request_file")"
   query="$(sed -n '3p' "$request_file")"
 
   [[ -n "$seq" && -n "$updated" ]] || return 1
-  [[ "$updated" =~ ^[0-9]+$ ]] || return 1
+  normalized_updated="$(sfac_normalize_epoch_millis "$updated")" || return 1
 
   # shellcheck disable=SC2034 # Exposed for callers that inspect the request snapshot fields.
   SFAC_REQUEST_SEQ="$seq"
-  SFAC_REQUEST_UPDATED="$updated"
+  # shellcheck disable=SC2034 # Exposed for callers that inspect the request snapshot fields.
+  SFAC_REQUEST_UPDATED="$normalized_updated"
+  # shellcheck disable=SC2034 # Exposed for callers that inspect the request snapshot fields.
   SFAC_REQUEST_QUERY="$query"
   return 0
 }
@@ -189,8 +213,8 @@ sfac_wait_for_final_query() {
     return 0
   fi
 
-  local now
-  now="$(sfac_now_epoch_seconds)"
+  local now_ms
+  now_ms="$(sfac_now_epoch_millis)"
 
   if ! sfac_read_latest_request; then
     sfac_write_latest_request "$query" >/dev/null || return 1
@@ -202,13 +226,13 @@ sfac_wait_for_final_query() {
     return 1
   fi
 
-  local age_seconds
-  age_seconds=$((now - SFAC_REQUEST_UPDATED))
-  if [[ "$age_seconds" -lt 0 ]]; then
-    age_seconds=0
+  local age_millis
+  age_millis=$((now_ms - SFAC_REQUEST_UPDATED))
+  if [[ "$age_millis" -lt 0 ]]; then
+    age_millis=0
   fi
 
-  if awk -v age="$age_seconds" -v settle="$settle_seconds" 'BEGIN { exit !(age >= settle) }'; then
+  if awk -v age_ms="$age_millis" -v settle="$settle_seconds" 'BEGIN { exit !(age_ms >= (settle * 1000)) }'; then
     return 0
   fi
 

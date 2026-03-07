@@ -63,9 +63,9 @@
         <key>keyword</key>
         <string>sp||spotify</string>
         <key>queuedelaycustom</key>
-        <integer>3</integer>
+        <integer>1</integer>
         <key>queuedelayimmediatelyinitially</key>
-        <true/>
+        <false/>
         <key>queuedelaymode</key>
         <integer>0</integer>
         <key>queuemode</key>

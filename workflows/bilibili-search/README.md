@@ -43,7 +43,7 @@ Set these via Alfred's "Configure Workflow..." UI:
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `BILIBILI_CLI_BIN`                       | Optional override path for `bilibili-cli` (useful for local debugging).                         |
 | `BILIBILI_QUERY_CACHE_TTL_SECONDS`       | Optional same-query cache TTL (seconds). Default `0` (disabled to avoid stale mid-typing hits). |
-| `BILIBILI_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `2`.                                         |
+| `BILIBILI_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `1`.                                         |
 | `BILIBILI_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.               |
 
 ## Deterministic checks

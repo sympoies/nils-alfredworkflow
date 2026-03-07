@@ -90,6 +90,7 @@ Node scraper structured error object contract (`ok: false`):
 - `CAMBRIDGE_SCRAPER_SCRIPT`
   - exported by script-filter to bundled Node scraper path
 - `CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS`
-  - default: `0` for Cambridge immediate dispatch; can be raised explicitly if needed
+  - default: `1`
+  - script filter should wait for the latest smart query to remain stable before dispatching backend calls
 - `CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER`
   - optional bootstrap helper override used mainly by smoke tests / debugging
