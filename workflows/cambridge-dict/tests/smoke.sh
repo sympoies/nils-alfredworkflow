@@ -25,6 +25,7 @@ for required in \
   scripts/cambridge_scraper.mjs \
   scripts/lib/cambridge_routes.mjs \
   scripts/lib/cambridge_selectors.mjs \
+  scripts/lib/cambridge_runtime_bootstrap.sh \
   scripts/lib/extract_suggest.mjs \
   scripts/lib/extract_define.mjs \
   scripts/lib/error_classify.mjs \
@@ -140,6 +141,21 @@ OPEN_STUB_OUT="$tmp_dir/open-arg.txt" PATH="$tmp_dir/bin:$PATH" \
   "$workflow_dir/scripts/action_open.sh" "$action_arg"
 [[ "$(cat "$tmp_dir/open-arg.txt")" == "$action_arg" ]] || fail "action_open.sh must pass URL to open"
 
+cat >"$tmp_dir/stubs/requery" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$1" >"$CAMBRIDGE_REQUERY_OUT"
+EOS
+chmod +x "$tmp_dir/stubs/requery"
+
+CAMBRIDGE_REQUERY_OUT="$tmp_dir/requery-define.txt" CAMBRIDGE_REQUERY_COMMAND="$tmp_dir/stubs/requery" \
+  "$workflow_dir/scripts/action_open.sh" "cambridge-requery:define:open up"
+[[ "$(cat "$tmp_dir/requery-define.txt")" == "cd open up" ]] || fail "define requery text mismatch"
+
+CAMBRIDGE_REQUERY_OUT="$tmp_dir/requery-suggest.txt" CAMBRIDGE_REQUERY_COMMAND="$tmp_dir/stubs/requery" \
+  "$workflow_dir/scripts/action_open.sh" "cambridge-requery:suggest:open up"
+[[ "$(cat "$tmp_dir/requery-suggest.txt")" == "cds open up" ]] || fail "suggest requery text mismatch"
+
 cat >"$tmp_dir/stubs/cambridge-cli-ok" <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -150,11 +166,16 @@ fi
 [[ "${2:-}" == "--input" ]] || exit 9
 query="${3:-}"
 if [[ "$query" == def::* ]]; then
-  printf '{"items":[{"title":"open","subtitle":"adjective • /əʊ.pən/","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true},{"title":"not closed","subtitle":"definition","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true}]}'
+  printf '{"items":[{"title":"open - Cambridge","subtitle":"adjective | /əʊ.pən/ | Press Enter on a row to open Cambridge","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true,"mods":{"cmd":{"subtitle":"Show Cambridge suggestions for open","arg":"cambridge-requery:suggest:open","valid":true}}},{"title":"not closed","subtitle":"Definition 1","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true,"mods":{"cmd":{"subtitle":"Show Cambridge suggestions for open","arg":"cambridge-requery:suggest:open","valid":true}}}]}'
   printf '\n'
   exit 0
 fi
-printf '{"items":[{"title":"open","subtitle":"Select to view definition rows","autocomplete":"def::open","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true}]}'
+if [[ "$query" == sug::* ]]; then
+  printf '{"items":[{"title":"open","subtitle":"verb | Press Enter to load definition","arg":"cambridge-requery:define:open","valid":true}]}'
+  printf '\n'
+  exit 0
+fi
+printf '{"items":[{"title":"open - Cambridge","subtitle":"adjective | /əʊ.pən/ | Press Enter on a row to open Cambridge","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true,"mods":{"cmd":{"subtitle":"Show Cambridge suggestions for open","arg":"cambridge-requery:suggest:open","valid":true}}},{"title":"not closed","subtitle":"Definition 1","arg":"https://dictionary.cambridge.org/dictionary/english/open","valid":true,"mods":{"cmd":{"subtitle":"Show Cambridge suggestions for open","arg":"cambridge-requery:suggest:open","valid":true}}}]}'
 printf '\n'
 EOS
 chmod +x "$tmp_dir/stubs/cambridge-cli-ok"
@@ -199,6 +220,85 @@ exit 3
 EOS
 chmod +x "$tmp_dir/stubs/cambridge-cli-runtime"
 
+cat >"$tmp_dir/stubs/cambridge-runtime-bootstrap" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+
+workflow_dir=""
+state_file=""
+log_file=""
+result_file=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --workflow-dir)
+    workflow_dir="${2:-}"
+    shift 2
+    ;;
+  --state-file)
+    state_file="${2:-}"
+    shift 2
+    ;;
+  --log-file)
+    log_file="${2:-}"
+    shift 2
+    ;;
+  --result-file)
+    result_file="${2:-}"
+    shift 2
+    ;;
+  *)
+    echo "unexpected arg: $1" >&2
+    exit 2
+    ;;
+  esac
+done
+
+mkdir -p "$(dirname "$state_file")" "$(dirname "$log_file")" "$(dirname "$result_file")"
+printf '%s\n' "$workflow_dir" >"$CAMBRIDGE_BOOTSTRAP_WORKFLOW_DIR_OUT"
+printf '%s\n' "$$" >"$state_file"
+trap 'printf "ok\t%s\n" "$(date +%s)" >"$result_file"; rm -f "$state_file"' EXIT
+echo "ok: stub runtime ready" >"$log_file"
+sleep "${CAMBRIDGE_BOOTSTRAP_STUB_SLEEP_SECONDS:-1}"
+EOS
+chmod +x "$tmp_dir/stubs/cambridge-runtime-bootstrap"
+
+cat >"$tmp_dir/stubs/cambridge-runtime-bootstrap-fail" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_file=""
+log_file=""
+result_file=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --state-file)
+    state_file="${2:-}"
+    shift 2
+    ;;
+  --log-file)
+    log_file="${2:-}"
+    shift 2
+    ;;
+  --result-file)
+    result_file="${2:-}"
+    shift 2
+    ;;
+  *)
+    shift 2
+    ;;
+  esac
+done
+
+mkdir -p "$(dirname "$state_file")" "$(dirname "$log_file")" "$(dirname "$result_file")"
+printf '%s\n' "$$" >"$state_file"
+trap 'printf "err\t%s\n" "$(date +%s)" >"$result_file"; rm -f "$state_file"' EXIT
+echo "error: stub runtime setup failed" >"$log_file"
+exit 1
+EOS
+chmod +x "$tmp_dir/stubs/cambridge-runtime-bootstrap-fail"
+
 cat >"$tmp_dir/stubs/cambridge-cli-env" <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -208,15 +308,21 @@ EOS
 chmod +x "$tmp_dir/stubs/cambridge-cli-env"
 
 success_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "open"; })"
-assert_jq_json "$success_json" '.items | type == "array" and length == 1' "script_filter suggest must output single item"
-assert_jq_json "$success_json" '.items[0].autocomplete == "def::open"' "suggest stage must expose def:: autocomplete token"
-assert_jq_json "$success_json" '.items[0].arg == "https://dictionary.cambridge.org/dictionary/english/open"' "suggest stage arg URL mismatch"
+assert_jq_json "$success_json" '.items | type == "array" and length >= 1' "script_filter smart mode must output detail rows"
+assert_jq_json "$success_json" '.items[0].title == "open - Cambridge"' "smart exact match should return detail header"
+assert_jq_json "$success_json" '.items[0].mods.cmd.arg == "cambridge-requery:suggest:open"' "detail rows must expose cmd requery modifier"
 
 env_query_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" alfred_workflow_query="open sesame" "$workflow_dir/scripts/script_filter.sh"; })"
-assert_jq_json "$env_query_json" '.items[0].autocomplete == "def::open"' "script_filter must support Alfred query via env fallback"
+assert_jq_json "$env_query_json" '.items[0].title == "open - Cambridge"' "script_filter must support Alfred query via env fallback"
 
 stdin_query_json="$(printf 'open' | CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh")"
-assert_jq_json "$stdin_query_json" '.items[0].autocomplete == "def::open"' "script_filter must support query via stdin fallback"
+assert_jq_json "$stdin_query_json" '.items[0].title == "open - Cambridge"' "script_filter must support query via stdin fallback"
+
+force_suggest_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" alfred_workflow_keyword="cds" "$workflow_dir/scripts/script_filter.sh" "open"; })"
+assert_jq_json "$force_suggest_json" '.items[0].arg == "cambridge-requery:define:open"' "cds keyword must force suggestion mode"
+
+explicit_suggest_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "sug::open"; })"
+assert_jq_json "$explicit_suggest_json" '.items[0].arg == "cambridge-requery:define:open"' "sug token must return suggestion rows"
 
 # Detail-stage query should return rows that still support Enter open URL.
 detail_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-ok" "$workflow_dir/scripts/script_filter.sh" "def::open"; })"
@@ -239,8 +345,24 @@ assert_jq_json "$cookie_json" '.items[0].title == "Cambridge cookie consent requ
 config_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-config" "$workflow_dir/scripts/script_filter.sh" "open"; })"
 assert_jq_json "$config_json" '.items[0].title == "Invalid Cambridge workflow config"' "invalid config title mapping mismatch"
 
-runtime_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" "$workflow_dir/scripts/script_filter.sh" "open"; })"
+runtime_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/missing-runtime-bootstrap" "$workflow_dir/scripts/script_filter.sh" "open"; })"
 assert_jq_json "$runtime_json" '.items[0].title == "Node/Playwright runtime unavailable"' "runtime unavailable title mapping mismatch"
+
+runtime_bootstrap_json="$({ CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/cambridge-runtime-bootstrap" CAMBRIDGE_BOOTSTRAP_WORKFLOW_DIR_OUT="$tmp_dir/bootstrap-workflow-dir.txt" "$workflow_dir/scripts/script_filter.sh" "open"; })"
+assert_jq_json "$runtime_bootstrap_json" '.items[0].title == "Installing Cambridge runtime..."' "runtime bootstrap should emit pending item"
+assert_jq_json "$runtime_bootstrap_json" '.items[0].valid == false' "runtime bootstrap pending item must be invalid"
+for _ in $(seq 1 20); do
+  [[ -f "$tmp_dir/bootstrap-workflow-dir.txt" ]] && break
+  sleep 0.1
+done
+[[ "$(cat "$tmp_dir/bootstrap-workflow-dir.txt")" == "$workflow_dir" ]] || fail "runtime bootstrap must target workflow install directory"
+
+runtime_bootstrap_fail_cache="$tmp_dir/alfred-cache-runtime-fail"
+runtime_bootstrap_fail_state_dir="$runtime_bootstrap_fail_cache/cambridge-runtime"
+mkdir -p "$runtime_bootstrap_fail_state_dir"
+printf 'err\t%s\n' "$(date +%s)" >"$runtime_bootstrap_fail_state_dir/bootstrap.result"
+runtime_bootstrap_fail_json="$({ ALFRED_WORKFLOW_CACHE="$runtime_bootstrap_fail_cache" CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/cambridge-runtime-bootstrap-fail" "$workflow_dir/scripts/script_filter.sh" "open"; })"
+assert_jq_json "$runtime_bootstrap_fail_json" '.items[0].title == "Automatic Cambridge runtime setup failed"' "recent runtime bootstrap failure should surface dedicated item"
 
 missing_layout="$tmp_dir/layout-missing"
 missing_script="$missing_layout/workflows/cambridge-dict/scripts/script_filter.sh"
@@ -368,11 +490,13 @@ assert_file "$packaged_dir/bin/cambridge-cli"
 assert_file "$packaged_dir/scripts/cambridge_scraper.mjs"
 assert_file "$packaged_dir/scripts/lib/cambridge_routes.mjs"
 assert_file "$packaged_dir/scripts/lib/cambridge_selectors.mjs"
+assert_file "$packaged_dir/scripts/lib/cambridge_runtime_bootstrap.sh"
 assert_file "$packaged_dir/scripts/lib/extract_suggest.mjs"
 assert_file "$packaged_dir/scripts/lib/extract_define.mjs"
 assert_file "$packaged_dir/scripts/lib/error_classify.mjs"
 assert_file "$packaged_dir/scripts/lib/script_filter_query_policy.sh"
 assert_file "$packaged_dir/scripts/lib/script_filter_async_coalesce.sh"
+assert_file "$packaged_dir/scripts/lib/workflow_action_requery.sh"
 
 if command -v plutil >/dev/null 2>&1; then
   plutil -lint "$packaged_plist" >/dev/null || fail "packaged plist lint failed"
@@ -386,7 +510,7 @@ assert_jq_file "$packaged_json_file" '.connections | length > 0' "packaged plist
 assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workflow.input.scriptfilter") | .config.type] | all(. == 8)' "script filter objects must be external script type=8"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptfile == "./scripts/script_filter.sh"' "script filter scriptfile wiring mismatch"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptargtype == 1' "script filter scriptargtype must be argv"
-assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.keyword == "cd||cambridge"' "keyword trigger must be cd"
+assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.keyword == "cd||cambridge||cds"' "keyword trigger must include smart and suggest aliases"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.alfredfiltersresults == false' "script filter must disable Alfred-side filtering"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.queuedelaycustom == 1' "script filter queue delay custom must be 1 second"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.queuedelaymode == 0' "script filter queue delay mode must be custom seconds"

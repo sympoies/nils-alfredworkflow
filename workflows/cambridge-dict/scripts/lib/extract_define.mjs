@@ -143,6 +143,30 @@ function firstClassText(html, selectors) {
   return '';
 }
 
+function looksLikeHeadingCopy(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  return (
+    normalized.startsWith('meaning of ') ||
+    normalized.startsWith('translation of ') ||
+    normalized.includes(' dictionary')
+  );
+}
+
+function resolveHeadwordText(source, selectors) {
+  const entryBody = collectElementsByClass(source, 'entry-body')[0]?.html || source;
+  const entryBodyHeadword = manyClassTexts(entryBody, ['.headword', '.hw'], 4).find(
+    (value) => !looksLikeHeadingCopy(value),
+  );
+  if (entryBodyHeadword) {
+    return entryBodyHeadword;
+  }
+
+  const fallbackHeadwordText = manyClassTexts(source, selectors, 6).find(
+    (value) => !looksLikeHeadingCopy(value),
+  );
+  return fallbackHeadwordText || '';
+}
+
 function manyClassTexts(html, selectors, limit) {
   const output = [];
   const seen = new Set();
@@ -386,7 +410,9 @@ export function extractDefineFromHtml({ html, mode, entry }) {
   const source = String(html ?? '');
   const selectors = selectorsForStage({ mode: normalizedMode, stage: 'define' });
 
-  const headword = firstClassText(source, selectors.headword) || fallbackHeadword({ html: source, entry: normalizedEntry });
+  const headword =
+    resolveHeadwordText(source, selectors.headword) ||
+    fallbackHeadword({ html: source, entry: normalizedEntry });
   const partOfSpeech = firstClassText(source, selectors.partOfSpeech);
   const phonetics = manyClassTexts(source, selectors.phonetics, 4);
   const definitions =

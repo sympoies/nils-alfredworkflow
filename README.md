@@ -9,6 +9,8 @@ Alfred workflows for macOS users.
 1. Download a `.alfredworkflow` package from the [Releases](https://github.com/sympoies/nils-alfredworkflow/releases) page.
 2. Double-click the package to import it into Alfred.
 3. For API-based workflows, open Alfred's `Configure Workflow...` and fill in required credentials.
+4. Workflow-local runtimes bootstrap automatically on first use when supported. Cambridge Dict, for example, installs
+   its bundled Playwright/Chromium runtime inside the installed workflow directory the first time a live lookup needs it.
 
 ## Workflows
 
@@ -25,7 +27,7 @@ Alfred workflows for macOS users.
 | [Bilibili Search](workflows/bilibili-search/README.md) | `bl`, `bilibili` | Search bilibili suggestions and open selected search links in browser. | Optional: `BILIBILI_UID`, `BILIBILI_MAX_RESULTS`, `BILIBILI_TIMEOUT_MS` |
 | [Bangumi Search](workflows/bangumi-search/README.md) | `bgm`, `bangumi` | Search Bangumi subjects and open selected subject pages in browser. | Optional: `BANGUMI_API_KEY`, `BANGUMI_MAX_RESULTS`, `BANGUMI_API_FALLBACK` |
 | [Weather Forecast](workflows/weather/README.md) | `wt`, `ww`, `weather` | Show today rows then hourly (`wt`) / city picker then 7-day (`ww`) forecasts, then copy selected rows. | Optional: `WEATHER_LOCALE`, `WEATHER_DEFAULT_CITIES`, `WEATHER_CACHE_TTL_SECS` |
-| [Cambridge Dict](workflows/cambridge-dict/README.md) | `cd`, `cambridge` | Two-stage Cambridge dictionary lookup (candidate -> detail) with Enter-to-open entry URL. | Optional: `CAMBRIDGE_DICT_MODE`, `CAMBRIDGE_MAX_RESULTS`, `CAMBRIDGE_TIMEOUT_MS` |
+| [Cambridge Dict](workflows/cambridge-dict/README.md) | `cd`, `cambridge`, `cds` | Smart Cambridge lookup: exact matches open detail rows directly, `cds` forces suggestions, and detail rows support `Cmd+Enter` back to suggestions. | Optional: `CAMBRIDGE_DICT_MODE`, `CAMBRIDGE_MAX_RESULTS`, `CAMBRIDGE_TIMEOUT_MS`, `CAMBRIDGE_HEADLESS` |
 | [Market Expression](workflows/market-expression/README.md) | `mx`, `market` | Show a prompt row on empty query, optionally append favorite quotes, or evaluate market expressions (numeric: `+ - * /`, assets: `+ -`) with FX/crypto conversion and copy selected rows. | Optional: `MARKET_DEFAULT_FIAT`, `MARKET_FX_CACHE_TTL`, `MARKET_CRYPTO_CACHE_TTL`, `MARKET_FAVORITES_ENABLED`, `MARKET_FAVORITE_LIST` |
 | [Quote Feed](workflows/quote-feed/README.md) | `qq`, `quote` | Show cached quotes, refresh in background, and copy a selected quote. | Optional: `QUOTE_DISPLAY_COUNT`, `QUOTE_REFRESH_INTERVAL`, `QUOTE_FETCH_COUNT` |
 | [Memo Add](workflows/memo-add/README.md) | `mm`, `memo` | Add/search memo text quickly into sqlite storage, with optional one-click db init and latest-record preview. | Optional: `MEMO_DB_PATH`, `MEMO_REQUIRE_CONFIRM`, `MEMO_SEARCH_MATCH` |

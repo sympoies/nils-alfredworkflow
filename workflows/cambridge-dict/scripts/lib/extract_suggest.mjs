@@ -407,6 +407,10 @@ function extractExactEntryCandidate(source, mode, pageUrl) {
   return null;
 }
 
+export function extractExactEntryCandidateFromHtml({ html, mode, pageUrl = '' }) {
+  return extractExactEntryCandidate(String(html ?? ''), normalizeMode(mode), pageUrl);
+}
+
 function extractBrowseCandidates(source, mode) {
   const selectors = selectorsForStage({ mode, stage: 'suggest' });
   const candidates = [];

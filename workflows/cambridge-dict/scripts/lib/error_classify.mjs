@@ -32,6 +32,11 @@ function hasDictionaryContent(lowerHtml) {
     "class='headword",
     'link rel="canonical" href="https://dictionary.cambridge.org/dictionary/',
     'property="og:url" content="https://dictionary.cambridge.org/dictionary/',
+    'search suggestions for',
+    'did you spell it correctly',
+    'alternative spellings in the cambridge',
+    'we have these words with similar spellings or pronunciations',
+    'https://dictionary.cambridge.org/spellcheck/',
   ];
 
   return containsAny(lowerHtml, contentMarkers);

@@ -11,22 +11,37 @@ Reference: [ALFRED_WORKFLOW_DEVELOPMENT.md](../../ALFRED_WORKFLOW_DEVELOPMENT.md
    - `CAMBRIDGE_MAX_RESULTS` (optional, default `8`)
    - `CAMBRIDGE_TIMEOUT_MS` (optional, default `8000`)
    - `CAMBRIDGE_HEADLESS` (optional, default `true`)
-3. Confirm installed workflow runtime is available:
+3. Confirm Alfred can see `node` and `npm`:
+   - `command -v node`
+   - `command -v npm`
+4. Confirm installed workflow runtime is available:
    - `scripts/setup-cambridge-workflow-runtime.sh --check-only --skip-browser`
-4. Confirm deterministic workflow/Node checks pass:
+5. Confirm deterministic workflow/Node checks pass:
    - `npm run test:cambridge-scraper`
    - `bash workflows/cambridge-dict/tests/smoke.sh`
 
 ## Common failures and actions
 
-| Symptom in Alfred                     | Likely cause                                                                                                      | Action                                                                              |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `cambridge-cli binary not found`      | Packaged binary missing or runtime path mismatch.                                                                 | Re-pack workflow, or set `CAMBRIDGE_CLI_BIN` to executable path.                    |
-| `Node/Playwright runtime unavailable` | `node` missing, workflow-local `playwright` package missing, or Chromium browser not installed for live scraping. | Run `scripts/setup-cambridge-workflow-runtime.sh` and retry.                        |
-| `Cambridge anti-bot challenge`        | Cambridge returned Cloudflare/anti-bot page.                                                                      | Retry later, reduce query frequency, or open Cambridge page directly in browser.    |
-| `Cambridge cookie consent required`   | Cookie wall rendered instead of dictionary content.                                                               | Open Cambridge Dictionary in browser once, accept cookies, then retry Alfred query. |
-| `Cambridge request timed out`         | Timeout too low for current network/page latency.                                                                 | Increase `CAMBRIDGE_TIMEOUT_MS` and retry.                                          |
-| `Invalid Cambridge workflow config`   | Invalid mode/max-results/timeout/headless values.                                                                 | Correct `CAMBRIDGE_*` variables in Alfred config.                                   |
+- `cambridge-cli binary not found`: packaged binary missing or runtime path mismatch.
+  Action: re-pack workflow, or set `CAMBRIDGE_CLI_BIN` to executable path.
+- `Installing Cambridge runtime...`: workflow-local Playwright/Chromium runtime is being bootstrapped automatically
+  after first-use runtime detection.
+  Action: wait for Alfred auto-rerun; if it does not finish, inspect the workflow cache log.
+- `Automatic Cambridge runtime setup failed`: auto-bootstrap ran but `npm install` or
+  `playwright install chromium` failed.
+  Action: check the bootstrap log in Alfred cache, fix Node/npm/network access, then retry.
+- `Node/Playwright runtime unavailable`: Alfred cannot locate `node`/`npm`, or auto-bootstrap is disabled or
+  unavailable.
+  Action: install Node.js, ensure Alfred PATH can resolve it, or run
+  `scripts/setup-cambridge-workflow-runtime.sh`.
+- `Cambridge anti-bot challenge`: Cambridge returned Cloudflare or an anti-bot page.
+  Action: retry later, reduce query frequency, or open Cambridge page directly in browser.
+- `Cambridge cookie consent required`: cookie wall rendered instead of dictionary content.
+  Action: open Cambridge Dictionary in browser once, accept cookies, then retry Alfred query.
+- `Cambridge request timed out`: timeout too low for current network/page latency.
+  Action: increase `CAMBRIDGE_TIMEOUT_MS` and retry.
+- `Invalid Cambridge workflow config`: invalid mode/max-results/timeout/headless values.
+  Action: correct `CAMBRIDGE_*` variables in Alfred config.
 
 ## Validation
 
@@ -39,6 +54,10 @@ Run these checks:
 - `scripts/setup-cambridge-workflow-runtime.sh --check-only --skip-browser`
 - `npm run test:cambridge-scraper`
 - `bash workflows/cambridge-dict/tests/smoke.sh`
+
+Bootstrap logs are stored under:
+
+- `$ALFRED_WORKFLOW_CACHE/cambridge-runtime/bootstrap.log`
 
 ## Rollback guidance
 

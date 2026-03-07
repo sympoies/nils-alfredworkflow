@@ -524,6 +524,35 @@ mod tests {
     }
 
     #[test]
+    fn bridge_decode_suggest_response_preserves_direct_entry_payload() {
+        let json = r#"{
+          "ok": true,
+          "stage": "suggest",
+          "items": [
+            {"entry": "symphony", "label": "symphony", "url": "https://example.com/symphony"}
+          ],
+          "entry": {
+            "headword": "symphony",
+            "part_of_speech": "noun",
+            "url": "https://example.com/symphony",
+            "definitions": ["a long piece of music"],
+            "examples": ["Mahler's ninth symphony"]
+          }
+        }"#;
+
+        let decoded = decode_scraper_json(json, ScraperStage::Suggest)
+            .expect("suggest response should decode");
+        let entry = decoded.entry.expect("direct entry should decode");
+
+        assert!(decoded.ok);
+        assert_eq!(decoded.stage, ScraperStage::Suggest);
+        assert_eq!(decoded.items.len(), 1);
+        assert_eq!(entry.headword, "symphony");
+        assert_eq!(entry.definitions[0].text, "a long piece of music");
+        assert_eq!(entry.examples, vec!["Mahler's ninth symphony".to_string()]);
+    }
+
+    #[test]
     fn bridge_decode_define_response_maps_entry_and_definition_rows() {
         let json = r#"{
           "ok": true,

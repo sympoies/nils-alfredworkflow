@@ -1,18 +1,21 @@
-use alfred_core::{Feedback, Item};
+use alfred_core::{Feedback, Item, ItemModifier};
 
 use crate::config::DictionaryMode;
 use crate::scraper_bridge::{Entry, ScraperErrorInfo, ScraperResponse, SuggestItem};
 
 const EMPTY_INPUT_TITLE: &str = "Type a word to search Cambridge";
-const EMPTY_INPUT_SUBTITLE: &str = "Select a suggestion, or use def::<word> for direct lookup";
+const EMPTY_INPUT_SUBTITLE: &str =
+    "Exact matches open entry rows; use cds <word> to force suggestions";
 const MISSING_DEFINE_TITLE: &str = "Definition token is incomplete";
 const MISSING_DEFINE_SUBTITLE: &str = "Use def::<word>, for example def::open";
+const MISSING_SUGGEST_TITLE: &str = "Suggestion token is incomplete";
+const MISSING_SUGGEST_SUBTITLE: &str = "Use sug::<word>, for example sug::open";
 
 const SUGGEST_ERROR_TITLE: &str = "Cambridge suggestions unavailable";
 const SUGGEST_ERROR_SUBTITLE: &str = "Retry in a moment or check scraper availability";
 const SUGGEST_EMPTY_TITLE: &str = "No candidate entries found";
 const SUGGEST_EMPTY_SUBTITLE: &str = "Try another keyword";
-const SUGGEST_GUIDANCE: &str = "Press Tab to load definition";
+const SUGGEST_GUIDANCE: &str = "Press Enter to load definition";
 
 const DEFINE_ERROR_TITLE: &str = "Cambridge definition unavailable";
 const DEFINE_ERROR_SUBTITLE: &str = "Retry this entry or pick another suggestion";
@@ -20,6 +23,9 @@ const DEFINE_EMPTY_TITLE: &str = "No definitions found";
 const DEFINE_EMPTY_SUBTITLE: &str = "Try another headword";
 const DEFINE_ROW_SUBTITLE_PREFIX: &str = "Definition";
 const EXAMPLE_ROW_SUBTITLE_PREFIX: &str = "Example";
+const REQUERY_ARG_PREFIX: &str = "cambridge-requery:";
+const REQUERY_DEFINE_SELECTOR: &str = "define";
+const REQUERY_SUGGEST_SELECTOR: &str = "suggest";
 
 pub fn empty_input_feedback() -> Feedback {
     single_invalid_item(EMPTY_INPUT_TITLE, EMPTY_INPUT_SUBTITLE)
@@ -27,6 +33,10 @@ pub fn empty_input_feedback() -> Feedback {
 
 pub fn missing_define_target_feedback() -> Feedback {
     single_invalid_item(MISSING_DEFINE_TITLE, MISSING_DEFINE_SUBTITLE)
+}
+
+pub fn missing_suggest_target_feedback() -> Feedback {
+    single_invalid_item(MISSING_SUGGEST_TITLE, MISSING_SUGGEST_SUBTITLE)
 }
 
 pub fn suggest_feedback(response: &ScraperResponse) -> Feedback {
@@ -93,6 +103,7 @@ pub fn define_feedback(
                 translation.as_deref(),
             ),
             &entry_url,
+            &headword,
         ));
         definition_count += 1;
     }
@@ -114,6 +125,7 @@ pub fn define_feedback(
                 translation.as_deref(),
             ),
             &entry_url,
+            &headword,
         ));
     }
 
@@ -141,8 +153,8 @@ fn suggest_item_to_feedback_item(item: &SuggestItem) -> Option<Item> {
     Some(
         Item::new(word.clone())
             .with_subtitle(subtitle)
-            .with_autocomplete(format!("def::{word}"))
-            .with_valid(false),
+            .with_arg(requery_arg(REQUERY_DEFINE_SELECTOR, &word))
+            .with_valid(true),
     )
 }
 
@@ -160,13 +172,15 @@ fn definition_header_item(entry: &Entry, headword: &str, entry_url: &str) -> Ite
         .with_subtitle(details.join(" | "))
         .with_arg(entry_url.to_string())
         .with_valid(true)
+        .with_mod("cmd", show_suggestions_modifier(headword))
 }
 
-fn detail_row_item(title: &str, subtitle: String, entry_url: &str) -> Item {
+fn detail_row_item(title: &str, subtitle: String, entry_url: &str, headword: &str) -> Item {
     Item::new(title)
         .with_subtitle(subtitle)
         .with_arg(entry_url.to_string())
         .with_valid(true)
+        .with_mod("cmd", show_suggestions_modifier(headword))
 }
 
 fn build_detail_subtitle(
@@ -268,6 +282,27 @@ fn split_bilingual_definition(input: &str) -> Option<(String, Option<String>)> {
     Some((english, translation))
 }
 
+fn compact_requery_text(input: &str) -> String {
+    normalize_text(input).unwrap_or_else(|| "entry".to_string())
+}
+
+fn requery_arg(selector: &str, query: &str) -> String {
+    format!(
+        "{REQUERY_ARG_PREFIX}{selector}:{}",
+        compact_requery_text(query)
+    )
+}
+
+fn show_suggestions_modifier(headword: &str) -> ItemModifier {
+    ItemModifier::new()
+        .with_subtitle(format!(
+            "Show Cambridge suggestions for {}",
+            compact_requery_text(headword)
+        ))
+        .with_arg(requery_arg(REQUERY_SUGGEST_SELECTOR, headword))
+        .with_valid(true)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::scraper_bridge::{DefinitionLine, Entry, ScraperResponse, ScraperStage};
@@ -304,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn feedback_suggest_maps_autocomplete_and_invalid_items() {
+    fn feedback_suggest_maps_requery_args_and_valid_items() {
         let feedback = suggest_feedback(&fixture_suggest_response(vec![SuggestItem {
             word: "open".to_string(),
             subtitle: Some("verb".to_string()),
@@ -313,14 +348,17 @@ mod tests {
 
         assert_eq!(feedback.items.len(), 1);
         assert_eq!(feedback.items[0].title, "open");
-        assert_eq!(feedback.items[0].valid, Some(false));
-        assert_eq!(feedback.items[0].autocomplete.as_deref(), Some("def::open"));
+        assert_eq!(feedback.items[0].valid, Some(true));
+        assert_eq!(
+            feedback.items[0].arg.as_deref(),
+            Some("cambridge-requery:define:open")
+        );
         assert!(
             feedback.items[0]
                 .subtitle
                 .as_deref()
-                .is_some_and(|subtitle| subtitle.contains("Press Tab")),
-            "suggest subtitle should include transition guidance"
+                .is_some_and(|subtitle| subtitle.contains("Press Enter")),
+            "suggest subtitle should include Enter guidance"
         );
     }
 
@@ -397,6 +435,15 @@ mod tests {
         assert_eq!(
             feedback.items[2].arg.as_deref(),
             Some("https://example.com/open")
+        );
+        let cmd_mod = feedback.items[0]
+            .mods
+            .as_ref()
+            .and_then(|mods| mods.get("cmd"))
+            .expect("header should expose cmd modifier");
+        assert_eq!(
+            cmd_mod.arg.as_deref(),
+            Some("cambridge-requery:suggest:open")
         );
     }
 
