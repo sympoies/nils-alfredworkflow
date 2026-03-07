@@ -40,6 +40,181 @@ emit_error_item() {
   sfej_emit_error_item_json "$title" "$subtitle"
 }
 
+append_path_entry() {
+  local dir="${1:-}"
+  [[ -n "$dir" && -d "$dir" ]] || return 0
+
+  case ":${PATH:-}:" in
+  *":$dir:"*) ;;
+  *)
+    if [[ -n "${PATH:-}" ]]; then
+      PATH="$dir:$PATH"
+    else
+      PATH="$dir"
+    fi
+    ;;
+  esac
+}
+
+ensure_common_runtime_path() {
+  append_path_entry "/opt/homebrew/bin"
+  append_path_entry "/usr/local/bin"
+  append_path_entry "/opt/local/bin"
+  append_path_entry "/usr/bin"
+  append_path_entry "/bin"
+  export PATH
+}
+
+resolve_workflow_cache_dir() {
+  if declare -F sfac_resolve_workflow_cache_dir >/dev/null 2>&1; then
+    sfac_resolve_workflow_cache_dir "nils-cambridge-dict-workflow"
+    return 0
+  fi
+
+  local candidate
+  for candidate in \
+    "${ALFRED_WORKFLOW_CACHE:-}" \
+    "${ALFRED_WORKFLOW_DATA:-}"; do
+    if [[ -n "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${TMPDIR:-/tmp}/nils-cambridge-dict-workflow"
+}
+
+cambridge_runtime_state_dir() {
+  local cache_dir
+  cache_dir="$(resolve_workflow_cache_dir)"
+  mkdir -p "$cache_dir/cambridge-runtime"
+  printf '%s/cambridge-runtime\n' "$cache_dir"
+}
+
+cambridge_runtime_state_file() {
+  printf '%s/bootstrap.state\n' "$(cambridge_runtime_state_dir)"
+}
+
+cambridge_runtime_log_file() {
+  printf '%s/bootstrap.log\n' "$(cambridge_runtime_state_dir)"
+}
+
+cambridge_runtime_result_file() {
+  printf '%s/bootstrap.result\n' "$(cambridge_runtime_state_dir)"
+}
+
+cambridge_runtime_bootstrap_helper_path() {
+  if [[ -n "${CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER:-}" ]]; then
+    printf '%s\n' "$CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER"
+    return 0
+  fi
+
+  wfhl_resolve_helper_path "$script_dir" "cambridge_runtime_bootstrap.sh" auto
+}
+
+cambridge_runtime_issue_message() {
+  local lower="${1:-}"
+  [[ "$lower" == *"node"*"not found"* || "$lower" == *"playwright"* || "$lower" == *"chromium executable doesn't exist"* || "$lower" == *"browser executable"* || "$lower" == *"cambridge_node_bin"* ]]
+}
+
+cambridge_runtime_bootstrap_supported() {
+  ensure_common_runtime_path
+
+  local helper
+  helper="$(cambridge_runtime_bootstrap_helper_path 2>/dev/null || true)"
+  [[ -n "$helper" && -x "$helper" ]] || return 1
+
+  command -v node >/dev/null 2>&1 || return 1
+  command -v npm >/dev/null 2>&1 || return 1
+  command -v npx >/dev/null 2>&1 || return 1
+}
+
+cambridge_runtime_bootstrap_running() {
+  local state_file pid
+  state_file="$(cambridge_runtime_state_file)"
+  [[ -f "$state_file" ]] || return 1
+
+  pid="$(sed -n '1p' "$state_file" 2>/dev/null | tr -d '[:space:]')"
+  if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+
+  rm -f "$state_file"
+  return 1
+}
+
+cambridge_runtime_recent_failure() {
+  local cooldown_seconds="${1:-60}"
+  local result_file status completed_at now age
+  result_file="$(cambridge_runtime_result_file)"
+  [[ -f "$result_file" ]] || return 1
+
+  IFS=$'\t' read -r status completed_at <"$result_file" || return 1
+  [[ "$status" == "err" ]] || return 1
+  [[ "$completed_at" =~ ^[0-9]+$ ]] || return 1
+
+  now="$(date +%s)"
+  age=$((now - completed_at))
+  [[ "$age" -ge 0 && "$age" -le "$cooldown_seconds" ]]
+}
+
+emit_runtime_bootstrap_pending_item() {
+  sfac_emit_pending_item_json \
+    "Installing Cambridge runtime..." \
+    "Setting up workflow-local Playwright and Chromium. Alfred will retry automatically." \
+    "${CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS:-0.4}"
+}
+
+emit_runtime_bootstrap_failed_item() {
+  local log_file
+  log_file="$(cambridge_runtime_log_file)"
+  emit_error_item \
+    "Automatic Cambridge runtime setup failed" \
+    "Check the bootstrap log at $log_file, then retry after fixing Node/npm access."
+}
+
+start_cambridge_runtime_bootstrap() {
+  local helper
+  helper="$(cambridge_runtime_bootstrap_helper_path 2>/dev/null || true)"
+  [[ -n "$helper" && -x "$helper" ]] || return 1
+
+  local workflow_dir state_file log_file result_file
+  workflow_dir="$(cd "$script_dir/.." && pwd)"
+  state_file="$(cambridge_runtime_state_file)"
+  log_file="$(cambridge_runtime_log_file)"
+  result_file="$(cambridge_runtime_result_file)"
+
+  nohup "$helper" \
+    --workflow-dir "$workflow_dir" \
+    --state-file "$state_file" \
+    --log-file "$log_file" \
+    --result-file "$result_file" \
+    >/dev/null 2>&1 </dev/null &
+}
+
+handle_runtime_bootstrap() {
+  if cambridge_runtime_bootstrap_running; then
+    emit_runtime_bootstrap_pending_item
+    return 0
+  fi
+
+  if ! cambridge_runtime_bootstrap_supported; then
+    return 1
+  fi
+
+  if cambridge_runtime_recent_failure "${CAMBRIDGE_RUNTIME_BOOTSTRAP_FAILURE_COOLDOWN_SECONDS:-60}"; then
+    emit_runtime_bootstrap_failed_item
+    return 0
+  fi
+
+  if ! start_cambridge_runtime_bootstrap; then
+    return 1
+  fi
+
+  emit_runtime_bootstrap_pending_item
+  return 0
+}
+
 print_error_item() {
   local raw_message="${1:-cambridge-cli query failed}"
   local message
@@ -66,9 +241,12 @@ print_error_item() {
   elif [[ "$lower" == *"timed out"* || "$lower" == *"timeout"* ]]; then
     title="Cambridge request timed out"
     subtitle="Increase CAMBRIDGE_TIMEOUT_MS or retry with shorter query."
-  elif [[ "$lower" == *"node"*"not found"* || "$lower" == *"playwright"* || "$lower" == *"chromium executable doesn't exist"* || "$lower" == *"browser executable"* ]]; then
+  elif cambridge_runtime_issue_message "$lower"; then
+    if handle_runtime_bootstrap; then
+      return 0
+    fi
     title="Node/Playwright runtime unavailable"
-    subtitle="Run scripts/setup-cambridge-workflow-runtime.sh to install workflow runtime."
+    subtitle="Automatic setup needs Node.js + npm in Alfred PATH. Install Node.js or run setup manually."
   elif [[ "$lower" == *"binary not found"* || "$lower" == *"cambridge-cli binary not found"* ]]; then
     title="cambridge-cli binary not found"
     subtitle="Package workflow or set CAMBRIDGE_CLI_BIN to a cambridge-cli executable."
@@ -78,6 +256,59 @@ print_error_item() {
   fi
 
   emit_error_item "$title" "$subtitle"
+}
+
+resolve_keyword_lookup_mode() {
+  local keyword="${alfred_workflow_keyword:-${ALFRED_WORKFLOW_KEYWORD:-}}"
+  keyword="$(printf '%s' "$keyword" | tr '[:upper:]' '[:lower:]')"
+
+  case "$keyword" in
+  cds)
+    printf '%s\n' "suggest"
+    ;;
+  *)
+    printf '%s\n' "smart"
+    ;;
+  esac
+}
+
+query_has_explicit_mode_prefix() {
+  local query="$1"
+  [[ "$query" == def::* || "$query" == sug::* ]]
+}
+
+prepare_cli_query_input() {
+  local query="$1"
+
+  if query_has_explicit_mode_prefix "$query"; then
+    printf '%s\n' "$query"
+    return 0
+  fi
+
+  if [[ "$(resolve_keyword_lookup_mode)" == "suggest" ]]; then
+    printf 'sug::%s\n' "$query"
+    return 0
+  fi
+
+  printf '%s\n' "$query"
+}
+
+emit_direct_query_result() {
+  local query="$1"
+  local err_file
+  err_file="$(sfsd_make_temp_err_file "cambridge-dict-direct.err")"
+
+  local json_output
+  if json_output="$(cambridge_query_fetch_json "$query" 2>"$err_file")"; then
+    rm -f "$err_file"
+    printf '%s\n' "$json_output"
+    return 0
+  fi
+
+  local err_msg
+  err_msg="$(cat "$err_file")"
+  rm -f "$err_file"
+  print_error_item "$err_msg"
 }
 
 resolve_cambridge_cli() {
@@ -159,6 +390,8 @@ if ! wfhl_source_helper "$script_dir" "script_filter_search_driver.sh"; then
   exit 0
 fi
 
+ensure_common_runtime_path
+
 query="$(sfqp_resolve_query_input "${1:-}")"
 trimmed_query="$(sfqp_trim "$query")"
 query="$trimmed_query"
@@ -176,10 +409,19 @@ if sfqp_is_short_query "$query" 2; then
   exit 0
 fi
 
+cli_query="$(prepare_cli_query_input "$query")"
+
+: "${CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS:=0}"
+
+if query_has_explicit_mode_prefix "$cli_query"; then
+  emit_direct_query_result "$cli_query"
+  exit 0
+fi
+
 # Shared driver owns cache/coalesce orchestration only.
 # Cambridge-specific backend fetch and error mapping remain local in this script.
 sfsd_run_search_flow \
-  "$query" \
+  "$cli_query" \
   "cambridge-dict" \
   "nils-cambridge-dict-workflow" \
   "CAMBRIDGE_QUERY_CACHE_TTL_SECONDS" \

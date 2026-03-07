@@ -38,7 +38,7 @@
   <key>createdby</key>
   <string>sympoies</string>
   <key>description</key>
-  <string>Search Cambridge Dictionary with a two-stage Alfred flow powered by cambridge-cli and Playwright.</string>
+  <string>Search Cambridge Dictionary with smart exact-match lookup and suggestion fallback powered by cambridge-cli and Playwright.</string>
   <key>disabled</key>
   <false/>
   <key>name</key>
@@ -61,7 +61,7 @@
         <key>escaping</key>
         <integer>102</integer>
         <key>keyword</key>
-        <string>cd||cambridge</string>
+        <string>cd||cambridge||cds</string>
         <key>queuedelaycustom</key>
         <integer>1</integer>
         <key>queuedelayimmediatelyinitially</key>
@@ -148,7 +148,7 @@
     </dict>
   </array>
   <key>readme</key>
-  <string>Use keyword cd or cambridge, pick a candidate, then Alfred autocomplete token def::WORD shows detail rows.</string>
+  <string>Use cd for smart lookup and cds for forced suggestions. Exact matches open detail rows directly; Cmd+Enter on detail rows shows suggestions; missing Playwright runtime bootstraps automatically on first live lookup.</string>
   <key>uidata</key>
   <dict>
     <key>A2EAAEA3-DE10-4407-BF6A-828CF4789D7A</key>

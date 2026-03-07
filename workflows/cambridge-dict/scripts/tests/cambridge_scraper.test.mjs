@@ -63,6 +63,8 @@ test('suggest keeps exact dictionary entries ahead of browse links on direct pag
     run.payload.items.map((item) => item.entry),
     ['symphony', 'sympathize', 'sympathizer', 'sympathy'],
   );
+  assert.equal(run.payload.entry?.headword, 'symphony');
+  assert.ok(run.payload.entry?.definitions?.length >= 1);
 });
 
 test('suggest maps spellcheck pages to q-based suggestions instead of unrelated dictionary links', () => {

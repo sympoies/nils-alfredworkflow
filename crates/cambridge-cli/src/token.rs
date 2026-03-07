@@ -1,11 +1,14 @@
 const DEFINE_PREFIX: &str = "def::";
+const SUGGEST_PREFIX: &str = "sug::";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QueryToken {
     Empty,
-    Suggest { query: String },
+    Smart { query: String },
+    SuggestOnly { query: String },
     Define { entry: String },
     DefineMissingEntry,
+    SuggestMissingQuery,
 }
 
 pub fn parse_query_token(raw_input: &str) -> QueryToken {
@@ -23,8 +26,17 @@ pub fn parse_query_token(raw_input: &str) -> QueryToken {
                 entry: entry.to_string(),
             }
         }
+    } else if let Some(rest) = input.strip_prefix(SUGGEST_PREFIX) {
+        let query = rest.trim();
+        if query.is_empty() {
+            QueryToken::SuggestMissingQuery
+        } else {
+            QueryToken::SuggestOnly {
+                query: query.to_string(),
+            }
+        }
     } else {
-        QueryToken::Suggest {
+        QueryToken::Smart {
             query: input.to_string(),
         }
     }
@@ -40,10 +52,10 @@ mod tests {
     }
 
     #[test]
-    fn token_parser_routes_plain_text_to_suggest_mode() {
+    fn token_parser_routes_plain_text_to_smart_mode() {
         assert_eq!(
             parse_query_token(" open "),
-            QueryToken::Suggest {
+            QueryToken::Smart {
                 query: "open".to_string(),
             }
         );
@@ -75,10 +87,38 @@ mod tests {
     }
 
     #[test]
+    fn token_parser_routes_suggest_prefix_to_suggest_only_mode() {
+        assert_eq!(
+            parse_query_token("sug::open"),
+            QueryToken::SuggestOnly {
+                query: "open".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn token_parser_trims_suggest_query_value() {
+        assert_eq!(
+            parse_query_token("sug::   open up  "),
+            QueryToken::SuggestOnly {
+                query: "open up".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn token_parser_flags_missing_suggest_query() {
+        assert_eq!(
+            parse_query_token("sug::  "),
+            QueryToken::SuggestMissingQuery
+        );
+    }
+
+    #[test]
     fn token_parser_is_case_sensitive_for_prefix() {
         assert_eq!(
             parse_query_token("DEF::open"),
-            QueryToken::Suggest {
+            QueryToken::Smart {
                 query: "DEF::open".to_string(),
             }
         );

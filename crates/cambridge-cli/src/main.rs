@@ -169,7 +169,25 @@ where
             let feedback_payload = match token::parse_query_token(&input) {
                 QueryToken::Empty => feedback::empty_input_feedback(),
                 QueryToken::DefineMissingEntry => feedback::missing_define_target_feedback(),
-                QueryToken::Suggest { query } => {
+                QueryToken::SuggestMissingQuery => feedback::missing_suggest_target_feedback(),
+                QueryToken::Smart { query } => {
+                    let config = load_config().map_err(AppError::from_config)?;
+                    let response = run_scraper(&config, ScraperStage::Suggest, &query)
+                        .map_err(AppError::from_bridge)?;
+
+                    if !response.ok {
+                        feedback::suggest_feedback(&response)
+                    } else if response.entry.is_some() {
+                        feedback::define_feedback(&response, &query, config.dict_mode)
+                    } else if let Some(entry) = exact_suggest_match(&response, &query) {
+                        let detail_response = run_scraper(&config, ScraperStage::Define, &entry)
+                            .map_err(AppError::from_bridge)?;
+                        feedback::define_feedback(&detail_response, &entry, config.dict_mode)
+                    } else {
+                        feedback::suggest_feedback(&response)
+                    }
+                }
+                QueryToken::SuggestOnly { query } => {
                     let config = load_config().map_err(AppError::from_config)?;
                     let response = run_scraper(&config, ScraperStage::Suggest, &query)
                         .map_err(AppError::from_bridge)?;
@@ -186,6 +204,40 @@ where
             render_feedback(mode, "query", feedback_payload)
         }
     }
+}
+
+fn exact_suggest_match(response: &ScraperResponse, query: &str) -> Option<String> {
+    let normalized_query = normalize_lookup_key(query);
+
+    response.items.iter().find_map(|item| {
+        let word = item.word.trim();
+        if word.is_empty() {
+            return None;
+        }
+
+        if normalize_lookup_key(word) == normalized_query {
+            Some(word.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn normalize_lookup_key(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .map(|ch| {
+            if ch == '-' || ch == '_' {
+                ' '
+            } else {
+                ch.to_ascii_lowercase()
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn render_feedback(
@@ -249,6 +301,26 @@ mod tests {
             entry: None,
             error: None,
         }
+    }
+
+    fn fixture_suggest_response_without_exact_match() -> ScraperResponse {
+        ScraperResponse {
+            ok: true,
+            stage: ScraperStage::Suggest,
+            items: vec![cambridge_cli::scraper_bridge::SuggestItem {
+                word: "open up".to_string(),
+                subtitle: Some("phrase".to_string()),
+                url: None,
+            }],
+            entry: None,
+            error: None,
+        }
+    }
+
+    fn fixture_suggest_response_with_entry() -> ScraperResponse {
+        let mut response = fixture_suggest_response();
+        response.entry = fixture_define_response().entry;
+        response
     }
 
     fn fixture_define_response() -> ScraperResponse {
@@ -323,7 +395,7 @@ mod tests {
             |_, stage, term| {
                 assert_eq!(stage, ScraperStage::Suggest);
                 assert_eq!(term, "open");
-                Ok(fixture_suggest_response())
+                Ok(fixture_suggest_response_without_exact_match())
             },
         )
         .expect("service-json query should succeed");
@@ -344,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn main_query_suggest_mode_maps_scraper_items_to_autocomplete_rows() {
+    fn main_query_smart_mode_falls_back_to_suggestion_rows_without_exact_match() {
         let cli = Cli::parse_from(["cambridge-cli", "query", "--input", "open"]);
         let output = run_with(
             cli,
@@ -352,10 +424,10 @@ mod tests {
             |_, stage, term| {
                 assert_eq!(stage, ScraperStage::Suggest);
                 assert_eq!(term, "open");
-                Ok(fixture_suggest_response())
+                Ok(fixture_suggest_response_without_exact_match())
             },
         )
-        .expect("suggest query should succeed");
+        .expect("smart query should succeed");
 
         let json: Value = serde_json::from_str(&output).expect("output should be json");
         let item = json
@@ -364,12 +436,106 @@ mod tests {
             .and_then(|items| items.first())
             .expect("first suggest item should exist");
 
-        assert_eq!(item.get("title").and_then(Value::as_str), Some("open"));
-        assert_eq!(item.get("valid").and_then(Value::as_bool), Some(false));
+        assert_eq!(item.get("title").and_then(Value::as_str), Some("open up"));
+        assert_eq!(item.get("valid").and_then(Value::as_bool), Some(true));
         assert_eq!(
-            item.get("autocomplete").and_then(Value::as_str),
-            Some("def::open")
+            item.get("arg").and_then(Value::as_str),
+            Some("cambridge-requery:define:open up")
         );
+    }
+
+    #[test]
+    fn main_query_smart_mode_uses_direct_entry_payload_without_second_fetch() {
+        let cli = Cli::parse_from(["cambridge-cli", "query", "--input", "open"]);
+        let bridge_calls = Cell::new(0usize);
+        let output = run_with(
+            cli,
+            || Ok(fixture_config()),
+            |_, stage, term| {
+                bridge_calls.set(bridge_calls.get() + 1);
+                assert_eq!(stage, ScraperStage::Suggest);
+                assert_eq!(term, "open");
+                Ok(fixture_suggest_response_with_entry())
+            },
+        )
+        .expect("smart query should succeed");
+
+        assert_eq!(
+            bridge_calls.get(),
+            1,
+            "direct entry should avoid define fetch"
+        );
+
+        let json: Value = serde_json::from_str(&output).expect("output should be json");
+        let items = json
+            .get("items")
+            .and_then(Value::as_array)
+            .expect("items should be array");
+
+        assert_eq!(
+            items[0].get("title").and_then(Value::as_str),
+            Some("open - Cambridge")
+        );
+        assert_eq!(
+            items[1].get("title").and_then(Value::as_str),
+            Some("to move to an open position")
+        );
+    }
+
+    #[test]
+    fn main_query_smart_mode_fetches_definition_for_exact_suggestion_match() {
+        let cli = Cli::parse_from(["cambridge-cli", "query", "--input", "open"]);
+        let bridge_calls = Cell::new(0usize);
+        let output = run_with(
+            cli,
+            || Ok(fixture_config()),
+            |_, stage, term| {
+                bridge_calls.set(bridge_calls.get() + 1);
+                match bridge_calls.get() {
+                    1 => {
+                        assert_eq!(stage, ScraperStage::Suggest);
+                        assert_eq!(term, "open");
+                        Ok(fixture_suggest_response())
+                    }
+                    2 => {
+                        assert_eq!(stage, ScraperStage::Define);
+                        assert_eq!(term, "open");
+                        Ok(fixture_define_response())
+                    }
+                    _ => panic!("unexpected scraper call"),
+                }
+            },
+        )
+        .expect("smart query should succeed");
+
+        assert_eq!(
+            bridge_calls.get(),
+            2,
+            "exact suggestion should trigger define fetch"
+        );
+
+        let json: Value = serde_json::from_str(&output).expect("output should be json");
+        let items = json
+            .get("items")
+            .and_then(Value::as_array)
+            .expect("items should be array");
+
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].get("valid").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            items[0].get("arg").and_then(Value::as_str),
+            Some("https://example.com/open")
+        );
+        assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            items[1].get("arg").and_then(Value::as_str),
+            Some("https://example.com/open")
+        );
+        assert_eq!(
+            items[2].get("title").and_then(Value::as_str),
+            Some("Leave the door open.")
+        );
+        assert_eq!(items[2].get("valid").and_then(Value::as_bool), Some(true));
     }
 
     #[test]
@@ -398,16 +564,69 @@ mod tests {
             items[0].get("arg").and_then(Value::as_str),
             Some("https://example.com/open")
         );
-        assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(true));
+    }
+
+    #[test]
+    fn main_query_suggest_only_mode_keeps_suggestion_rows() {
+        let cli = Cli::parse_from(["cambridge-cli", "query", "--input", "sug::open"]);
+        let output = run_with(
+            cli,
+            || Ok(fixture_config()),
+            |_, stage, term| {
+                assert_eq!(stage, ScraperStage::Suggest);
+                assert_eq!(term, "open");
+                Ok(fixture_suggest_response())
+            },
+        )
+        .expect("suggest-only query should succeed");
+
+        let json: Value = serde_json::from_str(&output).expect("output should be json");
+        let item = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.first())
+            .expect("first suggest item should exist");
+
+        assert_eq!(item.get("title").and_then(Value::as_str), Some("open"));
         assert_eq!(
-            items[1].get("arg").and_then(Value::as_str),
-            Some("https://example.com/open")
+            item.get("arg").and_then(Value::as_str),
+            Some("cambridge-requery:define:open")
         );
+    }
+
+    #[test]
+    fn main_query_missing_suggest_target_returns_guidance_without_runtime_dependencies() {
+        let cli = Cli::parse_from(["cambridge-cli", "query", "--input", "sug::   "]);
+        let config_called = Cell::new(false);
+        let bridge_called = Cell::new(false);
+
+        let output = run_with(
+            cli,
+            || {
+                config_called.set(true);
+                Ok(fixture_config())
+            },
+            |_, _, _| {
+                bridge_called.set(true);
+                Ok(fixture_suggest_response())
+            },
+        )
+        .expect("missing suggest target should succeed");
+
+        let json: Value = serde_json::from_str(&output).expect("output should be json");
+        let item = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.first())
+            .expect("feedback should contain one item");
+
         assert_eq!(
-            items[2].get("title").and_then(Value::as_str),
-            Some("Leave the door open.")
+            item.get("title").and_then(Value::as_str),
+            Some("Suggestion token is incomplete")
         );
-        assert_eq!(items[2].get("valid").and_then(Value::as_bool), Some(true));
+        assert_eq!(item.get("valid").and_then(Value::as_bool), Some(false));
+        assert!(!config_called.get(), "config should not be loaded");
+        assert!(!bridge_called.get(), "bridge should not be called");
     }
 
     #[test]

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -22,6 +23,15 @@ test('classifyHtmlBarrier ignores benign cloudflare references', () => {
 test('classifyHtmlBarrier ignores cookie text when dictionary content exists', () => {
   const html = '<html><link rel=\"canonical\" href=\"https://dictionary.cambridge.org/dictionary/english/open\" /><div class=\"entry-body\"><div class=\"headword\">open</div><div>cookie consent</div></div></html>';
   const classified = classifyHtmlBarrier(html);
+  assert.equal(classified, null);
+});
+
+test('classifyHtmlBarrier ignores spellcheck suggestion pages even when cookie text appears elsewhere', () => {
+  const fixtureHtml = readFileSync(
+    new URL('./fixtures/suggest-english-chinese-traditional-spellcheck-symph.html', import.meta.url),
+    'utf8',
+  );
+  const classified = classifyHtmlBarrier(`${fixtureHtml}<div>cookie consent preferences</div>`);
   assert.equal(classified, null);
 });
 

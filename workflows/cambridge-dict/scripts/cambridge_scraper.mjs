@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { buildDefineUrl, buildSuggestUrl, normalizeMode, sanitizeEntry } from './lib/cambridge_routes.mjs';
 import { asStructuredError, classifyHtmlBarrier } from './lib/error_classify.mjs';
 import { extractDefineFromHtml } from './lib/extract_define.mjs';
-import { extractSuggestFromHtml } from './lib/extract_suggest.mjs';
+import { extractExactEntryCandidateFromHtml, extractSuggestFromHtml } from './lib/extract_suggest.mjs';
 
 const HELP_TEXT = `Usage:
   cambridge_scraper.mjs suggest --query <word> [--mode <mode>] [--max-results <n>] [--timeout-ms <ms>] [--headless <true|false>]
@@ -191,12 +191,31 @@ async function runSuggest(args) {
     pageUrl: finalUrl,
   });
 
+  let entry = null;
+  const exactEntryCandidate = extractExactEntryCandidateFromHtml({
+    html,
+    mode: args.mode,
+    pageUrl: finalUrl,
+  });
+
+  if (
+    exactEntryCandidate &&
+    sanitizeEntry(exactEntryCandidate.entry) === sanitizeEntry(args.query)
+  ) {
+    entry = extractDefineFromHtml({
+      html,
+      mode: args.mode,
+      entry: exactEntryCandidate.entry,
+    });
+  }
+
   return {
     ok: true,
     stage: 'suggest',
     mode: args.mode,
     query: args.query,
     items,
+    entry,
   };
 }
 
