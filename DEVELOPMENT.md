@@ -154,15 +154,16 @@
 - Pack one workflow:
   - `scripts/workflow-pack.sh --id <workflow-id>`
 - Pack and install:
-  - `scripts/workflow-pack.sh --id <workflow-id> --install`
+  - `scripts/workflow-pack.sh --id <workflow-id> --install --mode ui`
+- Pack and background-install one already-installed workflow:
+  - `scripts/workflow-pack.sh --id <workflow-id> --install --mode background`
+  - Preserves `prefs.plist` plus installed hotkey and keyword customizations by default.
+  - Add `--no-preserve-customizations` to reset hotkeys and keywords to packaged defaults during background install.
 - Install latest already-built artifact only (skip rebuild):
   - `scripts/workflow-pack.sh --id <workflow-id> --install-only`
-- Background-update every tracked workflow that is already installed in Alfred:
-  - `scripts/workflow-reinstall.sh`
-- Background-update all installed tracked workflows explicitly:
-  - `scripts/workflow-reinstall.sh --all`
-- Use Alfred's native update/import UI for one workflow:
-  - `scripts/workflow-reinstall.sh --id <workflow-id> --ui`
+- Pack all workflows and background-install already-installed ones:
+  - `scripts/workflow-pack.sh --all --install`
+  - Add `--no-preserve-customizations` to reset installed hotkeys and keywords for every updated workflow.
 - Pack all workflows:
   - `scripts/workflow-pack.sh --all`
 

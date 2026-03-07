@@ -102,8 +102,8 @@ test_wait_for_file_contains_helper() {
     printf 'ready pattern\n' >>"$log_path"
   ) &
 
-  workflow_smoke_wait_for_file_contains "$log_path" "ready pattern" 3 \
-    || fail_test "wait helper should detect pattern before timeout"
+  workflow_smoke_wait_for_file_contains "$log_path" "ready pattern" 3 ||
+    fail_test "wait helper should detect pattern before timeout"
   assert_file_contains "$log_path" "ready pattern" "wait helper should preserve log contents"
 }
 
