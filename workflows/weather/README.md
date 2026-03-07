@@ -43,9 +43,15 @@ Set these via Alfred's `Configure Workflow...` UI:
 - `ww` row format: `City min~max°C Summary x%` (single-line title).
 - Subtitle shows `Date Timezone Latitude,Longitude`.
 - Result rows consume `weather-cli` icon metadata and render PNG assets under `assets/icons/weather/*.png`.
-- Editable SVG source lives under `assets-src/icons/weather/*.svg`; `scripts/generate_weather_icons.sh` converts every source SVG to runtime PNG via `image-processing`.
-- `wt` current-city rows use the city's current local time to select `*-day` / `*-night` variants; hourly rows use each row's local hour, so night rows now keep the same weather glyph with a darker night background and moon variants where applicable.
-- `wt` stage-one autocomplete now uses `city::<location>` instead of embedding coordinates in the visible query; when a cached geocoding result exists, the script reuses cached coordinates before fetching hourly rows.
+- Editable SVG source lives under `assets-src/icons/weather/*.svg`;
+  `scripts/generate_weather_icons.sh` converts every source SVG to runtime PNG via
+  `image-processing`.
+- `wt` current-city rows use the city's current local time to select `*-day` / `*-night`
+  variants; hourly rows use each row's local hour, so night rows now keep the same weather
+  glyph with a darker night background and moon variants where applicable.
+- `wt` stage-one autocomplete now uses `city::<location>` instead of embedding coordinates in
+  the visible query; when a cached geocoding result exists, the script reuses cached
+  coordinates before fetching hourly rows.
 - `wt` keeps original today-row display as stage one, then opens hourly rows as stage two.
 - `ww` uses city-picker stage first, then returns fixed 7-day rows for the selected city.
 - Cache TTL is configurable via `WEATHER_CACHE_TTL_SECS` (`900` by default in workflow).
