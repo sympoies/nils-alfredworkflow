@@ -61,6 +61,8 @@ pub fn github_url_for_project(project_path: &Path) -> Result<String, WorkflowErr
 pub fn normalize_github_remote(remote_url: &str) -> Result<String, WorkflowError> {
     let normalized = if let Some(rest) = remote_url.strip_prefix("git@github.com:") {
         normalize_repo_path(rest)
+    } else if let Some(rest) = remote_url.strip_prefix("ssh://git@github.com/") {
+        normalize_repo_path(rest)
     } else if let Some(rest) = remote_url.strip_prefix("https://github.com/") {
         normalize_repo_path(rest)
     } else {
@@ -95,6 +97,10 @@ mod tests {
         let ssh = normalize_github_remote("git@github.com:owner/repo.git")
             .expect("ssh remote should normalize");
         assert_eq!(ssh, "https://github.com/owner/repo");
+
+        let ssh_url = normalize_github_remote("ssh://git@github.com/owner/repo.git")
+            .expect("ssh url remote should normalize");
+        assert_eq!(ssh_url, "https://github.com/owner/repo");
 
         let https = normalize_github_remote("https://github.com/owner/repo.git")
             .expect("https remote should normalize");

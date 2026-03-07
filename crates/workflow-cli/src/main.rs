@@ -414,6 +414,46 @@ mod tests {
     }
 
     #[test]
+    fn github_url_accepts_ssh_url_remote_format() {
+        let temp = tempdir().expect("create temp dir");
+        let root = temp.path().join("projects");
+        let repo = root.join("alpha");
+        init_repo(&repo);
+
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "ssh://git@github.com/owner/repo.git",
+            ])
+            .status()
+            .expect("set git remote");
+        assert!(status.success(), "git remote add should succeed");
+
+        let config = RuntimeConfig {
+            project_roots: vec![root],
+            usage_file: temp.path().join("usage.log"),
+            vscode_path: "code".to_string(),
+            max_results: 10,
+        };
+
+        let github_url = run_with_config(
+            Cli {
+                command: Commands::GithubUrl { path: repo.clone() },
+            },
+            &config,
+        )
+        .expect("github-url should succeed for ssh url remotes");
+        assert_eq!(
+            github_url, "https://github.com/owner/repo",
+            "github-url should output canonical URL for ssh url remotes"
+        );
+    }
+
+    #[test]
     fn action_commands_report_user_error_for_invalid_path() {
         let temp = tempdir().expect("create temp dir");
         let config = RuntimeConfig {
