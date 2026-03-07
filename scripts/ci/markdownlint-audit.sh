@@ -133,6 +133,7 @@ def main() -> None:
     )
 
     audited_root_docs = {
+        "AGENTS.md",
         "ALFRED_WORKFLOW_DEVELOPMENT.md",
         "BINARY_DEPENDENCIES.md",
         "DEVELOPMENT.md",

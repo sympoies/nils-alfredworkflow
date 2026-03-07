@@ -3,16 +3,40 @@
 ## Scope
 
 - This policy applies to all markdown documentation in this repository.
-- The goal is to keep crate-owned docs with the owning crate and keep root `docs/` workspace-level.
+- The goal is to keep crate-owned docs with the owning crate and keep workspace-level docs in governed
+  repository-root/docs locations.
 
 ## Normative Rules
 
-### Allowed root docs categories (workspace-level only)
+### Allowed repository root markdown (workspace-level only)
 
-- `docs/ARCHITECTURE.md`, `ALFRED_WORKFLOW_DEVELOPMENT.md`, and similar repository-wide architecture or workflow guides.
+- `README.md` as the repository entrypoint.
+- `AGENTS.md` as repository-local agent/automation instructions when tracked.
+- Repository-wide maintainer/operator guides:
+  - `ALFRED_WORKFLOW_DEVELOPMENT.md`
+  - `BINARY_DEPENDENCIES.md`
+  - `DEVELOPMENT.md`
+  - `TROUBLESHOOTING.md`
+- Generated/compliance artifacts:
+  - `THIRD_PARTY_LICENSES.md`
+  - `THIRD_PARTY_NOTICES.md`
+- New repository-root markdown filenames require an explicit policy update before introduction.
+
+### Allowed `docs/` workspace categories (workspace-level only)
+
+- `docs/ARCHITECTURE.md` and similar repository-wide architecture baselines.
+- `docs/PACKAGING.md` and similar workspace-level packaging/install guides.
 - `docs/specs/*.md` for shared standards that are not owned by a single crate.
 - `docs/plans/*.md` for implementation planning.
+- `docs/reports/*.md` for workspace-level reports.
 - `docs/RELEASE.md` and other repository-wide release/operations documents.
+
+### Repository root navigation and ownership
+
+- Maintainer/operator guides in repository root must be linked from `README.md`.
+- Generated/compliance root artifacts must be linked from a canonical release/compliance entrypoint such as
+  `docs/RELEASE.md`.
+- Root files that are entrypoints themselves (`README.md`, `AGENTS.md`) do not require inbound links.
 
 ### Disallowed root docs patterns (crate-specific)
 
@@ -59,6 +83,8 @@
 
 1. Classify the document before adding it: workspace-level or crate-specific.
 2. If crate-specific, place it in `crates/<crate-name>/docs/`.
-3. If workspace-level, place it only in an allowed root `docs/` category.
-4. For cross-crate topics, choose canonical owner or declare workspace-level scope with rationale.
-5. Do not keep root compatibility stubs; remove legacy root files after migrating references.
+3. If workspace-level and stored in repository root, use only an allowed root markdown filename/category and link it
+   from the canonical entry doc.
+4. If workspace-level and stored under `docs/`, place it only in an allowed `docs/` category.
+5. For cross-crate topics, choose canonical owner or declare workspace-level scope with rationale.
+6. Do not keep root compatibility stubs; remove legacy root files after migrating references.

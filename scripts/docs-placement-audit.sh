@@ -171,15 +171,45 @@ def main() -> None:
 
     findings: list[tuple[str, str, str]] = []
 
-    allowed_root_docs = {"ARCHITECTURE.md", "RELEASE.md"}
-    allowed_docs_categories = {"plans", "specs"}
+    allowed_repo_root_docs = {
+        "README.md",
+        "AGENTS.md",
+        "ALFRED_WORKFLOW_DEVELOPMENT.md",
+        "BINARY_DEPENDENCIES.md",
+        "DEVELOPMENT.md",
+        "THIRD_PARTY_LICENSES.md",
+        "THIRD_PARTY_NOTICES.md",
+        "TROUBLESHOOTING.md",
+    }
+    root_doc_required_link_sources = {
+        "ALFRED_WORKFLOW_DEVELOPMENT.md": {"README.md"},
+        "BINARY_DEPENDENCIES.md": {"README.md"},
+        "DEVELOPMENT.md": {"README.md"},
+        "TROUBLESHOOTING.md": {"README.md"},
+        "THIRD_PARTY_LICENSES.md": {"docs/RELEASE.md"},
+        "THIRD_PARTY_NOTICES.md": {"docs/RELEASE.md"},
+    }
+    allowed_root_docs = {"ARCHITECTURE.md", "PACKAGING.md", "RELEASE.md"}
+    allowed_docs_categories = {"plans", "reports", "specs"}
+
+    for rel_path in (path for path in md_files if "/" not in path):
+        if rel_path not in allowed_repo_root_docs:
+            findings.append(("orphan_repo_root", rel_path, "repo-root-ownership"))
+
+    for rel_path, source_docs in root_doc_required_link_sources.items():
+        if rel_path not in md_set:
+            continue
+        if any(rel_path in links_by_file.get(source_doc, set()) for source_doc in source_docs):
+            continue
+        findings.append(("unlinked_repo_root", rel_path, ",".join(sorted(source_docs))))
+
     for rel_path in (path for path in md_files if path.startswith("docs/")):
         parts = rel_path.split("/")
         if len(parts) == 2 and parts[1] in allowed_root_docs:
             continue
         if len(parts) == 3 and parts[1] in allowed_docs_categories:
             continue
-        findings.append(("orphan_root", rel_path, "docs-ownership"))
+        findings.append(("orphan_docs_root", rel_path, "docs-ownership"))
 
     for rel_path in md_files:
         match = re.match(r"^crates/([^/]+)/docs/[^/]+\.md$", rel_path)
@@ -339,7 +369,7 @@ for package_name in "${publishable_packages[@]}"; do
 done
 
 echo
-echo "== Root docs placement =="
+echo "== docs/ workspace placement =="
 
 mapfile -t root_doc_paths < <(find "$repo_root/docs" -mindepth 1 -maxdepth 1 -type f -name '*.md' | sort)
 crate_specific_root_detected=0
@@ -367,13 +397,24 @@ docs_freshness_findings="$(collect_docs_freshness_findings)"
 orphan_docs_detected=0
 stale_reference_detected=0
 
+unexpected_root_docs_detected=0
+unlinked_root_docs_detected=0
+
 if [[ -n "$docs_freshness_findings" ]]; then
   while IFS=$'\t' read -r finding_type finding_arg1 finding_arg2; do
     [[ -n "$finding_type" ]] || continue
     case "$finding_type" in
-    orphan_root)
+    orphan_repo_root)
+      unexpected_root_docs_detected=1
+      repo_fail "repository-root markdown file is outside canonical ownership paths: $finding_arg1 (allowed root docs are defined by docs/specs/crate-docs-placement-policy.md)"
+      ;;
+    unlinked_repo_root)
+      unlinked_root_docs_detected=1
+      repo_fail "repository-root markdown file is not linked from its canonical entry doc(s): $finding_arg1 (expected link from: $finding_arg2)"
+      ;;
+    orphan_docs_root)
       orphan_docs_detected=1
-      repo_fail "orphan docs file path is outside canonical ownership paths: $finding_arg1 (allowed: docs/ARCHITECTURE.md, docs/RELEASE.md, docs/{plans,reports,specs}/*.md)"
+      repo_fail "docs/ file path is outside canonical ownership paths: $finding_arg1 (allowed: docs/ARCHITECTURE.md, docs/PACKAGING.md, docs/RELEASE.md, docs/{plans,reports,specs}/*.md)"
       ;;
     orphan_crate)
       orphan_docs_detected=1
@@ -392,6 +433,14 @@ if [[ -n "$docs_freshness_findings" ]]; then
       ;;
     esac
   done <<<"$docs_freshness_findings"
+fi
+
+if [[ $unexpected_root_docs_detected -eq 0 ]]; then
+  repo_pass "no unexpected repository-root markdown files detected"
+fi
+
+if [[ $unlinked_root_docs_detected -eq 0 ]]; then
+  repo_pass "all governed repository-root markdown files are linked from canonical entry docs"
 fi
 
 if [[ $orphan_docs_detected -eq 0 ]]; then

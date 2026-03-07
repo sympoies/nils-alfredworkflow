@@ -35,15 +35,17 @@ Out of scope:
 
 - Repository-wide standards duplicated verbatim across all workflows.
 
-### Layer 3: Development flow and quality gates
+### Layer 3: Development flow, packaging, and quality gates
 
 Location:
 
 - `DEVELOPMENT.md`
+- `docs/PACKAGING.md`
 
 In scope:
 
-- Build/lint/test/pack/release commands and contribution gate expectations.
+- Build/lint/test/coverage commands and contribution gate expectations in `DEVELOPMENT.md`.
+- Packaging/install/macOS acceptance entrypoints in `docs/PACKAGING.md`.
 - CI-oriented quality requirements and commit-time checks.
 
 Out of scope:
@@ -56,8 +58,8 @@ Out of scope:
 - Do not mirror workflow-specific details into this global file when the workflow-local docs already own them.
 - If content is stale, duplicated, or conflicts with workflow-local docs, remove it instead of copying it forward.
 - Reintroducing a central workflow-details encyclopedia is disallowed.
-- Keep file-level owner/retention decisions in the owning canonical docs (`README.md`, `DEVELOPMENT.md`, and
-  `docs/ARCHITECTURE.md`).
+- Keep file-level owner/retention decisions in the owning canonical docs (`README.md`, `DEVELOPMENT.md`,
+  `docs/PACKAGING.md`, and `docs/ARCHITECTURE.md`).
 
 ## Troubleshooting Routing Policy
 
@@ -345,7 +347,7 @@ xattr -dr com.apple.quarantine "$WORKFLOW_DIR"
 
 ### Reference policy
 
-- Active entry-point documents (`README.md`, `DEVELOPMENT.md`, `AGENT_DOCS.toml`, and
+- Active entry-point documents (`README.md`, `DEVELOPMENT.md`, `docs/PACKAGING.md`, `AGENT_DOCS.toml`, and
   `workflows/<workflow-id>/README.md`) must link to:
   - `ALFRED_WORKFLOW_DEVELOPMENT.md` for global standards.
   - `workflows/<workflow-id>/TROUBLESHOOTING.md` for workflow-specific operations.

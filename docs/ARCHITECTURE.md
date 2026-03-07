@@ -32,3 +32,4 @@ For operator standards and command gates, see:
 
 - `ALFRED_WORKFLOW_DEVELOPMENT.md`
 - `DEVELOPMENT.md`
+- `docs/PACKAGING.md`

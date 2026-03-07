@@ -36,15 +36,11 @@ This document lists required local tools for development, linting, testing, and 
   - one SHA-256 provider (`shasum`, `sha256sum`, or `openssl`)
   - standard shell utilities used by the script (`awk`, `cmp`, `mktemp`, `sed`, `sort`)
 
-## Crates.io pinned binary packaging policy
+## Related maintainer docs
 
-- For workflows that bundle a crates.io runtime binary, packaging must use pinned-version resolution:
-  1. Prefer explicit local override (`*_PACK_BIN`) when provided.
-  2. Then try local PATH binary.
-  3. If missing or version-mismatched, auto-install the pinned crate version from crates.io (with
-     `cargo install --locked`) into a workflow-local cache root and use that binary for packaging.
-- Packaging must fail only when pinned auto-install cannot run (for example missing `cargo`, network failure, or invalid
-  pinned version).
+- Packaging/install/macOS acceptance: `docs/PACKAGING.md`
+- Release/tag/publish flow: `docs/RELEASE.md`
+- Cross-workflow runtime and troubleshooting standards: `ALFRED_WORKFLOW_DEVELOPMENT.md`
 
 ## Install (macOS)
 

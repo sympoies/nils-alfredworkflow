@@ -21,6 +21,17 @@ When using `.agents/skills/nils-alfredworkflow-release-workflow/scripts/nils-alf
 
 Artifacts are written to `dist/<workflow-id>/<version>/`.
 
+## Rust crate publishing (crates.io)
+
+1. Dry-run publish checks for all crates from `release/crates-io-publish-order.txt`:
+   - `scripts/publish-crates.sh --dry-run`
+2. Dry-run publish checks for a single crate:
+   - `scripts/publish-crates.sh --dry-run --crates "<crate-name>"`
+3. Publish all crates in dependency order:
+   - `CARGO_REGISTRY_TOKEN=... scripts/publish-crates.sh --publish`
+4. Publish a subset:
+   - `scripts/publish-crates.sh --publish --crates "nils-alfred-core nils-workflow-common"`
+
 ## Documentation freshness checks (before tag)
 
 1. For CLI contract changes, refresh canonical specs:
@@ -40,9 +51,9 @@ Tag push (`v*`) triggers `.github/workflows/release.yml` and uploads built `.alf
 
 Release uploads include third-party compliance artifacts under `dist/release-bundles/`:
 
-- `THIRD_PARTY_LICENSES.md`
+- [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md)
 - `THIRD_PARTY_LICENSES.md.sha256`
-- `THIRD_PARTY_NOTICES.md`
+- [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)
 - `THIRD_PARTY_NOTICES.md.sha256`
 
 Before upload, release CI runs:
@@ -73,4 +84,4 @@ If release-time checks fail on third-party artifact freshness or audit gate comm
 
 For detailed troubleshooting (including crates.io lookup failures), use:
 
-- `TROUBLESHOOTING.md` -> `Third-party artifacts route`
+- [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) -> `Third-party artifacts route`

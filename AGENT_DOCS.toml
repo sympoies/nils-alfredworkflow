@@ -13,3 +13,11 @@ path = "ALFRED_WORKFLOW_DEVELOPMENT.md"
 required = true
 when = "always"
 notes = "Global Alfred workflow development standards file with project-wide ownership boundaries"
+
+[[document]]
+context = "project-dev"
+scope = "project"
+path = "docs/PACKAGING.md"
+required = true
+when = "always"
+notes = "Workflow packaging, install, and macOS acceptance guide for maintainer tasks"

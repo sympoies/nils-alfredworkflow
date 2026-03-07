@@ -49,5 +49,13 @@ Alfred workflows for macOS users.
 
 ## Troubleshooting
 
+- Quick routing index: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Global standards and shared operator playbooks: [ALFRED_WORKFLOW_DEVELOPMENT.md](ALFRED_WORKFLOW_DEVELOPMENT.md)
 - Workflow-specific runtime failures: `workflows/<workflow-id>/TROUBLESHOOTING.md`
+
+## Maintainer docs
+
+- Development and quality gates: [DEVELOPMENT.md](DEVELOPMENT.md)
+- Packaging, install, and macOS acceptance: [docs/PACKAGING.md](docs/PACKAGING.md)
+- Release and publish flow: [docs/RELEASE.md](docs/RELEASE.md)
+- Local toolchain prerequisites: [BINARY_DEPENDENCIES.md](BINARY_DEPENDENCIES.md)
