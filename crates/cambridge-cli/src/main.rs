@@ -265,6 +265,7 @@ mod tests {
                     text: "to move to an open position".to_string(),
                     part_of_speech: Some("verb".to_string()),
                 }],
+                examples: vec!["Leave the door open.".to_string()],
             }),
             error: None,
         }
@@ -391,7 +392,7 @@ mod tests {
             .and_then(Value::as_array)
             .expect("items should be array");
 
-        assert_eq!(items.len(), 2);
+        assert_eq!(items.len(), 3);
         assert_eq!(items[0].get("valid").and_then(Value::as_bool), Some(true));
         assert_eq!(
             items[0].get("arg").and_then(Value::as_str),
@@ -402,6 +403,11 @@ mod tests {
             items[1].get("arg").and_then(Value::as_str),
             Some("https://example.com/open")
         );
+        assert_eq!(
+            items[2].get("title").and_then(Value::as_str),
+            Some("Leave the door open.")
+        );
+        assert_eq!(items[2].get("valid").and_then(Value::as_bool), Some(true));
     }
 
     #[test]

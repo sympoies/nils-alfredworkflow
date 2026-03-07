@@ -19,6 +19,7 @@ const DEFINE_ERROR_SUBTITLE: &str = "Retry this entry or pick another suggestion
 const DEFINE_EMPTY_TITLE: &str = "No definitions found";
 const DEFINE_EMPTY_SUBTITLE: &str = "Try another headword";
 const DEFINE_ROW_SUBTITLE_PREFIX: &str = "Definition";
+const EXAMPLE_ROW_SUBTITLE_PREFIX: &str = "Example";
 
 pub fn empty_input_feedback() -> Feedback {
     single_invalid_item(EMPTY_INPUT_TITLE, EMPTY_INPUT_SUBTITLE)
@@ -81,28 +82,39 @@ pub fn define_feedback(
         let (title, translation) = split_bilingual_definition(&definition_text)
             .unwrap_or_else(|| (definition_text.clone(), None));
 
-        let mut subtitle_parts = Vec::new();
-        if let Some(part) = row
-            .part_of_speech
-            .as_deref()
-            .or(entry.part_of_speech.as_deref())
-            .and_then(normalize_text)
-        {
-            subtitle_parts.push(part);
-        }
-        subtitle_parts.push(format!("{DEFINE_ROW_SUBTITLE_PREFIX} {}", idx + 1));
-        if let Some(text) = translation {
-            subtitle_parts.push(text);
-        }
-        let subtitle = subtitle_parts.join(" | ");
-
-        items.push(
-            Item::new(title)
-                .with_subtitle(subtitle)
-                .with_arg(entry_url.clone())
-                .with_valid(true),
-        );
+        items.push(detail_row_item(
+            &title,
+            build_detail_subtitle(
+                row.part_of_speech
+                    .as_deref()
+                    .or(entry.part_of_speech.as_deref()),
+                DEFINE_ROW_SUBTITLE_PREFIX,
+                idx + 1,
+                translation.as_deref(),
+            ),
+            &entry_url,
+        ));
         definition_count += 1;
+    }
+
+    for (idx, example) in entry.examples.iter().enumerate() {
+        let Some(example_text) = normalize_text(example) else {
+            continue;
+        };
+
+        let (title, translation) = split_bilingual_definition(&example_text)
+            .unwrap_or_else(|| (example_text.clone(), None));
+
+        items.push(detail_row_item(
+            &title,
+            build_detail_subtitle(
+                None,
+                EXAMPLE_ROW_SUBTITLE_PREFIX,
+                idx + 1,
+                translation.as_deref(),
+            ),
+            &entry_url,
+        ));
     }
 
     if definition_count == 0 {
@@ -148,6 +160,30 @@ fn definition_header_item(entry: &Entry, headword: &str, entry_url: &str) -> Ite
         .with_subtitle(details.join(" | "))
         .with_arg(entry_url.to_string())
         .with_valid(true)
+}
+
+fn detail_row_item(title: &str, subtitle: String, entry_url: &str) -> Item {
+    Item::new(title)
+        .with_subtitle(subtitle)
+        .with_arg(entry_url.to_string())
+        .with_valid(true)
+}
+
+fn build_detail_subtitle(
+    part_of_speech: Option<&str>,
+    row_kind: &str,
+    idx: usize,
+    translation: Option<&str>,
+) -> String {
+    let mut subtitle_parts = Vec::new();
+    if let Some(part) = part_of_speech.and_then(normalize_text) {
+        subtitle_parts.push(part);
+    }
+    subtitle_parts.push(format!("{row_kind} {idx}"));
+    if let Some(text) = translation.and_then(normalize_text) {
+        subtitle_parts.push(text);
+    }
+    subtitle_parts.join(" | ")
 }
 
 fn single_invalid_item(title: &str, subtitle: &str) -> Feedback {
@@ -337,6 +373,7 @@ mod tests {
                     part_of_speech: None,
                 },
             ],
+            examples: Vec::new(),
         });
 
         let feedback = define_feedback(&response, "open", DictionaryMode::English);
@@ -374,6 +411,7 @@ mod tests {
                 text: "to become available".to_string(),
                 part_of_speech: None,
             }],
+            examples: Vec::new(),
         });
 
         let feedback = define_feedback(
@@ -402,6 +440,7 @@ mod tests {
                 text: "the spirit of a dead person | 鬼，幽靈".to_string(),
                 part_of_speech: None,
             }],
+            examples: Vec::new(),
         });
 
         let feedback = define_feedback(
@@ -416,6 +455,33 @@ mod tests {
         assert!(subtitle.contains("noun"));
         assert!(subtitle.contains("Definition 1"));
         assert!(subtitle.contains("鬼，幽靈"));
+    }
+
+    #[test]
+    fn feedback_define_appends_example_rows_after_definitions() {
+        let response = fixture_define_response(Entry {
+            headword: "symphony".to_string(),
+            part_of_speech: Some("noun".to_string()),
+            phonetics: None,
+            url: Some("https://example.com/symphony".to_string()),
+            definitions: vec![DefinitionLine {
+                text: "a long piece of music | 交響樂".to_string(),
+                part_of_speech: None,
+            }],
+            examples: vec!["Mahler's ninth symphony | 馬勒的《第九交響曲》".to_string()],
+        });
+
+        let feedback = define_feedback(
+            &response,
+            "symphony",
+            DictionaryMode::EnglishChineseTraditional,
+        );
+
+        assert_eq!(feedback.items.len(), 3);
+        assert_eq!(feedback.items[2].title, "Mahler's ninth symphony");
+        let subtitle = feedback.items[2].subtitle.as_deref().expect("subtitle");
+        assert!(subtitle.contains("Example 1"));
+        assert!(subtitle.contains("馬勒的《第九交響曲》"));
     }
 
     #[test]

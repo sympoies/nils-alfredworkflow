@@ -29,7 +29,7 @@ This document defines the functional/runtime contract for `workflows/cambridge-d
   - `arg`: canonical Cambridge URL for Enter action
   - `valid`: boolean
 - Detail-stage row contract:
-  - `title`: headword/definition line
+  - `title`: headword/definition/example line
   - `subtitle`: optional POS/phonetics/detail text
   - `arg`: canonical Cambridge URL
   - `valid`: boolean (rows can remain valid so Enter opens URL)

@@ -92,6 +92,10 @@ function findMatchingCloseIndex(html, tagName, contentStartIndex) {
 }
 
 function collectByClass(html, className) {
+  return collectElementsByClass(html, className).map((item) => item.text).filter(Boolean);
+}
+
+function collectElementsByClass(html, className) {
   const pattern = /<([a-zA-Z][\w:-]*)\b[^>]*\bclass=(['"])([^'"]+)\2[^>]*>/gi;
 
   const values = [];
@@ -114,7 +118,12 @@ function collectByClass(html, className) {
 
     const normalized = normalizeText(html.slice(contentStartIndex, contentEndIndex));
     if (normalized) {
-      values.push(normalized);
+      values.push({
+        openTag,
+        rawClassList,
+        html: html.slice(contentStartIndex, contentEndIndex),
+        text: normalized,
+      });
     }
   }
   return values;
@@ -201,6 +210,38 @@ function pairBilingualDefinitions({ englishDefinitions, translatedDefinitions, l
   return output;
 }
 
+function mergeBilingualLine(text, translation) {
+  const normalizedText = normalizeText(text);
+  if (!normalizedText) {
+    return '';
+  }
+
+  const normalizedTranslation = normalizeText(translation);
+  if (!normalizedTranslation || normalizedTranslation.toLowerCase() === normalizedText.toLowerCase()) {
+    return normalizedText;
+  }
+
+  return `${normalizedText} | ${normalizedTranslation}`;
+}
+
+function collectSenseBlocks(html) {
+  const seen = new Set();
+  const output = [];
+
+  for (const className of ['sense-body', 'def-body', 'def-block']) {
+    for (const element of collectElementsByClass(html, className)) {
+      const key = element.text.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      output.push(element.html);
+    }
+  }
+
+  return output;
+}
+
 function traditionalChineseBilingualDefinitions({ html, selectors, limit }) {
   const translationSelectors = selectors.definitions.filter((selector) =>
     selectorHasClass(selector, 'trans'),
@@ -211,6 +252,23 @@ function traditionalChineseBilingualDefinitions({ html, selectors, limit }) {
 
   if (translationSelectors.length === 0 || englishDefinitionSelectors.length === 0) {
     return [];
+  }
+
+  const pairedFromSenseBlocks = [];
+  for (const block of collectSenseBlocks(html)) {
+    const english = manyClassTexts(block, englishDefinitionSelectors, 1)[0];
+    if (!english) {
+      continue;
+    }
+
+    const translation = manyClassTexts(block, translationSelectors, 1)[0];
+    pairedFromSenseBlocks.push(mergeBilingualLine(english, translation));
+    if (pairedFromSenseBlocks.length >= limit) {
+      return pairedFromSenseBlocks;
+    }
+  }
+  if (pairedFromSenseBlocks.length > 0) {
+    return pairedFromSenseBlocks;
   }
 
   const englishDefinitions = manyClassTexts(html, englishDefinitionSelectors, limit * 4);
@@ -224,6 +282,55 @@ function traditionalChineseBilingualDefinitions({ html, selectors, limit }) {
     translatedDefinitions,
     limit,
   });
+}
+
+function collectExampleLines({ html, selectors, limit }) {
+  const containerClasses = selectors.exampleContainers
+    .map(primaryClassFromSelector)
+    .filter(Boolean);
+  const exampleTextSelectors = selectors.exampleText || [];
+  const exampleTranslationSelectors = selectors.exampleTranslations || [];
+
+  if (containerClasses.length === 0 || exampleTextSelectors.length === 0) {
+    return [];
+  }
+
+  const output = [];
+  const seen = new Set();
+
+  const addLine = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+      return false;
+    }
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    output.push(normalized);
+    return output.length >= limit;
+  };
+
+  for (const className of containerClasses) {
+    for (const element of collectElementsByClass(html, className)) {
+      let exampleText = firstClassText(element.html, exampleTextSelectors);
+      if (!exampleText && hasExactClassToken(element.rawClassList, 'eg')) {
+        exampleText = element.text;
+      }
+      if (!exampleText) {
+        continue;
+      }
+
+      const exampleTranslation = firstClassText(element.html, exampleTranslationSelectors);
+      if (addLine(mergeBilingualLine(exampleText, exampleTranslation))) {
+        return output;
+      }
+    }
+  }
+
+  return output;
 }
 
 function absolutizeUrl(rawValue) {
@@ -291,6 +398,11 @@ export function extractDefineFromHtml({ html, mode, entry }) {
         })
       : [];
   const effectiveDefinitions = definitions.length > 0 ? definitions : manyClassTexts(source, selectors.definitions, 8);
+  const examples = collectExampleLines({
+    html: source,
+    selectors,
+    limit: 6,
+  });
 
   const url = findCanonicalUrl(source) || buildDefineUrl({ entry: normalizedEntry, mode: normalizedMode });
 
@@ -299,6 +411,7 @@ export function extractDefineFromHtml({ html, mode, entry }) {
     partOfSpeech,
     phonetics,
     definitions: effectiveDefinitions,
+    examples,
     url,
   };
 }

@@ -2,18 +2,32 @@ import { normalizeMode } from './cambridge_routes.mjs';
 
 const BASE_SELECTORS = Object.freeze({
   suggest: Object.freeze({
-    candidateHeadwords: Object.freeze([
-      '.search_results .h .hw',
+    searchResultContainers: Object.freeze([
+      '.search_results',
+    ]),
+    searchResultLinks: Object.freeze([
+      'a.entry-link[href*="/dictionary/"]',
+    ]),
+    directEntryContainers: Object.freeze([
+      '.entry-body',
+      '.entry',
+    ]),
+    directHeadwords: Object.freeze([
       '.entry-body .headword',
       '.entry-body .hw',
       '.entry .headword',
-      '.di-title .hw',
-      '.phrase-title .hw',
     ]),
-    candidateLinks: Object.freeze([
-      '.search_results .entry-link',
-      '.entry-body a[href*="/dictionary/"]',
-      '.di-title a[href*="/dictionary/"]',
+    directBrowseContainers: Object.freeze([
+      '.dbrowse',
+    ]),
+    directBrowseLinks: Object.freeze([
+      'a[href*="/dictionary/"]',
+    ]),
+    spellcheckSuggestionLists: Object.freeze([
+      '.hul-u',
+    ]),
+    spellcheckSuggestionLinks: Object.freeze([
+      'a[href*="/search/"]',
     ]),
   }),
   define: Object.freeze({
@@ -39,6 +53,17 @@ const BASE_SELECTORS = Object.freeze({
       '.def-block .def',
       '.def-body .def',
       '.def.ddef_d',
+    ]),
+    exampleContainers: Object.freeze([
+      '.dexamp',
+    ]),
+    exampleText: Object.freeze([
+      '.eg',
+      '.deg',
+    ]),
+    exampleTranslations: Object.freeze([
+      '.trans',
+      '.dtrans',
     ]),
     canonicalUrl: Object.freeze([
       'link[rel="canonical"]',

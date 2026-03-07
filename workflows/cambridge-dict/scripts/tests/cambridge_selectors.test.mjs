@@ -5,10 +5,18 @@ import { selectorsForMode, selectorsForStage } from '../lib/cambridge_selectors.
 
 test('selector registry exposes suggest and define chains', () => {
   const selectors = selectorsForMode('english');
-  assert.ok(selectors.suggest.candidateHeadwords.length > 0);
-  assert.ok(selectors.suggest.candidateLinks.length > 0);
+  assert.ok(selectors.suggest.searchResultContainers.length > 0);
+  assert.ok(selectors.suggest.searchResultLinks.length > 0);
+  assert.ok(selectors.suggest.directEntryContainers.length > 0);
+  assert.ok(selectors.suggest.directHeadwords.length > 0);
+  assert.ok(selectors.suggest.directBrowseContainers.length > 0);
+  assert.ok(selectors.suggest.directBrowseLinks.length > 0);
+  assert.ok(selectors.suggest.spellcheckSuggestionLists.length > 0);
+  assert.ok(selectors.suggest.spellcheckSuggestionLinks.length > 0);
   assert.ok(selectors.define.headword.length > 0);
   assert.ok(selectors.define.definitions.length > 0);
+  assert.ok(selectors.define.exampleContainers.length > 0);
+  assert.ok(selectors.define.exampleText.length > 0);
 });
 
 test('traditional chinese mode keeps translation selectors first', () => {

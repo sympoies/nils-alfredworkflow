@@ -46,6 +46,44 @@ test('suggest emits stable success JSON with fixture html', () => {
   assert.equal(run.payload.items[0].entry, 'open');
 });
 
+test('suggest keeps exact dictionary entries ahead of browse links on direct pages', () => {
+  const run = runScraper([
+    'suggest',
+    '--query',
+    'symphony',
+    '--mode',
+    'english-chinese-traditional',
+    '--fixture-html',
+    fixturePath('suggest-english-chinese-traditional-direct-symphony.html'),
+  ]);
+
+  assert.equal(run.status, 0);
+  assert.equal(run.payload.ok, true);
+  assert.deepEqual(
+    run.payload.items.map((item) => item.entry),
+    ['symphony', 'sympathize', 'sympathizer', 'sympathy'],
+  );
+});
+
+test('suggest maps spellcheck pages to q-based suggestions instead of unrelated dictionary links', () => {
+  const run = runScraper([
+    'suggest',
+    '--query',
+    'symph',
+    '--mode',
+    'english-chinese-traditional',
+    '--fixture-html',
+    fixturePath('suggest-english-chinese-traditional-spellcheck-symph.html'),
+  ]);
+
+  assert.equal(run.status, 0);
+  assert.equal(run.payload.ok, true);
+  assert.deepEqual(
+    run.payload.items.map((item) => item.entry),
+    ['lymph', 'sympathy', 'symphony'],
+  );
+});
+
 test('define emits stable success JSON with fixture html', () => {
   const run = runScraper([
     'define',
@@ -62,6 +100,7 @@ test('define emits stable success JSON with fixture html', () => {
   assert.equal(run.payload.stage, 'define');
   assert.equal(run.payload.entry.headword, 'open');
   assert.ok(run.payload.entry.definitions.length >= 2);
+  assert.ok(run.payload.entry.examples.length >= 2);
 });
 
 test('invalid mode emits structured error JSON', () => {

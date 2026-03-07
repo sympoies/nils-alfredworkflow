@@ -66,6 +66,7 @@ pub struct Entry {
     pub phonetics: Option<String>,
     pub url: Option<String>,
     pub definitions: Vec<DefinitionLine>,
+    pub examples: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -268,6 +269,11 @@ fn normalize_entry(raw: RawEntry) -> Entry {
             .into_iter()
             .filter_map(normalize_definition)
             .collect(),
+        examples: raw
+            .examples
+            .into_iter()
+            .filter_map(normalize_string)
+            .collect(),
     }
 }
 
@@ -389,6 +395,8 @@ struct RawEntry {
     link: Option<String>,
     #[serde(default, alias = "senses", alias = "items", alias = "rows")]
     definitions: Vec<RawDefinition>,
+    #[serde(default)]
+    examples: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -528,6 +536,10 @@ mod tests {
             "definitions": [
               "not closed",
               {"definition": "ready for use", "part_of_speech": "adjective"}
+            ],
+            "examples": [
+              "Leave the door open.",
+              "The museum is open until six. | 博物館營業到六點。"
             ]
           }
         }"#;
@@ -545,6 +557,8 @@ mod tests {
         assert_eq!(entry.definitions.len(), 2);
         assert_eq!(entry.definitions[0].text, "not closed");
         assert_eq!(entry.definitions[1].text, "ready for use");
+        assert_eq!(entry.examples.len(), 2);
+        assert_eq!(entry.examples[0], "Leave the door open.");
     }
 
     #[test]
@@ -555,7 +569,8 @@ mod tests {
           "entry": {
             "headword": "open",
             "phonetics": ["ˈəʊ.p ə", "ˈoʊ.p ə"],
-            "definitions": ["not closed"]
+            "definitions": ["not closed"],
+            "examples": ["an open door/window"]
           }
         }"#;
 
@@ -565,6 +580,7 @@ mod tests {
 
         assert_eq!(entry.phonetics.as_deref(), Some("ˈəʊ.p ə"));
         assert_eq!(entry.definitions.len(), 1);
+        assert_eq!(entry.examples, vec!["an open door/window".to_string()]);
     }
 
     #[test]

@@ -130,9 +130,12 @@ function fallbackMode() {
   }
 }
 
-async function loadHtml({ url, timeoutMs, headless, fixtureHtml }) {
+async function loadPageSnapshot({ url, timeoutMs, headless, fixtureHtml }) {
   if (fixtureHtml) {
-    return readFile(fixtureHtml, 'utf8');
+    return {
+      html: await readFile(fixtureHtml, 'utf8'),
+      finalUrl: '',
+    };
   }
 
   const browser = await chromium.launch({ headless });
@@ -149,7 +152,10 @@ async function loadHtml({ url, timeoutMs, headless, fixtureHtml }) {
         timeout: timeoutMs,
       });
       await page.waitForTimeout(120);
-      return await page.content();
+      return {
+        html: await page.content(),
+        finalUrl: page.url(),
+      };
     } finally {
       await context.close();
     }
@@ -160,7 +166,7 @@ async function loadHtml({ url, timeoutMs, headless, fixtureHtml }) {
 
 async function runSuggest(args) {
   const url = buildSuggestUrl({ query: args.query, mode: args.mode });
-  const html = await loadHtml({
+  const { html, finalUrl } = await loadPageSnapshot({
     url,
     timeoutMs: args.timeoutMs,
     headless: args.headless,
@@ -182,6 +188,7 @@ async function runSuggest(args) {
     html,
     mode: args.mode,
     maxResults: args.maxResults,
+    pageUrl: finalUrl,
   });
 
   return {
@@ -196,7 +203,7 @@ async function runSuggest(args) {
 async function runDefine(args) {
   const entry = sanitizeEntry(args.entry);
   const url = buildDefineUrl({ entry, mode: args.mode });
-  const html = await loadHtml({
+  const { html } = await loadPageSnapshot({
     url,
     timeoutMs: args.timeoutMs,
     headless: args.headless,
