@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Thunderstorm weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="76%">
+      <stop offset="0%" stop-color="#78B5E6"/>
+      <stop offset="58%" stop-color="#4F86BF"/>
+      <stop offset="100%" stop-color="#2E5E95"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <g fill="#F7FBFF">
+    <rect x="24" y="52" width="80" height="24" rx="12" ry="12"/>
+    <circle cx="40" cy="56" r="14"/>
+    <circle cx="66" cy="44" r="18"/>
+    <circle cx="92" cy="56" r="14"/>
+  </g>
+  <polygon points="60,86 74,86 66,100 80,100 56,120 62,104 50,104" fill="#FFD65A"/>
+  <g stroke="#9ED0FF" stroke-width="4" stroke-linecap="round">
+    <line x1="34" y1="88" x2="28" y2="102"/>
+    <line x1="94" y1="88" x2="88" y2="102"/>
+  </g>
+</svg>

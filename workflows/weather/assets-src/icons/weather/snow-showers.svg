@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Snow showers weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="76%">
+      <stop offset="0%" stop-color="#78B5E6"/>
+      <stop offset="58%" stop-color="#4F86BF"/>
+      <stop offset="100%" stop-color="#2E5E95"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <g fill="#F7FBFF">
+    <rect x="24" y="54" width="80" height="24" rx="12" ry="12"/>
+    <circle cx="40" cy="58" r="14"/>
+    <circle cx="66" cy="46" r="18"/>
+    <circle cx="92" cy="58" r="14"/>
+  </g>
+  <g stroke="#EAF4FF" stroke-width="3" stroke-linecap="round">
+    <line x1="36" y1="92" x2="36" y2="108"/>
+    <line x1="28" y1="100" x2="44" y2="100"/>
+    <line x1="56" y1="92" x2="56" y2="110"/>
+    <line x1="48" y1="101" x2="64" y2="101"/>
+    <line x1="76" y1="92" x2="76" y2="110"/>
+    <line x1="68" y1="101" x2="84" y2="101"/>
+    <line x1="96" y1="92" x2="96" y2="108"/>
+    <line x1="88" y1="100" x2="104" y2="100"/>
+  </g>
+</svg>

@@ -34,42 +34,103 @@ present_today_with_hourly_token() {
     return 0
   fi
 
-  jq -ce --arg city_token "$CITY_TOKEN_PREFIX" --arg coord_token "$COORD_TOKEN_PREFIX" '
+  jq -ce --arg city_token "$CITY_TOKEN_PREFIX" '
     if (.items | type) != "array" then
       .
     else
       .items |= map(
         . as $item
+        | (.weather_meta // {}) as $meta
         | (.title // "") as $title
         | (.subtitle // "") as $subtitle
         | (
-            if ($title | test("^(?<location>.+) -?[0-9]+(?:\\.[0-9]+)?~-?[0-9]+(?:\\.[0-9]+)?°C .+ [0-9?]+%$"))
+            if (($meta.location_name // "") | length) > 0 then $meta.location_name
+            elif ($title | test("^(?<location>.+) -?[0-9]+(?:\\.[0-9]+)?~-?[0-9]+(?:\\.[0-9]+)?°C .+ [0-9?]+%$"))
             then ($title | capture("^(?<location>.+) -?[0-9]+(?:\\.[0-9]+)?~-?[0-9]+(?:\\.[0-9]+)?°C .+ [0-9?]+%$")).location
             else null
             end
           ) as $location
-        | (
-            if ($subtitle | test("(?<lat>-?[0-9]+(?:\\.[0-9]+)?),(?<lon>-?[0-9]+(?:\\.[0-9]+)?)$"))
-            then ($subtitle | capture("(?<lat>-?[0-9]+(?:\\.[0-9]+)?),(?<lon>-?[0-9]+(?:\\.[0-9]+)?)$"))
-            else null
-            end
-          ) as $coords
         | if $location == null then
             $item + { "valid": false }
           else
             $item + {
               "valid": false,
-              "autocomplete": (
-                if $coords != null
-                then ($coord_token + $coords.lat + "," + $coords.lon + "::" + $location)
-                else ($city_token + $location)
-                end
-              )
+              "autocomplete": ($city_token + $location)
             }
           end
       )
     end
   ' <<<"$json_output"
+}
+
+today_is_lat_lon_query() {
+  local query="${1-}"
+  [[ "$query" =~ ^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?[[:space:]]*,[[:space:]]*[+-]?[0-9]+([.][0-9]+)?[[:space:]]*$ ]]
+}
+
+resolve_weather_cache_dir() {
+  local candidate=""
+
+  for candidate in \
+    "${WEATHER_CACHE_DIR:-}" \
+    "${ALFRED_WORKFLOW_CACHE:-}" \
+    "${ALFRED_WORKFLOW_DATA:-}"; do
+    candidate="$(sfqp_trim "$candidate")"
+    if [[ -n "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${TMPDIR:-/tmp}/nils-weather-cli"
+}
+
+cached_coords_for_city() {
+  local city="$1"
+  local cache_dir=""
+  local normalized_city=""
+  local cache_file=""
+
+  command -v jq >/dev/null 2>&1 || return 1
+
+  cache_dir="$(resolve_weather_cache_dir)/weather-cli/geocode"
+  [[ -d "$cache_dir" ]] || return 1
+
+  normalized_city="$(printf '%s' "$(sfqp_trim "$city")" | tr '[:upper:]' '[:lower:]')"
+  [[ -n "$normalized_city" ]] || return 1
+
+  while IFS= read -r cache_file; do
+    local coords=""
+    coords="$(jq -er --arg city "$normalized_city" '
+      select(((.name // "") | ascii_downcase) == $city)
+      | "\(.latitude),\(.longitude)"
+    ' "$cache_file" 2>/dev/null)" || continue
+
+    if [[ -n "$coords" ]]; then
+      printf '%s\n' "$coords"
+      return 0
+    fi
+  done < <(find "$cache_dir" -maxdepth 1 -type f -name '*.json' | sort)
+
+  return 1
+}
+
+dispatch_hourly_city_token() {
+  local selected_city="$1"
+  local cached_coords=""
+
+  if today_is_lat_lon_query "$selected_city"; then
+    "$script_dir/script_filter_common.sh" hourly "$selected_city"
+    return 0
+  fi
+
+  if cached_coords="$(cached_coords_for_city "$selected_city")"; then
+    WEATHER_DISPLAY_LOCATION_OVERRIDE="$selected_city" \
+      "$script_dir/script_filter_common.sh" hourly "$cached_coords"
+    return 0
+  fi
+
+  "$script_dir/script_filter_common.sh" hourly "$selected_city"
 }
 
 query="$(sfqp_resolve_query_input "${1:-}")"
@@ -81,7 +142,7 @@ if [[ "$trimmed_query" == "${CITY_TOKEN_PREFIX}"* ]]; then
     selected_city=""
   fi
 
-  "$script_dir/script_filter_common.sh" hourly "$selected_city"
+  dispatch_hourly_city_token "$selected_city"
   exit 0
 fi
 

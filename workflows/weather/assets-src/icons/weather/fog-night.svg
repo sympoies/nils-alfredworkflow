@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Fog night weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="78%">
+      <stop offset="0%" stop-color="#577C9F"/>
+      <stop offset="58%" stop-color="#355A7E"/>
+      <stop offset="100%" stop-color="#1A3553"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <g fill="#F7FBFF">
+    <rect x="28" y="58" width="72" height="22" rx="11" ry="11"/>
+    <circle cx="42" cy="62" r="14"/>
+    <circle cx="66" cy="52" r="18"/>
+    <circle cx="88" cy="62" r="14"/>
+  </g>
+  <g stroke="#D8E8FA" stroke-width="4" stroke-linecap="round">
+    <line x1="30" y1="92" x2="98" y2="92"/>
+    <line x1="38" y1="102" x2="90" y2="102"/>
+  </g>
+</svg>

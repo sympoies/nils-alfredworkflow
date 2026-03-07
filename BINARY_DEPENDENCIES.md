@@ -15,6 +15,7 @@ This document lists required local tools for development, linting, testing, and 
 - Rust components: `rustfmt`, `clippy`, `llvm-tools-preview`
 - Cargo tools: `cargo-nextest`, `cargo-llvm-cov`
 - Core CLI/runtime: `git`, `jq`, `rg` (ripgrep), `curl`
+- Workflow SVG asset conversion: `image-processing` (required when regenerating SVG-based workflow assets)
 - Shell tooling: `shellcheck`, `shfmt`
 - Node runtime: `node`, `npm`
 - Node dependency: `playwright` package (managed via root `package.json`)
@@ -52,6 +53,9 @@ scripts/setup-rust-tooling.sh
 # Shell tools
 brew install shellcheck shfmt
 
+# Workflow SVG asset conversion
+brew install nils-cli
+
 # Packaging helpers
 brew install zip unzip
 
@@ -59,6 +63,9 @@ brew install zip unzip
 npm ci
 # Optional (only for live scraping checks)
 npx playwright install chromium
+
+# Workflow SVG asset conversion
+# Install `image-processing` from nils-cli before regenerating SVG workflow assets.
 ```
 
 ## Install (Ubuntu/Debian)

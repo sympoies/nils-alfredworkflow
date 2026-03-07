@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Mainly clear day weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="76%">
+      <stop offset="0%" stop-color="#78B5E6"/>
+      <stop offset="58%" stop-color="#4F86BF"/>
+      <stop offset="100%" stop-color="#2E5E95"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <g fill="#F7FBFF">
+    <rect x="38" y="70" width="66" height="20" rx="10" ry="10"/>
+    <circle cx="50" cy="72" r="14"/>
+    <circle cx="72" cy="62" r="18"/>
+    <circle cx="92" cy="72" r="14"/>
+  </g>
+  <circle cx="46" cy="42" r="24" fill="#FFD65A"/>
+</svg>

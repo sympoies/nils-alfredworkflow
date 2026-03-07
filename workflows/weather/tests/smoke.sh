@@ -33,21 +33,30 @@ for required in \
 done
 
 weather_icons=(
-  clear
+  clear-day
   clear-night
-  mainly-clear
+  mainly-clear-day
   mainly-clear-night
-  partly-cloudy
+  partly-cloudy-day
   partly-cloudy-night
   cloudy
+  cloudy-night
   fog
+  fog-night
   drizzle
+  drizzle-night
   rain
+  rain-night
   snow
+  snow-night
   rain-showers
+  rain-showers-night
   snow-showers
+  snow-showers-night
   thunderstorm
+  thunderstorm-night
   unknown
+  unknown-night
 )
 
 for icon in "${weather_icons[@]}"; do
@@ -145,13 +154,25 @@ while [[ $# -gt 0 ]]; do
     lang="${2:-}"
     shift 2
     ;;
+  --lang=*)
+    lang="${1#--lang=}"
+    shift
+    ;;
   --lat)
     lat="${2:-}"
     shift 2
     ;;
+  --lat=*)
+    lat="${1#--lat=}"
+    shift
+    ;;
   --lon)
     lon="${2:-}"
     shift 2
+    ;;
+  --lon=*)
+    lon="${1#--lon=}"
+    shift
     ;;
   *)
     shift
@@ -162,6 +183,7 @@ done
 [[ "$mode" == "alfred-json" ]] || exit 9
 
 summary="Cloudy"
+summary_en="Cloudy"
 rain_label="rain"
 
 location="city:${city}"
@@ -203,7 +225,7 @@ elif [[ -n "$city" ]]; then
     timezone="Asia/Tokyo"
     lat_out="35.0116"
     lon_out="135.7681"
-    summary="Mainly clear"
+    summary_en="Mainly clear"
     ;;
   taipei)
     timezone="Asia/Taipei"
@@ -214,13 +236,13 @@ elif [[ -n "$city" ]]; then
     timezone="Asia/Taipei"
     lat_out="24.1477"
     lon_out="120.6736"
-    summary="Partly cloudy"
+    summary_en="Partly cloudy"
     ;;
   "los angeles")
     timezone="America/Los_Angeles"
     lat_out="34.0522"
     lon_out="-118.2437"
-    summary="Clear sky"
+    summary_en="Clear sky"
     ;;
   *)
     timezone="Asia/Tokyo"
@@ -230,21 +252,108 @@ elif [[ -n "$city" ]]; then
   esac
 fi
 
-if [[ "$lang" == "zh" ]]; then
-  case "$summary" in
+weather_code_for_summary() {
+  case "$1" in
   "Clear sky")
-    summary="晴朗"
+    printf '0'
     ;;
   "Mainly clear")
-    summary="大致晴朗"
+    printf '1'
     ;;
   "Partly cloudy")
-    summary="晴時多雲"
+    printf '2'
     ;;
   *)
-    summary="陰天"
+    printf '3'
     ;;
   esac
+}
+
+summary_zh_from_en() {
+  case "$1" in
+  "Clear sky")
+    printf '晴朗'
+    ;;
+  "Mainly clear")
+    printf '大致晴朗'
+    ;;
+  "Partly cloudy")
+    printf '晴時多雲'
+    ;;
+  *)
+    printf '陰天'
+    ;;
+  esac
+}
+
+day_icon_key_for_summary() {
+  case "$1" in
+  "Clear sky")
+    printf 'clear-day'
+    ;;
+  "Mainly clear")
+    printf 'mainly-clear-day'
+    ;;
+  "Partly cloudy")
+    printf 'partly-cloudy-day'
+    ;;
+  *)
+    printf 'cloudy'
+    ;;
+  esac
+}
+
+night_icon_key_for_summary() {
+  case "$1" in
+  "Clear sky")
+    printf 'clear-night'
+    ;;
+  "Mainly clear")
+    printf 'mainly-clear-night'
+    ;;
+  "Partly cloudy")
+    printf 'partly-cloudy-night'
+    ;;
+  *)
+    printf 'cloudy-night'
+    ;;
+  esac
+}
+
+is_night_hour() {
+  local hour="$1"
+  ((10#$hour < 6 || 10#$hour >= 18))
+}
+
+current_icon_key_for_summary() {
+  local summary="$1"
+  local override="${WEATHER_ICON_LOCAL_HOUR_OVERRIDE:-}"
+
+  override="$(printf '%s' "$override" | tr -d '[:space:]')"
+  if [[ "$override" =~ ^[0-9]{1,2}$ ]] && ((10#$override >= 0 && 10#$override <= 23)) && is_night_hour "$override"; then
+    night_icon_key_for_summary "$summary"
+    return 0
+  fi
+
+  day_icon_key_for_summary "$summary"
+}
+
+hourly_icon_key_for_summary() {
+  local summary="$1"
+  local hour="$2"
+
+  if is_night_hour "$hour"; then
+    night_icon_key_for_summary "$summary"
+    return 0
+  fi
+
+  day_icon_key_for_summary "$summary"
+}
+
+weather_code="$(weather_code_for_summary "$summary_en")"
+summary="$summary_en"
+if [[ "$lang" == "zh" ]]; then
+  summary="$(summary_zh_from_en "$summary_en")"
   rain_label="降雨"
 fi
 
@@ -255,27 +364,66 @@ if [[ "$period" == "hourly" ]]; then
     --arg lat "$lat_out" \
     --arg lon "$lon_out" \
     --arg summary "$summary" \
+    --arg summary_en "$summary_en" \
     --arg rain_label "$rain_label" \
-    '{
+    --argjson weather_code "$weather_code" \
+    '
+      def hourly_icon($summary_en; $hour):
+        if $summary_en == "Clear sky" then
+          (if $hour < 6 or $hour >= 18 then "clear-night" else "clear-day" end)
+        elif $summary_en == "Mainly clear" then
+          (if $hour < 6 or $hour >= 18 then "mainly-clear-night" else "mainly-clear-day" end)
+        elif $summary_en == "Partly cloudy" then
+          (if $hour < 6 or $hour >= 18 then "partly-cloudy-night" else "partly-cloudy-day" end)
+        else
+          (if $hour < 6 or $hour >= 18 then "cloudy-night" else "cloudy" end)
+        end;
+      {
       items: (
         [
           {
             title: ($location + " (" + $timezone + ")"),
             subtitle: ("source=open_meteo freshness=live lat=" + $lat + " lon=" + $lon),
             arg: $location,
-            valid: false
+            valid: false,
+            weather_meta: {
+              item_kind: "header",
+              location_name: $location,
+              timezone: $timezone,
+              latitude_label: $lat,
+              longitude_label: $lon
+            }
           }
         ]
         + [
-          range(0; 4) | {
-            title: ("2026-02-12 " + ((if . < 10 then "0" else "" end) + (tostring) + ":00") + " " + $summary + " 12.0°C"),
-            subtitle: ($rain_label + ":10%"),
-            arg: ("2026-02-12T" + (if . < 10 then "0" else "" end) + (tostring) + ":00"),
-            valid: false
-          }
+          range(0; 4) as $hour_index
+          | ((if $hour_index < 10 then "0" else "" end) + ($hour_index | tostring)) as $hour
+          | (hourly_icon($summary_en; ($hour | tonumber))) as $icon_key
+          | {
+              title: ("2026-02-12 " + $hour + ":00 " + $summary + " 12.0°C"),
+              subtitle: ($rain_label + ":10%"),
+              arg: ("2026-02-12T" + $hour + ":00"),
+              valid: false,
+              icon: {
+                path: ("assets/icons/weather/" + $icon_key + ".png")
+              },
+              weather_meta: {
+                item_kind: "hourly",
+                date: "2026-02-12",
+                time: ($hour + ":00"),
+                datetime: ("2026-02-12T" + $hour + ":00"),
+                summary: $summary,
+                weather_code: $weather_code,
+                icon_key: $icon_key,
+                is_night: ($icon_key | endswith("-night")),
+                temp_c_label: "12.0",
+                precip_prob_pct_label: "10"
+              }
+            }
         ]
       )
-    }'
+      }
+    '
   exit 0
 fi
 
@@ -286,34 +434,114 @@ if [[ "$period" == "week" ]]; then
     --arg lat "$lat_out" \
     --arg lon "$lon_out" \
     --arg summary "$summary" \
+    --arg summary_en "$summary_en" \
     --arg rain_label "$rain_label" \
     --arg period "$period" \
-    '{
+    --argjson weather_code "$weather_code" \
+    '
+      def daily_icon($summary_en):
+        if $summary_en == "Clear sky" then "clear-day"
+        elif $summary_en == "Mainly clear" then "mainly-clear-day"
+        elif $summary_en == "Partly cloudy" then "partly-cloudy-day"
+        else "cloudy"
+        end;
+      {
       items: (
         [
           {
             title: ($location + " (" + $timezone + ")"),
             subtitle: ("source=open_meteo freshness=live lat=" + $lat + " lon=" + $lon),
             arg: $location,
-            valid: false
+            valid: false,
+            weather_meta: {
+              item_kind: "header",
+              location_name: $location,
+              timezone: $timezone,
+              latitude_label: $lat,
+              longitude_label: $lon
+            }
           }
         ]
         + [
-          range(0; 7) | {
-            title: ("2026-02-" + ((12 + .) | tostring) + " " + $summary + " 12.0~18.0°C"),
-            subtitle: ($rain_label + ":10%"),
-            arg: ($period + " forecast"),
-            valid: false
-          }
+          range(0; 7) as $day_index
+          | (daily_icon($summary_en)) as $icon_key
+          | ("2026-02-" + ((12 + $day_index) | tostring)) as $date
+          | {
+              title: ($date + " " + $summary + " 12.0~18.0°C"),
+              subtitle: ($rain_label + ":10%"),
+              arg: ($period + " forecast"),
+              valid: false,
+              icon: {
+                path: ("assets/icons/weather/" + $icon_key + ".png")
+              },
+              weather_meta: {
+                item_kind: "daily",
+                date: $date,
+                summary: $summary,
+                weather_code: $weather_code,
+                icon_key: $icon_key,
+                is_night: false,
+                temp_min_c_label: "12.0",
+                temp_max_c_label: "18.0",
+                precip_prob_max_pct_label: "10"
+              }
+            }
         ]
       )
-    }'
+      }
+    '
   exit 0
 fi
 
 if [[ "$period" == "today" ]]; then
-  printf '{"items":[{"title":"%s (%s)","subtitle":"source=open_meteo freshness=live lat=%s lon=%s","arg":"%s","valid":false},{"title":"2026-02-12 %s 12.0~18.0°C","subtitle":"%s:10%%","arg":"%s forecast","valid":false}]}' "$location" "$timezone" "$lat_out" "$lon_out" "$location" "$summary" "$rain_label" "$period"
-  printf '\n'
+  current_icon_key="$(current_icon_key_for_summary "$summary_en")"
+  jq -nc \
+    --arg location "$location" \
+    --arg timezone "$timezone" \
+    --arg lat "$lat_out" \
+    --arg lon "$lon_out" \
+    --arg summary "$summary" \
+    --arg rain_label "$rain_label" \
+    --arg period "$period" \
+    --arg icon_key "$current_icon_key" \
+    --argjson weather_code "$weather_code" \
+    '{
+      items: [
+        {
+          title: ($location + " (" + $timezone + ")"),
+          subtitle: ("source=open_meteo freshness=live lat=" + $lat + " lon=" + $lon),
+          arg: $location,
+          valid: false,
+          weather_meta: {
+            item_kind: "header",
+            location_name: $location,
+            timezone: $timezone,
+            latitude_label: $lat,
+            longitude_label: $lon
+          }
+        },
+        {
+          title: ("2026-02-12 " + $summary + " 12.0~18.0°C"),
+          subtitle: ($rain_label + ":10%"),
+          arg: ($period + " forecast"),
+          valid: false,
+          icon: {
+            path: ("assets/icons/weather/" + $icon_key + ".png")
+          },
+          weather_meta: {
+            item_kind: "daily",
+            date: "2026-02-12",
+            summary: $summary,
+            weather_code: $weather_code,
+            icon_key: $icon_key,
+            is_night: ($icon_key | endswith("-night")),
+            temp_min_c_label: "12.0",
+            temp_max_c_label: "18.0",
+            precip_prob_max_pct_label: "10"
+          }
+        }
+      ]
+    }'
   exit 0
 fi
 
@@ -344,27 +572,133 @@ printf '{"bad":"shape"}\n'
 EOS
 chmod +x "$tmp_dir/stubs/weather-cli-malformed"
 
+cat >"$tmp_dir/stubs/weather-cli-city-fails-latlon-ok" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+
+period="${1:-}"
+shift || true
+
+city=""
+lat=""
+lon=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --city)
+    city="${2:-}"
+    shift 2
+    ;;
+  --lat=*)
+    lat="${1#--lat=}"
+    shift
+    ;;
+  --lon=*)
+    lon="${1#--lon=}"
+    shift
+    ;;
+  --lat)
+    lat="${2:-}"
+    shift 2
+    ;;
+  --lon)
+    lon="${2:-}"
+    shift 2
+    ;;
+  *)
+    shift
+    ;;
+  esac
+done
+
+if [[ "$period" != "hourly" ]]; then
+  echo "unsupported period" >&2
+  exit 9
+fi
+
+if [[ -n "$city" ]]; then
+  echo "geocode network lookup should not happen" >&2
+  exit 1
+fi
+
+if [[ "$lat" != "25.033" || "$lon" != "121.5654" ]]; then
+  echo "missing cached coordinates" >&2
+  exit 1
+fi
+
+jq -nc '
+  {
+    items: [
+      {
+        title: "25.0330,121.5654 (Asia/Taipei)",
+        subtitle: "source=open_meteo freshness=live lat=25.0330 lon=121.5654",
+        arg: "25.0330,121.5654",
+        valid: false,
+        weather_meta: {
+          item_kind: "header",
+          location_name: "25.0330,121.5654",
+          timezone: "Asia/Taipei",
+          latitude_label: "25.0330",
+          longitude_label: "121.5654"
+        }
+      },
+      {
+        title: "2026-02-12 00:00 Cloudy 12.0°C",
+        subtitle: "rain:10%",
+        arg: "2026-02-12T00:00",
+        valid: false,
+        icon: { path: "assets/icons/weather/cloudy-night.png" },
+        weather_meta: {
+          item_kind: "hourly",
+          date: "2026-02-12",
+          time: "00:00",
+          datetime: "2026-02-12T00:00",
+          summary: "Cloudy",
+          weather_code: 3,
+          icon_key: "cloudy-night",
+          is_night: true,
+          temp_c_label: "12.0",
+          precip_prob_pct_label: "10"
+        }
+      }
+    ]
+  }
+'
+EOS
+chmod +x "$tmp_dir/stubs/weather-cli-city-fails-latlon-ok"
+
+mkdir -p "$tmp_dir/empty-cache"
+export ALFRED_WORKFLOW_CACHE="$tmp_dir/empty-cache"
+
 today_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "Taipei"; })"
 assert_jq_json "$today_stage_one_json" '.items | type == "array" and length == 1' "today stage one should keep original single-row display"
 assert_jq_json "$today_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "today stage one should keep original today row title"
 assert_jq_json "$today_stage_one_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "today stage one should keep original subtitle format"
 assert_jq_json "$today_stage_one_json" '.items[0].icon.path == "assets/icons/weather/cloudy.png"' "today stage one should keep weather icon mapping"
 assert_jq_json "$today_stage_one_json" '.items[0].valid == false' "today stage one row must be non-actionable for stage two transition"
-assert_jq_json "$today_stage_one_json" '.items[0].autocomplete == "coord::25.0330,121.5654::Taipei"' "today stage one should add coordinate token for faster stage two"
+assert_jq_json "$today_stage_one_json" '.items[0].autocomplete == "city::Taipei"' "today stage one should add city token for stage two"
 
 today_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_stage_one_json")"
 today_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "$today_stage_two_query"; })"
 assert_jq_json "$today_stage_two_json" '.items | type == "array" and length == 4' "today stage two must return hourly rows"
 assert_jq_json "$today_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should render normalized hourly row"
 assert_jq_json "$today_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "today stage two subtitle should show date timezone and coordinates"
-assert_jq_json "$today_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy.png"' "today hourly row should map to weather icon"
+assert_jq_json "$today_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy-night.png"' "today hourly row should map to night weather icon after dark"
 assert_jq_json "$today_stage_two_json" '.items[3].title == "Taipei 03:00 12.0°C cloudy 10%"' "today stage two should keep later hourly rows"
 
 today_legacy_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
 assert_jq_json "$today_legacy_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should keep legacy city token compatibility"
 
+mkdir -p "$tmp_dir/cache/weather-cli/geocode"
+cat >"$tmp_dir/cache/weather-cli/geocode/city-taipei.json" <<'EOS'
+{"name":"Taipei","latitude":25.033,"longitude":121.5654,"timezone":"Asia/Taipei"}
+EOS
+today_cached_city_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-city-fails-latlon-ok" ALFRED_WORKFLOW_CACHE="$tmp_dir/cache" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
+assert_jq_json "$today_cached_city_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should resolve cached city coordinates before hourly fetch"
+assert_jq_json "$today_cached_city_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "cached city coordinates should preserve normalized subtitle output"
+
 today_clear_day_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_ICON_LOCAL_HOUR_OVERRIDE=10 "$workflow_dir/scripts/script_filter_today.sh" "Los Angeles"; })"
-assert_jq_json "$today_clear_day_json" '.items[0].icon.path == "assets/icons/weather/clear.png"' "today stage one should keep day clear icon during daytime"
+assert_jq_json "$today_clear_day_json" '.items[0].icon.path == "assets/icons/weather/clear-day.png"' "today stage one should keep day clear icon during daytime"
 
 today_clear_night_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_ICON_LOCAL_HOUR_OVERRIDE=22 "$workflow_dir/scripts/script_filter_today.sh" "Los Angeles"; })"
 assert_jq_json "$today_clear_night_json" '.items[0].icon.path == "assets/icons/weather/clear-night.png"' "today stage one should use clear night icon after dark"
@@ -378,15 +712,22 @@ assert_jq_json "$today_partly_cloudy_night_json" '.items[0].icon.path == "assets
 today_hourly_clear_night_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "city::Los Angeles"; })"
 assert_jq_json "$today_hourly_clear_night_json" '.items[0].icon.path == "assets/icons/weather/clear-night.png"' "hourly rows should use night icon for overnight clear weather"
 
+today_la_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "Los Angeles"; })"
+today_la_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_la_stage_one_json")"
+today_la_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "$today_la_stage_two_query"; })"
+assert_jq_json "$today_la_stage_two_json" '.items | type == "array" and length == 4' "today stage two should support negative longitude coordinate tokens"
+assert_jq_json "$today_la_stage_two_json" '.items[0].title == "Los Angeles 00:00 12.0°C clear sky 10%"' "negative longitude city token stage two should preserve the display location"
+assert_jq_json "$today_la_stage_two_json" '.items[0].subtitle == "2026-02-12 America/Los_Angeles 34.0522,-118.2437"' "negative longitude city token stage two should keep the negative longitude in subtitle"
+
 today_zh_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_LOCALE="zh" "$workflow_dir/scripts/script_filter_today.sh" "Taipei"; })"
 assert_jq_json "$today_zh_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C 陰天 10%"' "today stage one zh should keep original localized title"
-assert_jq_json "$today_zh_stage_one_json" '.items[0].autocomplete == "coord::25.0330,121.5654::Taipei"' "today stage one zh should emit coordinate token for stage two"
+assert_jq_json "$today_zh_stage_one_json" '.items[0].autocomplete == "city::Taipei"' "today stage one zh should emit city token for stage two"
 
 today_zh_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_zh_stage_one_json")"
 today_zh_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_LOCALE="zh" "$workflow_dir/scripts/script_filter_today.sh" "$today_zh_stage_two_query"; })"
 assert_jq_json "$today_zh_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C 陰天 10%"' "zh locale should use chinese summary for hourly rows"
 assert_jq_json "$today_zh_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "zh locale hourly subtitle should show date timezone and coordinates"
-assert_jq_json "$today_zh_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy.png"' "zh hourly row should map to same cloudy icon"
+assert_jq_json "$today_zh_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy-night.png"' "zh hourly row should map to same night cloudy icon"
 
 week_city_picker_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_week.sh" "Taipei"; })"
 assert_jq_json "$week_city_picker_json" '.items | type == "array" and length >= 1' "week stage one should list city candidates"
@@ -420,7 +761,7 @@ assert_jq_json "$week_coordinate_stage_two_json" '.items[0].subtitle == "2026-02
 empty_today_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "  "; })"
 assert_jq_json "$empty_today_json" '.items | type == "array" and length == 1' "empty today query should keep original today result count"
 assert_jq_json "$empty_today_json" '.items[0].title == "Tokyo 12.0~18.0°C cloudy 10%"' "empty today query should keep original Tokyo row"
-assert_jq_json "$empty_today_json" '.items[0].autocomplete == "coord::35.6762,139.6503::Tokyo"' "empty today query should add coordinate token for faster stage two"
+assert_jq_json "$empty_today_json" '.items[0].autocomplete == "city::Tokyo"' "empty today query should add city token for stage two"
 
 empty_today_multi_default_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_DEFAULT_CITIES="Tokyo,Osaka" "$workflow_dir/scripts/script_filter_today.sh" "  "; })"
 assert_jq_json "$empty_today_multi_default_json" '.items | type == "array" and length == 2' "multi default cities should keep original row-per-city today display"

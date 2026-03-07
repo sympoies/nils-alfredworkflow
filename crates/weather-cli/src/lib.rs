@@ -7,3 +7,4 @@ pub mod model;
 pub mod providers;
 pub mod service;
 pub mod weather_code;
+pub mod weather_icon;

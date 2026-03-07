@@ -1480,6 +1480,7 @@ name = "nils-weather-cli"
 version = "1.2.4"
 dependencies = [
  "chrono",
+ "chrono-tz",
  "clap",
  "nils-workflow-common",
  "reqwest",

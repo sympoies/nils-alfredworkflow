@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Rain showers weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="76%">
+      <stop offset="0%" stop-color="#78B5E6"/>
+      <stop offset="58%" stop-color="#4F86BF"/>
+      <stop offset="100%" stop-color="#2E5E95"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <g fill="#F7FBFF">
+    <rect x="24" y="54" width="80" height="24" rx="12" ry="12"/>
+    <circle cx="40" cy="58" r="14"/>
+    <circle cx="66" cy="46" r="18"/>
+    <circle cx="92" cy="58" r="14"/>
+  </g>
+  <g stroke="#9ED0FF" stroke-width="5" stroke-linecap="round">
+    <line x1="38" y1="88" x2="30" y2="108"/>
+    <line x1="54" y1="88" x2="46" y2="110"/>
+    <line x1="70" y1="88" x2="62" y2="110"/>
+    <line x1="86" y1="88" x2="78" y2="108"/>
+  </g>
+</svg>

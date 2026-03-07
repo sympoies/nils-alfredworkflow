@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Clear night weather icon">
+  <defs>
+    <radialGradient id="bg" cx="34%" cy="30%" r="78%">
+      <stop offset="0%" stop-color="#577C9F"/>
+      <stop offset="58%" stop-color="#355A7E"/>
+      <stop offset="100%" stop-color="#1A3553"/>
+    </radialGradient>
+    <mask id="moon-shape">
+      <rect width="128" height="128" fill="black"/>
+      <circle cx="58" cy="60" r="29" fill="white"/>
+      <circle cx="73" cy="50" r="24" fill="black"/>
+    </mask>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="url(#bg)"/>
+  <circle cx="28" cy="34" r="2.6" fill="#EAF4FF"/>
+  <circle cx="40" cy="24" r="3.1" fill="#EAF4FF"/>
+  <circle cx="52" cy="44" r="2.4" fill="#EAF4FF"/>
+  <circle cx="88" cy="36" r="2.8" fill="#EAF4FF"/>
+  <circle cx="96" cy="52" r="2.2" fill="#EAF4FF"/>
+  <circle cx="58" cy="60" r="29" fill="#F7D97A" mask="url(#moon-shape)"/>
+</svg>

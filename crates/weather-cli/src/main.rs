@@ -40,9 +40,9 @@ enum Commands {
     Today {
         #[arg(long)]
         city: Option<String>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lat: Option<f64>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
         #[arg(long, value_enum)]
         output: Option<OutputModeArg>,
@@ -55,9 +55,9 @@ enum Commands {
     Week {
         #[arg(long)]
         city: Option<String>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lat: Option<f64>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
         #[arg(long, value_enum)]
         output: Option<OutputModeArg>,
@@ -70,9 +70,9 @@ enum Commands {
     Hourly {
         #[arg(long)]
         city: Option<String>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lat: Option<f64>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
         #[arg(long, value_enum)]
         output: Option<OutputModeArg>,
@@ -319,7 +319,7 @@ fn run_command<P, N>(
 ) -> Result<String, CliError>
 where
     P: ProviderApi,
-    N: Fn() -> DateTime<Utc>,
+    N: Fn() -> DateTime<Utc> + Copy,
 {
     let output_mode = select_output_mode(args.output.map(Into::into), args.json, OutputMode::Human)
         .map_err(|error| user_error(ERROR_CODE_USER_OUTPUT_MODE_CONFLICT, error.to_string()))?;
@@ -336,7 +336,7 @@ where
     match output_mode {
         OutputMode::Json => render_service_json_envelope(args.command, &output),
         OutputMode::Human => Ok(format_text_output(&output, output_language)),
-        OutputMode::AlfredJson => render_alfred_json(&output, output_language),
+        OutputMode::AlfredJson => render_alfred_json(&output, output_language, now_fn()),
     }
 }
 
@@ -348,7 +348,7 @@ fn run_hourly_command<P, N>(
 ) -> Result<String, CliError>
 where
     P: ProviderApi,
-    N: Fn() -> DateTime<Utc>,
+    N: Fn() -> DateTime<Utc> + Copy,
 {
     let output_mode = select_output_mode(args.output.map(Into::into), args.json, OutputMode::Human)
         .map_err(|error| user_error(ERROR_CODE_USER_OUTPUT_MODE_CONFLICT, error.to_string()))?;
@@ -418,23 +418,29 @@ fn render_hourly_json_envelope(
 fn render_alfred_json(
     output: &weather_cli::model::ForecastOutput,
     language: OutputLanguage,
+    now: DateTime<Utc>,
 ) -> Result<String, CliError> {
     let mut items = Vec::with_capacity(output.forecast.len() + 1);
-    items.push(json!({
-        "title": format!("{} ({})", output.location.name, output.timezone),
-        "subtitle": format!(
-            "source={} freshness={} lat={:.4} lon={:.4}",
-            output.source,
-            freshness_label(output.freshness.status),
-            output.location.latitude,
-            output.location.longitude
-        ),
-        "arg": output.location.name,
-        "valid": false,
-    }));
-
+    items.push(alfred_header_item(
+        &output.location.name,
+        &output.timezone,
+        output.location.latitude,
+        output.location.longitude,
+        &output.source,
+        output.freshness.status,
+    ));
     for day in &output.forecast {
         let summary = localized_summary(day, language);
+        let icon_key = if output.period == ForecastPeriod::Today {
+            weather_cli::weather_icon::current_conditions_icon_key(
+                day.weather_code,
+                &output.timezone,
+                now,
+            )
+        } else {
+            weather_cli::weather_icon::daily_forecast_icon_key(day.weather_code)
+        };
+
         items.push(json!({
             "title": format!(
                 "{} {} {:.1}~{:.1}°C",
@@ -443,6 +449,23 @@ fn render_alfred_json(
             "subtitle": format!("{}:{}%", precip_label(language), day.precip_prob_max_pct),
             "arg": day.date,
             "valid": false,
+            "icon": {
+                "path": icon_path(icon_key),
+            },
+            "weather_meta": {
+                "item_kind": "daily",
+                "date": day.date,
+                "summary": summary,
+                "weather_code": day.weather_code,
+                "icon_key": icon_key,
+                "is_night": weather_cli::weather_icon::is_night_icon_key(icon_key),
+                "temp_min_c": day.temp_min_c,
+                "temp_max_c": day.temp_max_c,
+                "temp_min_c_label": format!("{:.1}", day.temp_min_c),
+                "temp_max_c_label": format!("{:.1}", day.temp_max_c),
+                "precip_prob_max_pct": day.precip_prob_max_pct,
+                "precip_prob_max_pct_label": day.precip_prob_max_pct.to_string(),
+            },
         }));
     }
 
@@ -459,21 +482,20 @@ fn render_hourly_alfred_json(
     language: OutputLanguage,
 ) -> Result<String, CliError> {
     let mut items = Vec::with_capacity(output.hourly.len() + 1);
-    items.push(json!({
-        "title": format!("{} ({})", output.location.name, output.timezone),
-        "subtitle": format!(
-            "source={} freshness={} lat={:.4} lon={:.4}",
-            output.source,
-            freshness_label(output.freshness.status),
-            output.location.latitude,
-            output.location.longitude
-        ),
-        "arg": output.location.name,
-        "valid": false,
-    }));
+    items.push(alfred_header_item(
+        &output.location.name,
+        &output.timezone,
+        output.location.latitude,
+        output.location.longitude,
+        &output.source,
+        output.freshness.status,
+    ));
 
     for hour in &output.hourly {
         let summary = localized_summary_by_code(hour.weather_code, language);
+        let icon_key =
+            weather_cli::weather_icon::hourly_forecast_icon_key(hour.weather_code, &hour.datetime);
+        let (date, time) = split_datetime_label(&hour.datetime);
         items.push(json!({
             "title": format!(
                 "{} {} {:.1}°C",
@@ -484,6 +506,23 @@ fn render_hourly_alfred_json(
             "subtitle": format!("{}:{}%", precip_label(language), hour.precip_prob_pct),
             "arg": hour.datetime,
             "valid": false,
+            "icon": {
+                "path": icon_path(icon_key),
+            },
+            "weather_meta": {
+                "item_kind": "hourly",
+                "date": date,
+                "time": time,
+                "datetime": hour.datetime,
+                "summary": summary,
+                "weather_code": hour.weather_code,
+                "icon_key": icon_key,
+                "is_night": weather_cli::weather_icon::is_night_icon_key(icon_key),
+                "temp_c": hour.temp_c,
+                "temp_c_label": format!("{:.1}", hour.temp_c),
+                "precip_prob_pct": hour.precip_prob_pct,
+                "precip_prob_pct_label": hour.precip_prob_pct.to_string(),
+            },
         }));
     }
 
@@ -615,6 +654,48 @@ fn localized_summary_by_code(weather_code: i32, language: OutputLanguage) -> Str
 
 fn display_hour_label(datetime: &str) -> String {
     datetime.replace('T', " ")
+}
+
+fn split_datetime_label(datetime: &str) -> (&str, &str) {
+    datetime
+        .split_once('T')
+        .or_else(|| datetime.split_once(' '))
+        .unwrap_or((datetime, ""))
+}
+
+fn icon_path(icon_key: &str) -> String {
+    format!("assets/icons/weather/{icon_key}.png")
+}
+
+fn alfred_header_item(
+    location_name: &str,
+    timezone: &str,
+    latitude: f64,
+    longitude: f64,
+    source: &str,
+    freshness_status: weather_cli::model::FreshnessStatus,
+) -> serde_json::Value {
+    json!({
+        "title": format!("{location_name} ({timezone})"),
+        "subtitle": format!(
+            "source={} freshness={} lat={:.4} lon={:.4}",
+            source,
+            freshness_label(freshness_status),
+            latitude,
+            longitude
+        ),
+        "arg": location_name,
+        "valid": false,
+        "weather_meta": {
+            "item_kind": "header",
+            "location_name": location_name,
+            "timezone": timezone,
+            "latitude": latitude,
+            "longitude": longitude,
+            "latitude_label": format!("{latitude:.4}"),
+            "longitude_label": format!("{longitude:.4}"),
+        },
+    })
 }
 
 fn precip_label(language: OutputLanguage) -> &'static str {
@@ -855,6 +936,29 @@ mod tests {
     }
 
     #[test]
+    fn main_accepts_negative_longitude_values() {
+        let cli = Cli::try_parse_from([
+            "weather-cli",
+            "hourly",
+            "--lat",
+            "34.0522",
+            "--lon",
+            "-118.2437",
+            "--json",
+        ])
+        .expect("negative longitude should parse");
+
+        let output = run_with(cli, &config_in_tempdir(), &FakeProviders::ok(), fixed_now)
+            .expect("hourly should pass");
+        let json: Value = serde_json::from_str(&output).expect("json");
+
+        assert_eq!(
+            json.get("command").and_then(Value::as_str),
+            Some("weather.hourly")
+        );
+    }
+
+    #[test]
     fn main_maps_invalid_input_to_user_error() {
         let cli = Cli::parse_from([
             "weather-cli",
@@ -952,6 +1056,24 @@ mod tests {
             .and_then(|item| item.get("title"))
             .and_then(Value::as_str);
         assert_eq!(second_item_title, Some("2026-02-11 Cloudy 14.5~20.1°C"));
+
+        let second_item_icon = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("icon"))
+            .and_then(|icon| icon.get("path"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_icon, Some("assets/icons/weather/cloudy.png"));
+
+        let second_item_icon_key = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("icon_key"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_icon_key, Some("cloudy"));
     }
 
     #[test]
@@ -1004,6 +1126,27 @@ mod tests {
             .and_then(|item| item.get("title"))
             .and_then(Value::as_str);
         assert_eq!(second_item_title, Some("2026-02-11 00:00 Cloudy 16.1°C"));
+
+        let second_item_icon = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("icon"))
+            .and_then(|icon| icon.get("path"))
+            .and_then(Value::as_str);
+        assert_eq!(
+            second_item_icon,
+            Some("assets/icons/weather/cloudy-night.png")
+        );
+
+        let second_item_time = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("time"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_time, Some("00:00"));
     }
 
     #[test]
