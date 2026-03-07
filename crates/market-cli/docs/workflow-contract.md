@@ -54,11 +54,15 @@ It also includes favorites-list output for the `market-expression` workflow empt
     when workflow variable `MARKET_FAVORITES_ENABLED` is enabled;
     otherwise the workflow may render only the prompt row locally
   - Successful output is Alfred Script Filter JSON by default
-  - Favorites output always starts with a non-actionable prompt row, followed by one non-actionable row per favorite symbol
-  - Quote rows render `1 <SYMBOL> = <PRICE> <DEFAULT_FIAT>` when pricing succeeds
-  - If one favorite quote cannot be resolved, that row falls back to a symbol hint instead of failing the whole payload
+  - Favorites output always starts with a non-actionable prompt row, followed by one non-actionable row per favorite symbol or explicit FX pair
+  - Plain symbol tokens (for example `BTC`, `JPY`) use `--default-fiat` as quote
+  - Explicit FX pair tokens (for example `JPY/USD`, `JPY/TWD`) keep their configured quote and bypass `--default-fiat` for that row
+  - Quote rows render `1 <BASE> = <PRICE> <QUOTE>` when pricing succeeds
+  - If one favorite quote cannot be resolved, that row falls back to a symbol/pair hint instead of failing the whole payload
   - Every favorites row remains non-actionable / non-selectable (`valid: false`)
-  - Ordered parsing preserves source order, trims surrounding whitespace, accepts comma/newline separators, and de-duplicates by first occurrence
+  - Ordered parsing preserves source order, trims surrounding whitespace,
+    accepts comma/newline separators, and de-duplicates by first occurrence of
+    the effective base/quote pair
   - Empty or delimiter-only list input falls back to `BTC,ETH,<DEFAULT_FIAT>,JPY`
   - Invalid non-empty tokens surface a user error rather than being silently skipped
 
@@ -73,7 +77,8 @@ It also includes favorites-list output for the `market-expression` workflow empt
 
 - No API key is required for any command path.
 - FX provider stack:
-  - `Frankfurter` (single provider)
+  - Primary: `Frankfurter`
+  - Fallback: `FloatRates`
   - Default TTL: `86400` seconds (`24h`)
   - Optional override: `MARKET_FX_CACHE_TTL` (`1s`, `1m`, `1h`, `1d`)
 - Crypto provider stack:
@@ -198,9 +203,9 @@ Favorites row requirements:
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `items[].uid` | string | Stable Alfred row identity for prompt and favorite quote rows |
-| `items[].title` | string | Prompt title or favorite quote title (`1 BTC = ... USD`) |
-| `items[].subtitle` | string | Prompt guidance, quote metadata, or symbol-hint fallback when quote lookup fails |
+| `items[].uid` | string | Stable Alfred row identity for prompt and favorite quote rows (`market-favorite-<base>-<quote>`) |
+| `items[].title` | string | Prompt title or favorite quote title (`1 BTC = ... USD`, `1 JPY = ... TWD`) |
+| `items[].subtitle` | string | Prompt guidance, quote metadata, or symbol/pair-hint fallback when quote lookup fails |
 | `items[].valid` | boolean | Must be `false` for every favorites item (non-actionable / non-selectable policy) |
 
 ## `script_filter.sh` Integration Notes
@@ -216,7 +221,10 @@ Favorites row requirements:
   empty keeps the built-in FX default, values like `15m` or `1d` override FX cache TTL only.
 - Workflow variable `MARKET_CRYPTO_CACHE_TTL` may be passed through environment;
   empty keeps the built-in crypto default, values like `30s` or `1h` override crypto cache TTL only.
-- Workflow variable `MARKET_FAVORITE_LIST` should be passed to `--list`; empty or delimiter-only config falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
+- Workflow variable `MARKET_FAVORITE_LIST` should be passed to `--list`;
+  plain symbol tokens use `MARKET_DEFAULT_FIAT`, explicit FX pair tokens keep
+  their configured quote, and empty or delimiter-only config falls back to
+  `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
 - For non-zero exits, script filter should render one fallback item with `valid: false`.
 
 Minimal shell examples:
@@ -242,5 +250,5 @@ PY
 market-cli expr --query "1 btc + 3 eth to jpy" --default-fiat USD
 
 # Favorites (Alfred JSON passthrough)
-market-cli favorites --list "btc,eth,usd,jpy" --default-fiat USD
+market-cli favorites --list "btc,eth,jpy/usd,jpy/twd" --default-fiat USD
 ```

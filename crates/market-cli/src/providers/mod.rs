@@ -7,6 +7,7 @@ use crate::config::{PROVIDER_TIMEOUT_SECS, RetryPolicy};
 use crate::model::MarketQuote;
 
 pub mod coinbase;
+pub mod floatrates;
 pub mod frankfurter;
 pub mod kraken;
 
@@ -44,7 +45,10 @@ impl HttpProviders {
 
 impl ProviderApi for HttpProviders {
     fn fetch_fx_rate(&self, base: &str, quote: &str) -> Result<MarketQuote, ProviderError> {
-        frankfurter::fetch_fx_rate(&self.client, base, quote, self.retry_policy)
+        resolve_fx_with_fallback(
+            frankfurter::fetch_fx_rate(&self.client, base, quote, self.retry_policy),
+            || floatrates::fetch_fx_rate(&self.client, base, quote, self.retry_policy),
+        )
     }
 
     fn fetch_crypto_coinbase(&self, base: &str, quote: &str) -> Result<MarketQuote, ProviderError> {
@@ -53,6 +57,24 @@ impl ProviderApi for HttpProviders {
 
     fn fetch_crypto_kraken(&self, base: &str, quote: &str) -> Result<MarketQuote, ProviderError> {
         kraken::fetch_crypto_spot(&self.client, base, quote, self.retry_policy)
+    }
+}
+
+fn resolve_fx_with_fallback<F>(
+    primary: Result<MarketQuote, ProviderError>,
+    fallback: F,
+) -> Result<MarketQuote, ProviderError>
+where
+    F: FnOnce() -> Result<MarketQuote, ProviderError>,
+{
+    match primary {
+        Ok(quote) => Ok(quote),
+        Err(primary_error) => match fallback() {
+            Ok(quote) => Ok(quote),
+            Err(fallback_error) => Err(ProviderError::InvalidResponse(format!(
+                "primary provider failed ({primary_error}); fallback provider failed ({fallback_error})"
+            ))),
+        },
     }
 }
 
@@ -221,5 +243,47 @@ mod tests {
             }
             .retryable()
         );
+    }
+
+    #[test]
+    fn fx_provider_falls_back_when_primary_fails() {
+        let now = chrono::Utc::now();
+        let result = resolve_fx_with_fallback(
+            Err(ProviderError::Http {
+                status: 404,
+                message: "frankfurter: not found".to_string(),
+            }),
+            || {
+                Ok(MarketQuote::new(
+                    "floatrates",
+                    rust_decimal::Decimal::new(318, 1),
+                    now,
+                ))
+            },
+        )
+        .expect("fallback should succeed");
+
+        assert_eq!(result.provider, "floatrates");
+        assert_eq!(result.unit_price.to_string(), "31.8");
+    }
+
+    #[test]
+    fn fx_provider_surfaces_both_primary_and_fallback_failures() {
+        let error = resolve_fx_with_fallback(
+            Err(ProviderError::Http {
+                status: 404,
+                message: "frankfurter: not found".to_string(),
+            }),
+            || {
+                Err(ProviderError::UnsupportedPair(
+                    "floatrates: TWD".to_string(),
+                ))
+            },
+        )
+        .expect_err("both providers should fail");
+
+        assert!(matches!(error, ProviderError::InvalidResponse(_)));
+        assert!(error.to_string().contains("primary provider failed"));
+        assert!(error.to_string().contains("fallback provider failed"));
     }
 }

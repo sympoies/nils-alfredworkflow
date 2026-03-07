@@ -402,7 +402,9 @@ fn format_plain_decimal(value: Decimal) -> String {
 
 pub fn format_market_decimal(value: Decimal) -> String {
     let abs = value.abs();
-    let precision = if abs < Decimal::from(100) {
+    let precision = if abs < Decimal::from(10) {
+        3
+    } else if abs < Decimal::from(100) {
         2
     } else if abs < Decimal::from(1000) {
         1
@@ -894,7 +896,8 @@ mod tests {
 
     #[test]
     fn expression_rounding_rule_follows_thresholds_and_half_up() {
-        assert_eq!(format_market_decimal(Decimal::new(9876, 3)), "9.88");
+        assert_eq!(format_market_decimal(Decimal::new(98764, 4)), "9.876");
+        assert_eq!(format_market_decimal(Decimal::new(98765, 4)), "9.877");
         assert_eq!(format_market_decimal(Decimal::new(12345, 3)), "12.35");
         assert_eq!(format_market_decimal(Decimal::new(45678, 2)), "456.8");
         assert_eq!(format_market_decimal(Decimal::new(123456, 2)), "1235");

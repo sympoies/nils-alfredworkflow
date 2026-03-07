@@ -21,16 +21,19 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 - Workflow favorites source: `MARKET_FAVORITE_LIST` (typically passed to `market-cli favorites --list`)
 - Workflow toggle: `MARKET_FAVORITES_ENABLED` controls whether
   the Alfred workflow calls `market-cli favorites` for empty query
-- Favorites list semantics: comma/newline ordered input, trim per token, preserve first occurrence.
+- Favorites list semantics: comma/newline ordered input, trim per token, preserve first occurrence of the effective
+  base/quote pair.
+  Tokens may be plain symbols (`BTC`, `JPY`) or explicit FX pairs (`JPY/USD`, `JPY/TWD`).
+  Plain symbols resolve against `MARKET_DEFAULT_FIAT`.
   Empty or delimiter-only input falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`
 
 ## Output Contract
 
 - `fx` / `crypto`: deterministic JSON object on `stdout`.
 - `expr` / `favorites`: Alfred Script Filter JSON on `stdout` by default.
-- `favorites` output starts with a non-actionable prompt row, then one non-actionable quote row per favorite symbol.
-- Favorite quote rows render `1 <SYMBOL> = <PRICE> <DEFAULT_FIAT>` when pricing succeeds.
-- If a favorite quote cannot be resolved, that row degrades to a symbol hint instead of failing the whole empty-query payload.
+- `favorites` output starts with a non-actionable prompt row, then one non-actionable quote row per favorite symbol/pair.
+- Favorite quote rows render `1 <BASE> = <PRICE> <QUOTE>` when pricing succeeds.
+- If a favorite quote cannot be resolved, that row degrades to a symbol/pair hint instead of failing the whole empty-query payload.
 - `fx` / `crypto` Alfred rows, favorite quote rows, and asset-expression quote rows
   may include Alfred `icon.path` values pointing at cached local PNG files.
 - Icon resolution is best-effort: cached symbol icon first, then cached/downloaded `generic.png`, otherwise no icon field.
@@ -43,7 +46,7 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 
 ### Provider stack (no API key)
 
-- FX: Frankfurter (`24h` TTL by default)
+- FX: Frankfurter primary + FloatRates fallback (`24h` TTL by default)
 - Crypto: Coinbase primary + Kraken fallback (`5m` TTL by default)
 - `MARKET_FX_CACHE_TTL` overrides only FX TTL
 - `MARKET_CRYPTO_CACHE_TTL` overrides only crypto TTL

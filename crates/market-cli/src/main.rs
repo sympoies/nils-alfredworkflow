@@ -8,6 +8,7 @@ use workflow_common::{
 };
 
 use market_cli::{
+    FavoriteTarget,
     config::RuntimeConfig,
     error::AppError,
     expression, icons,
@@ -84,7 +85,7 @@ const ERROR_CODE_RUNTIME_SERIALIZE: &str = "runtime.serialize_failed";
 const FAVORITES_PROMPT_TITLE: &str = "Enter a market expression";
 const FAVORITES_PROMPT_EXAMPLE: &str = "Example: 1 BTC + 3 ETH to JPY";
 const FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE: &str =
-    "Favorite symbol. Type an expression to convert. Quote unavailable.";
+    "Favorite quote. Type an expression to convert. Quote unavailable.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum OutputModeArg {
@@ -289,7 +290,7 @@ where
             output,
             json,
         } => {
-            let symbols = parse_favorites_list(list.as_deref(), &default_fiat)
+            let favorites = parse_favorites_list(list.as_deref(), &default_fiat)
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
             let default_fiat = normalize_fx_symbol(&default_fiat, "default_fiat")
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
@@ -299,13 +300,13 @@ where
                 )?;
 
             match output_mode {
-                OutputMode::Human => Ok(format_favorites_human_output(&symbols)),
+                OutputMode::Human => Ok(format_favorites_human_output(&favorites)),
                 OutputMode::AlfredJson | OutputMode::Json => {
                     let alfred_json = render_favorites_alfred_output(
                         config,
                         providers,
                         now_fn,
-                        &symbols,
+                        &favorites,
                         &default_fiat,
                     )?;
 
@@ -416,22 +417,29 @@ fn render_market_alfred_output(
     })
 }
 
-fn format_favorites_human_output(symbols: &[String]) -> String {
-    format!("favorites: {}", symbols.join(", "))
+fn format_favorites_human_output(favorites: &[FavoriteTarget]) -> String {
+    format!(
+        "favorites: {}",
+        favorites
+            .iter()
+            .map(FavoriteTarget::display_token)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 fn render_favorites_alfred_output<P, N>(
     config: &RuntimeConfig,
     providers: &P,
     now_fn: N,
-    symbols: &[String],
+    favorites: &[FavoriteTarget],
     default_fiat: &str,
 ) -> Result<String, CliError>
 where
     P: ProviderApi,
     N: Fn() -> DateTime<Utc> + Copy,
 {
-    let mut items = Vec::with_capacity(symbols.len() + 1);
+    let mut items = Vec::with_capacity(favorites.len() + 1);
     items.push(
         Item::new(FAVORITES_PROMPT_TITLE)
             .with_uid("market-favorites-prompt")
@@ -441,13 +449,9 @@ where
             .with_valid(false),
     );
 
-    for symbol in symbols {
+    for favorite in favorites {
         items.push(build_favorite_quote_item(
-            config,
-            providers,
-            now_fn,
-            symbol,
-            default_fiat,
+            config, providers, now_fn, favorite,
         ));
     }
 
@@ -463,43 +467,46 @@ fn build_favorite_quote_item<P, N>(
     config: &RuntimeConfig,
     providers: &P,
     now_fn: N,
-    symbol: &str,
-    default_fiat: &str,
+    favorite: &FavoriteTarget,
 ) -> Item
 where
     P: ProviderApi,
     N: Fn() -> DateTime<Utc> + Copy,
 {
-    if symbol == default_fiat {
+    let base = favorite.base();
+    let quote = favorite.quote();
+
+    if base == quote {
         return with_symbol_icon(
-            Item::new(format!("1 {symbol} = 1 {default_fiat}"))
-                .with_uid(favorite_item_uid(symbol, default_fiat))
+            Item::new(format!("1 {base} = 1 {quote}"))
+                .with_uid(favorite_item_uid(base, quote))
                 .with_subtitle("provider: identity · freshness: fixed")
                 .with_valid(false),
             config,
-            symbol,
+            base,
         );
     }
 
-    match expression::resolve_symbol_output(config, providers, now_fn, symbol, default_fiat) {
-        Ok(output) => favorite_quote_success_item(config, symbol, default_fiat, &output),
+    match resolve_favorite_output(config, providers, now_fn, favorite) {
+        Ok(output) => favorite_quote_success_item(config, favorite, &output),
         Err(_) => with_symbol_icon(
-            Item::new(symbol)
-                .with_uid(favorite_item_uid(symbol, default_fiat))
+            Item::new(favorite.display_token())
+                .with_uid(favorite_item_uid(base, quote))
                 .with_subtitle(FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE)
                 .with_valid(false),
             config,
-            symbol,
+            base,
         ),
     }
 }
 
 fn favorite_quote_success_item(
     config: &RuntimeConfig,
-    symbol: &str,
-    default_fiat: &str,
+    favorite: &FavoriteTarget,
     output: &market_cli::model::MarketOutput,
 ) -> Item {
+    let base = favorite.base();
+    let quote = favorite.quote();
     let rendered_price = output
         .unit_price
         .parse::<Decimal>()
@@ -507,8 +514,8 @@ fn favorite_quote_success_item(
         .unwrap_or_else(|_| output.unit_price.clone());
 
     with_symbol_icon(
-        Item::new(format!("1 {symbol} = {rendered_price} {default_fiat}"))
-            .with_uid(favorite_item_uid(symbol, default_fiat))
+        Item::new(format!("1 {base} = {rendered_price} {quote}"))
+            .with_uid(favorite_item_uid(base, quote))
             .with_subtitle(format!(
                 "provider: {} · freshness: {}",
                 output.provider,
@@ -516,15 +523,37 @@ fn favorite_quote_success_item(
             ))
             .with_valid(false),
         config,
-        symbol,
+        base,
     )
 }
 
-fn favorite_item_uid(symbol: &str, default_fiat: &str) -> String {
+fn resolve_favorite_output<P, N>(
+    config: &RuntimeConfig,
+    providers: &P,
+    now_fn: N,
+    favorite: &FavoriteTarget,
+) -> Result<market_cli::model::MarketOutput, AppError>
+where
+    P: ProviderApi,
+    N: Fn() -> DateTime<Utc> + Copy,
+{
+    match favorite {
+        FavoriteTarget::Symbol { symbol, quote } => {
+            expression::resolve_symbol_output(config, providers, now_fn, symbol, quote)
+        }
+        FavoriteTarget::FxPair { base, quote } => {
+            let request =
+                MarketRequest::new(MarketKind::Fx, base, quote, "1").map_err(AppError::from)?;
+            service::resolve_market(config, providers, now_fn, &request)
+        }
+    }
+}
+
+fn favorite_item_uid(base: &str, quote: &str) -> String {
     format!(
         "market-favorite-{}-{}",
-        symbol.to_ascii_lowercase(),
-        default_fiat.to_ascii_lowercase()
+        base.to_ascii_lowercase(),
+        quote.to_ascii_lowercase()
     )
 }
 
@@ -707,6 +736,16 @@ mod tests {
                 ("JPY", "USD") => Ok(MarketQuote::new(
                     "frankfurter",
                     rust_decimal::Decimal::new(67, 4),
+                    now,
+                )),
+                ("JPY", "TWD") => Ok(MarketQuote::new(
+                    "frankfurter",
+                    rust_decimal::Decimal::new(215, 2),
+                    now,
+                )),
+                ("USD", "JPY") => Ok(MarketQuote::new(
+                    "frankfurter",
+                    rust_decimal::Decimal::new(15025, 2),
                     now,
                 )),
                 _ => Err(ProviderError::UnsupportedPair(format!("{base}/{quote}"))),
@@ -1126,6 +1165,30 @@ mod tests {
     }
 
     #[test]
+    fn main_outputs_favorites_human_mode_with_explicit_fx_pairs() {
+        let cli = Cli::parse_from([
+            "market-cli",
+            "favorites",
+            "--list",
+            "jpy/usd,jpy/twd,btc",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "human",
+        ]);
+        let failing_providers = FakeProviders {
+            fx_result: Err(ProviderError::Transport("offline".to_string())),
+            crypto_coinbase_result: Err(ProviderError::Transport("offline".to_string())),
+            crypto_kraken_result: Err(ProviderError::Transport("offline".to_string())),
+        };
+
+        let output = run_with(cli, &config_in_tempdir(), &failing_providers, fixed_now)
+            .expect("favorites human output should not resolve quotes");
+
+        assert_eq!(output, "favorites: JPY/USD, JPY/TWD, BTC");
+    }
+
+    #[test]
     fn favorites_rows_include_icon_paths_for_supported_symbols() {
         let cli = Cli::parse_from([
             "market-cli",
@@ -1169,7 +1232,7 @@ mod tests {
         );
         assert_eq!(
             items[4].get("title").and_then(Value::as_str),
-            Some("1 JPY = 0.01 USD")
+            Some("1 JPY = 0.007 USD")
         );
         assert!(items.iter().all(|item| item.get("uid").is_some()));
         assert!(items[0].get("icon").is_none());
@@ -1182,6 +1245,57 @@ mod tests {
                 .iter()
                 .all(|item| { item.get("valid").and_then(Value::as_bool) == Some(false) })
         );
+    }
+
+    #[test]
+    fn favorites_rows_include_explicit_fx_pairs() {
+        let cli = Cli::parse_from([
+            "market-cli",
+            "favorites",
+            "--list",
+            "jpy/usd,jpy/twd,usd/jpy",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "alfred-json",
+        ]);
+
+        let output = run_with(cli, &config_in_tempdir(), &FavoritesProviders, fixed_now)
+            .expect("favorites Alfred output with FX pairs should pass");
+        let json: Value = serde_json::from_str(&output).expect("json");
+        let items = json
+            .get("items")
+            .and_then(Value::as_array)
+            .expect("items should be array");
+
+        assert_eq!(items.len(), 4);
+        assert_eq!(
+            items[1].get("uid").and_then(Value::as_str),
+            Some("market-favorite-jpy-usd")
+        );
+        assert_eq!(
+            items[1].get("title").and_then(Value::as_str),
+            Some("1 JPY = 0.007 USD")
+        );
+        assert_eq!(
+            items[2].get("uid").and_then(Value::as_str),
+            Some("market-favorite-jpy-twd")
+        );
+        assert_eq!(
+            items[2].get("title").and_then(Value::as_str),
+            Some("1 JPY = 2.150 TWD")
+        );
+        assert_eq!(
+            items[3].get("uid").and_then(Value::as_str),
+            Some("market-favorite-usd-jpy")
+        );
+        assert_eq!(
+            items[3].get("title").and_then(Value::as_str),
+            Some("1 USD = 150.3 JPY")
+        );
+        assert!(item_icon_path(&items[1]).is_some_and(|path| path.ends_with("jpy.png")));
+        assert!(item_icon_path(&items[2]).is_some_and(|path| path.ends_with("jpy.png")));
+        assert!(item_icon_path(&items[3]).is_some_and(|path| path.ends_with("usd.png")));
     }
 
     #[test]
@@ -1218,6 +1332,45 @@ mod tests {
         );
         assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(false));
         assert!(item_icon_path(&items[1]).is_some_and(|path| path.ends_with("btc.png")));
+    }
+
+    #[test]
+    fn main_favorite_fx_pair_failures_fall_back_to_pair_hint_rows() {
+        let cli = Cli::parse_from([
+            "market-cli",
+            "favorites",
+            "--list",
+            "jpy/twd",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "alfred-json",
+        ]);
+        let failing_providers = FakeProviders {
+            fx_result: Err(ProviderError::Transport("offline".to_string())),
+            crypto_coinbase_result: Err(ProviderError::Transport("offline".to_string())),
+            crypto_kraken_result: Err(ProviderError::Transport("offline".to_string())),
+        };
+
+        let output = run_with(cli, &config_in_tempdir(), &failing_providers, fixed_now)
+            .expect("favorite FX pair output should degrade gracefully");
+        let json: Value = serde_json::from_str(&output).expect("json");
+        let items = json
+            .get("items")
+            .and_then(Value::as_array)
+            .expect("items should be array");
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            items[1].get("title").and_then(Value::as_str),
+            Some("JPY/TWD")
+        );
+        assert_eq!(
+            items[1].get("subtitle").and_then(Value::as_str),
+            Some(FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE)
+        );
+        assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(false));
+        assert!(item_icon_path(&items[1]).is_some_and(|path| path.ends_with("jpy.png")));
     }
 
     #[test]

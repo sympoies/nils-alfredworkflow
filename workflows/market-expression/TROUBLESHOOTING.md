@@ -29,7 +29,7 @@ MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
 MARKET_FX_CACHE_TTL="1d" \
 MARKET_CRYPTO_CACHE_TTL="5m" \
 MARKET_FAVORITES_ENABLED="1" \
-MARKET_FAVORITE_LIST="BTC,ETH,EUR,JPY" \
+MARKET_FAVORITE_LIST="BTC,ETH,JPY/USD,JPY/TWD" \
   bash workflows/market-expression/scripts/script_filter.sh "" \
   | jq -e '.items | length == 5 and .[0].title == "Enter a market expression" and all(.[]; .valid == false)'
 
@@ -44,10 +44,10 @@ rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACH
 | `market-cli binary not found` row | Binary is absent in all lookup paths | Package workflow again or set `MARKET_CLI_BIN` to executable absolute path. |
 | FX or crypto cache feels too fresh/stale | `MARKET_FX_CACHE_TTL` or `MARKET_CRYPTO_CACHE_TTL` is unset, too small, too large, or invalid | Leave them empty for defaults, or set explicit durations like `15m`, `1h`, or `1d`. Invalid values fall back to the built-in defaults. |
 | Empty query shows only the prompt row | `MARKET_FAVORITES_ENABLED` is disabled | Set `MARKET_FAVORITES_ENABLED` to `1`, `true`, or `on` if you want favorite quotes below the prompt. |
-| Empty query shows unexpected order or missing favorites | `MARKET_FAVORITE_LIST` contains duplicates, different order, or custom separators | `MARKET_FAVORITE_LIST` preserves first-occurrence order after trimming comma/newline tokens. Re-check the configured list exactly as entered. |
+| Empty query shows unexpected order or missing favorites | `MARKET_FAVORITE_LIST` contains duplicates, different order, or custom separators | `MARKET_FAVORITE_LIST` preserves first-occurrence order after trimming comma/newline tokens. Duplicates are evaluated by effective base/quote pair, so `USD` and `USD/TWD` collapse when `MARKET_DEFAULT_FIAT=TWD`. |
 | Empty query falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY` | `MARKET_FAVORITE_LIST` is empty or delimiter-only | This is expected fallback behavior. Set a non-empty comma/newline list to override it. |
-| Empty query shows a generic `Market Expression error` row | `MARKET_FAVORITE_LIST` contains an invalid symbol token or `MARKET_DEFAULT_FIAT` is invalid | Use uppercase symbol tokens. Empty or delimiter-only input falls back automatically; malformed non-empty tokens do not. |
-| Empty query shows a raw symbol instead of `1 SYMBOL = ...` | Quote lookup for that favorite failed and the row degraded to hint mode | Retry after provider recovery, or inspect cache/provider connectivity if it persists for the same symbol. |
+| Empty query shows a generic `Market Expression error` row | `MARKET_FAVORITE_LIST` contains an invalid symbol/pair token or `MARKET_DEFAULT_FIAT` is invalid | Use uppercase symbol tokens like `BTC`, `JPY` or uppercase FX pairs like `JPY/USD`. Empty or delimiter-only input falls back automatically; malformed non-empty tokens do not. |
+| Empty query shows a raw symbol/pair instead of `1 BASE = ... QUOTE` | Quote lookup for that favorite failed and the row degraded to hint mode | Retry after provider recovery, or inspect cache/provider connectivity if it persists for the same symbol/pair. |
 | Quote rows show no icon | Cold icon cache, icon CDN issue, or symbol has no dedicated icon and generic fallback was unavailable | Retry once to allow cold-cache fill, then inspect the market cache tree under `market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`. Rows should still work without icons. |
 | First render feels slower than later renders | Cold icon cache download happened during row rendering | Re-run the same query once. Warm-cache renders should reuse the same cached icon path. |
 | `Unsupported operator` row | Asset expression used `*` or `/` | Use `+`/`-` for asset terms. Keep `*`/`/` for numeric-only expressions. |
@@ -65,7 +65,7 @@ MARKET_CLI_BIN="$(pwd)/target/debug/market-cli" \
 MARKET_FX_CACHE_TTL="1d" \
 MARKET_CRYPTO_CACHE_TTL="5m" \
 MARKET_FAVORITES_ENABLED="1" \
-MARKET_FAVORITE_LIST=$'ETH\nBTC,EUR,JPY' \
+MARKET_FAVORITE_LIST=$'ETH\nBTC,JPY/USD,JPY/TWD' \
   bash workflows/market-expression/scripts/script_filter.sh "" \
   | jq -r '.items[] | [.title, .subtitle, (.valid|tostring)] | @tsv'
 

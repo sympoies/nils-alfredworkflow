@@ -72,7 +72,7 @@ fn resolve_fx<P: ProviderApi>(
         Ok(quote) => build_live_output(request, quote, now, cache_path, ttl_secs, key),
         Err(error) => fallback_or_error(
             "failed to fetch fx rate",
-            vec![format!("frankfurter: {error}")],
+            vec![format!("fx provider: {error}")],
             request,
             cached_state,
             ttl_secs,

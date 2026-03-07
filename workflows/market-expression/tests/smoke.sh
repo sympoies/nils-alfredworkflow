@@ -139,28 +139,49 @@ raw_list = sys.argv[1].replace("\\n", "\n")
 default_fiat = (sys.argv[2].strip().upper() or "USD")
 default_symbols = ["BTC", "ETH", default_fiat, "JPY"]
 
-symbols = []
+entries = []
 seen = set()
 for token in re.split(r"[\n,]", raw_list):
     normalized = token.strip().upper()
-    if not normalized or normalized in seen:
+    if not normalized:
         continue
-    seen.add(normalized)
-    symbols.append(normalized)
 
-if not symbols:
-    symbols = []
+    if "/" in normalized:
+        parts = [part.strip() for part in normalized.split("/")]
+        if len(parts) != 2 or not all(parts):
+            continue
+        base, quote = parts
+        label = f"{base}/{quote}"
+    else:
+        base = normalized
+        quote = default_fiat
+        label = normalized
+
+    key = (base, quote)
+    if key in seen:
+        continue
+    seen.add(key)
+    entries.append({"label": label, "base": base, "quote": quote})
+
+if not entries:
+    entries = []
     seen = set()
     for symbol in default_symbols:
-        if symbol in seen:
+        key = (symbol, default_fiat)
+        if key in seen:
             continue
-        seen.add(symbol)
-        symbols.append(symbol)
+        seen.add(key)
+        entries.append({"label": symbol, "base": symbol, "quote": default_fiat})
 
-quote_values = {
+pair_quote_values = {
+    ("JPY", "TWD"): "0.220",
+    ("USD", "JPY"): "150.3",
+}
+
+symbol_quote_values = {
     "BTC": "68194",
     "ETH": "1980",
-    "JPY": "0.01",
+    "JPY": "0.010",
 }
 
 items = [
@@ -172,30 +193,34 @@ items = [
     }
 ]
 
-for symbol in symbols:
-    if symbol == default_fiat:
+for entry in entries:
+    label = entry["label"]
+    base = entry["base"]
+    quote = entry["quote"]
+
+    if base == quote:
         items.append(
             {
-                "uid": f"market-favorite-{symbol.lower()}-{default_fiat.lower()}",
-                "title": f"1 {symbol} = 1 {default_fiat}",
+                "uid": f"market-favorite-{base.lower()}-{quote.lower()}",
+                "title": f"1 {base} = 1 {quote}",
                 "subtitle": "provider: identity · freshness: fixed",
                 "valid": False,
                 "icon": {
-                    "path": f"cache/icons/{symbol.lower()}.png",
+                    "path": f"cache/icons/{base.lower()}.png",
                 },
             }
         )
         continue
 
-    rendered = quote_values.get(symbol, "1")
+    rendered = pair_quote_values.get((base, quote), symbol_quote_values.get(base, "1"))
     items.append(
         {
-            "uid": f"market-favorite-{symbol.lower()}-{default_fiat.lower()}",
-            "title": f"1 {symbol} = {rendered} {default_fiat}",
+            "uid": f"market-favorite-{base.lower()}-{quote.lower()}",
+            "title": f"1 {base} = {rendered} {quote}",
             "subtitle": "provider: stub-provider · freshness: cache_fresh",
             "valid": False,
             "icon": {
-                "path": f"cache/icons/{symbol.lower()}.png",
+                "path": f"cache/icons/{base.lower()}.png",
             },
         }
     )
@@ -280,17 +305,22 @@ assert_jq_json "$success_default_json" '.items[0].subtitle == "default fiat=USD"
 favorites_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST=$'ETH\nBTC,USD,JPY' "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_json" '.items | type == "array" and length == 5' "favorites query should output prompt plus four configured rows"
 assert_jq_json "$favorites_json" '.items[0].title == "Enter a market expression"' "favorites query must include prompt row first"
-assert_jq_json "$favorites_json" '(.items[1:] | map(.title)) == ["1 ETH = 1980 USD","1 BTC = 68194 USD","1 USD = 1 USD","1 JPY = 0.01 USD"]' "favorites query must preserve configured order with quote rows"
+assert_jq_json "$favorites_json" '(.items[1:] | map(.title)) == ["1 ETH = 1980 USD","1 BTC = 68194 USD","1 USD = 1 USD","1 JPY = 0.010 USD"]' "favorites query must preserve configured order with quote rows"
 assert_jq_json "$favorites_json" '[.items[].valid] | all(. == false)' "favorites rows must be non-actionable"
 assert_jq_json "$favorites_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/eth.png","cache/icons/btc.png","cache/icons/usd.png","cache/icons/jpy.png"]' "favorites query should preserve icon paths for quote rows"
 
+favorites_pair_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST="JPY/USD,JPY/TWD,USD/JPY" "$workflow_dir/scripts/script_filter.sh" ""; })"
+assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.title)) == ["1 JPY = 0.010 USD","1 JPY = 0.220 TWD","1 USD = 150.3 JPY"]' "favorites query must support explicit FX pairs"
+assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.uid)) == ["market-favorite-jpy-usd","market-favorite-jpy-twd","market-favorite-usd-jpy"]' "favorites FX pair rows must use base/quote uid keys"
+assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/jpy.png","cache/icons/jpy.png","cache/icons/usd.png"]' "favorites FX pair rows should use base symbol icon paths"
+
 favorites_default_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="TWD" MARKET_FAVORITE_LIST="" "$workflow_dir/scripts/script_filter.sh" ""; })"
-assert_jq_json "$favorites_default_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 TWD","1 ETH = 1980 TWD","1 TWD = 1 TWD","1 JPY = 0.01 TWD"]' "empty favorites list must fall back to default favorites set with quote rows"
+assert_jq_json "$favorites_default_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 TWD","1 ETH = 1980 TWD","1 TWD = 1 TWD","1 JPY = 0.220 TWD"]' "empty favorites list must fall back to default favorites set with quote rows"
 assert_jq_json "$favorites_default_json" '[.items[].valid] | all(. == false)' "fallback favorites rows must be non-actionable"
 assert_jq_json "$favorites_default_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/btc.png","cache/icons/eth.png","cache/icons/twd.png","cache/icons/jpy.png"]' "fallback favorites rows must preserve icon paths"
 
 favorites_delimiter_only_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST=", ,\n,," "$workflow_dir/scripts/script_filter.sh" ""; })"
-assert_jq_json "$favorites_delimiter_only_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 USD","1 ETH = 1980 USD","1 USD = 1 USD","1 JPY = 0.01 USD"]' "delimiter-only favorites list must fall back to default favorites set"
+assert_jq_json "$favorites_delimiter_only_json" '(.items[1:] | map(.title)) == ["1 BTC = 68194 USD","1 ETH = 1980 USD","1 USD = 1 USD","1 JPY = 0.010 USD"]' "delimiter-only favorites list must fall back to default favorites set"
 
 favorites_disabled_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="EUR" MARKET_FAVORITES_ENABLED="0" MARKET_FAVORITE_LIST=$'ETH\nBTC,EUR,JPY' "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_disabled_json" '.items | type == "array" and length == 1' "disabled favorites toggle must show only prompt row"

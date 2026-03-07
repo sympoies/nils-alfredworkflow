@@ -89,14 +89,16 @@ Example: `1 btc + 3 btc` (without `to`)
 
 - Perform full-precision calculation first, then apply display rounding as the final step.
 - Decimal places are determined by absolute value `|x|`:
-  - `|x| < 100`: show 2 decimal places
+  - `|x| < 10`: show 3 decimal places
+  - `10 <= |x| < 100`: show 2 decimal places
   - `100 <= |x| < 1000`: show 1 decimal place
   - `|x| >= 1000`: show no decimal places
 - Rounding rule: `half-up`
 
 Examples:
 
-- `9.876 -> 9.88`
+- `9.8764 -> 9.876`
+- `9.8765 -> 9.877`
 - `12.345 -> 12.35`
 - `456.78 -> 456.8`
 - `1234.56 -> 1235`

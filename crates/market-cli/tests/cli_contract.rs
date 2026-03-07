@@ -237,6 +237,28 @@ fn cli_contract_favorites_human_output_preserves_mixed_separator_order() {
 }
 
 #[test]
+fn cli_contract_favorites_human_output_supports_explicit_fx_pairs() {
+    let output = run_cli(
+        &[
+            "favorites",
+            "--list",
+            "jpy/usd,jpy/twd,btc",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "human",
+        ],
+        &[],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        favorites_human_output(&output),
+        "favorites: JPY/USD, JPY/TWD, BTC"
+    );
+}
+
+#[test]
 fn cli_contract_favorites_alfred_rows_include_prompt_and_quotes() {
     let cache_dir = tempfile::tempdir().expect("tempdir");
     seed_cache_record(
@@ -269,7 +291,7 @@ fn cli_contract_favorites_alfred_rows_include_prompt_and_quotes() {
         vec![
             "Enter a market expression",
             "1 USD = 1 USD",
-            "1 JPY = 0.01 USD",
+            "1 JPY = 0.007 USD",
         ]
     );
     for item in favorite_items(&output) {
@@ -279,6 +301,78 @@ fn cli_contract_favorites_alfred_rows_include_prompt_and_quotes() {
     assert!(items[0].get("icon").is_none());
     assert_icon_path_suffix(&items[1], "/usd.png");
     assert_icon_path_suffix(&items[2], "/jpy.png");
+}
+
+#[test]
+fn cli_contract_favorites_alfred_rows_include_explicit_fx_pairs() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "JPY",
+        "USD",
+        "frankfurter",
+        "0.0067",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "JPY",
+        "TWD",
+        "frankfurter",
+        "2.15",
+    );
+    seed_cache_record(
+        cache_dir.path(),
+        MarketKind::Fx,
+        "USD",
+        "JPY",
+        "frankfurter",
+        "150.25",
+    );
+    seed_icon_cache(cache_dir.path(), "jpy.png", BTC_ICON_FIXTURE);
+    seed_icon_cache(cache_dir.path(), "usd.png", BTC_ICON_FIXTURE);
+
+    let cache_dir_value = cache_dir.path().display().to_string();
+    let output = run_cli(
+        &[
+            "favorites",
+            "--list",
+            "jpy/usd,jpy/twd,usd/jpy",
+            "--default-fiat",
+            "USD",
+            "--output",
+            "alfred-json",
+        ],
+        &[(MARKET_CACHE_DIR_ENV, cache_dir_value.as_str())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        favorite_item_titles(&output),
+        vec![
+            "Enter a market expression",
+            "1 JPY = 0.007 USD",
+            "1 JPY = 2.150 TWD",
+            "1 USD = 150.3 JPY",
+        ]
+    );
+    let items = favorite_items(&output);
+    assert_eq!(
+        items[1].get("uid").and_then(Value::as_str),
+        Some("market-favorite-jpy-usd")
+    );
+    assert_eq!(
+        items[2].get("uid").and_then(Value::as_str),
+        Some("market-favorite-jpy-twd")
+    );
+    assert_eq!(
+        items[3].get("uid").and_then(Value::as_str),
+        Some("market-favorite-usd-jpy")
+    );
+    assert_icon_path_suffix(&items[1], "/jpy.png");
+    assert_icon_path_suffix(&items[2], "/jpy.png");
+    assert_icon_path_suffix(&items[3], "/usd.png");
 }
 
 #[test]
@@ -403,6 +497,25 @@ fn cli_contract_favorites_dedup_preserves_first_occurrence_in_human_mode() {
 
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(favorites_human_output(&output), "favorites: BTC, ETH, USD");
+}
+
+#[test]
+fn cli_contract_favorites_dedup_uses_effective_base_quote_pair() {
+    let output = run_cli(
+        &[
+            "favorites",
+            "--list",
+            "usd,usd/twd,jpy/twd,jpy",
+            "--default-fiat",
+            "TWD",
+            "--output",
+            "human",
+        ],
+        &[],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(favorites_human_output(&output), "favorites: USD, JPY/TWD");
 }
 
 #[test]
