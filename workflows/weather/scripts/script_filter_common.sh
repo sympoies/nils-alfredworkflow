@@ -172,17 +172,102 @@ normalize_alfred_items() {
         {"path": "assets/icons/weather/unknown.png"}
       end;
 
+    def display_weekday($meta):
+      if (($meta.weekday_label // "") | length) > 0 then
+        $meta.weekday_label
+      else
+        ""
+      end;
+
+    def english_month_abbr($month_number):
+      ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][$month_number - 1];
+
+    def subtitle_separator:
+      " • ";
+
+    def timezone_label($meta; $default_timezone):
+      if (($meta.timezone_display // "") | length) > 0 then
+        $meta.timezone_display
+      elif (($meta.timezone // "") | length) > 0 then
+        $meta.timezone
+      else
+        $default_timezone
+      end;
+
+    def subtitle_date($meta):
+      if (($meta.date // "") | length) > 0 then
+        if (($meta.date | test("^(?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})$")) and ((display_weekday($meta)) | test("^[A-Za-z]{3}$"))) then
+          ($meta.date | capture("^(?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})$")) as $parts
+          | (display_weekday($meta) + ", " + english_month_abbr(($parts.month | tonumber)) + " " + (($parts.day | tonumber) | tostring))
+        else
+          ($meta.date + (if (display_weekday($meta) | length) > 0 then " " + display_weekday($meta) else "" end))
+        end
+      elif (($meta.date_with_weekday // "") | length) > 0 then
+        $meta.date_with_weekday
+      else
+        ($meta.date // "")
+      end;
+
+    def normalize_item($item; $display_location; $timezone; $lat; $lon):
+      ($item.weather_meta // {}) as $meta
+      | (timezone_label($meta; $timezone)) as $timezone_display
+      | if $meta.item_kind == "daily" then
+          (($meta.summary // "unknown weather") | if test("^[A-Za-z ]+$") then ascii_downcase else . end) as $summary
+          |
+          {
+              "title": ($display_location + " " + ($meta.temp_min_c_label // "?") + "~" + ($meta.temp_max_c_label // "?") + "°C " + $summary + " " + (($meta.precip_prob_max_pct_label // "?") + "%")),
+              "subtitle": (subtitle_date($meta) + subtitle_separator + $timezone_display + subtitle_separator + $lat + "," + $lon),
+              "arg": (if (($item.arg // "") | length) == 0 then ($meta.date // ($item.title // "")) else $item.arg end),
+              "valid": true,
+              "icon": resolved_icon($item),
+              "weather_meta": ($meta + {
+                "location_name": $display_location,
+                "timezone": $timezone,
+                "timezone_display": $timezone_display,
+                "latitude_label": $lat,
+                "longitude_label": $lon
+              })
+            }
+        elif $meta.item_kind == "hourly" then
+          (($meta.summary // "unknown weather") | if test("^[A-Za-z ]+$") then ascii_downcase else . end) as $summary
+          |
+          {
+              "title": ($display_location + " " + ($meta.time // "") + " " + ($meta.temp_c_label // "?") + "°C " + $summary + " " + (($meta.precip_prob_pct_label // "?") + "%")),
+              "subtitle": (subtitle_date($meta) + subtitle_separator + $timezone_display + subtitle_separator + $lat + "," + $lon),
+              "arg": (if (($item.arg // "") | length) == 0 then (($meta.datetime // "") | gsub("T"; " ")) else $item.arg end),
+              "valid": true,
+              "icon": resolved_icon($item),
+              "weather_meta": ($meta + {
+                "location_name": $display_location,
+                "timezone": $timezone,
+                "timezone_display": $timezone_display,
+                "latitude_label": $lat,
+                "longitude_label": $lon
+              })
+            }
+        else
+          {
+            "title": ($item.title // ""),
+            "subtitle": (if (($item.subtitle // "") | length) == 0 then ($timezone + " " + $lat + "," + $lon) else $item.subtitle end),
+            "arg": (if (($item.arg // "") | length) == 0 then ($item.title // "") else $item.arg end),
+            "valid": true,
+            "icon": resolved_icon($item),
+            "weather_meta": ($meta + {
+              "location_name": $display_location,
+              "timezone": $timezone,
+              "timezone_display": $timezone_display,
+              "latitude_label": $lat,
+              "longitude_label": $lon
+            })
+          }
+        end;
+
     if (.items | type != "array") then
       error("missing items array")
     else
-      if (.items | length) < 2 then
-        .items |= map(
-          . + {
-            "valid": false,
-            "arg": (if ((.arg // "") | length) == 0 then (.title // "") else .arg end)
-          }
-        )
-      else
+      if (.items | length) == 0 then
+        .
+      elif ((.items[0].weather_meta.item_kind // "") == "header") then
         (.items[0].weather_meta // {}) as $header
         | fallback_coords as $coords
         | ($header.location_name // ((.items[0].title // "") | sub(" \\([^)]*\\)$"; ""))) as $location
@@ -192,57 +277,24 @@ normalize_alfred_items() {
         | ($header.longitude_label // $coords.lon // "?") as $lon
         | .items = (
             .items[1:]
-            | map(
-                (.weather_meta // {}) as $meta
-                | if $meta.item_kind == "daily" then
-                    (($meta.summary // "unknown weather") | if test("^[A-Za-z ]+$") then ascii_downcase else . end) as $summary
-                    |
-                    {
-                        "title": ($display_location + " " + ($meta.temp_min_c_label // "?") + "~" + ($meta.temp_max_c_label // "?") + "°C " + $summary + " " + (($meta.precip_prob_max_pct_label // "?") + "%")),
-                        "subtitle": (($meta.date // "") + " " + $timezone + " " + $lat + "," + $lon),
-                        "arg": (if ((.arg // "") | length) == 0 then ($meta.date // (.title // "")) else .arg end),
-                        "valid": true,
-                        "icon": resolved_icon(.),
-                        "weather_meta": ($meta + {
-                          "location_name": $display_location,
-                          "timezone": $timezone,
-                          "latitude_label": $lat,
-                          "longitude_label": $lon
-                        })
-                      }
-                  elif $meta.item_kind == "hourly" then
-                    (($meta.summary // "unknown weather") | if test("^[A-Za-z ]+$") then ascii_downcase else . end) as $summary
-                    |
-                    {
-                        "title": ($display_location + " " + ($meta.time // "") + " " + ($meta.temp_c_label // "?") + "°C " + $summary + " " + (($meta.precip_prob_pct_label // "?") + "%")),
-                        "subtitle": (($meta.date // "") + " " + $timezone + " " + $lat + "," + $lon),
-                        "arg": (if ((.arg // "") | length) == 0 then (($meta.datetime // "") | gsub("T"; " ")) else .arg end),
-                        "valid": true,
-                        "icon": resolved_icon(.),
-                        "weather_meta": ($meta + {
-                          "location_name": $display_location,
-                          "timezone": $timezone,
-                          "latitude_label": $lat,
-                          "longitude_label": $lon
-                        })
-                      }
-                  else
-                    {
-                      "title": (.title // ""),
-                      "subtitle": (if ((.subtitle // "") | length) == 0 then ($timezone + " " + $lat + "," + $lon) else .subtitle end),
-                      "arg": (if ((.arg // "") | length) == 0 then (.title // "") else .arg end),
-                      "valid": true,
-                      "icon": resolved_icon(.),
-                      "weather_meta": ($meta + {
-                        "location_name": $display_location,
-                        "timezone": $timezone,
-                        "latitude_label": $lat,
-                        "longitude_label": $lon
-                      })
-                    }
-                  end
-              )
+            | map(normalize_item(.; $display_location; $timezone; $lat; $lon))
           )
+      elif ((.items[0].weather_meta.item_kind // "") == "daily" or (.items[0].weather_meta.item_kind // "") == "hourly") then
+        .items |= map(
+          (.weather_meta // {}) as $meta
+          | (if ($display_location_override | length) > 0 then $display_location_override else ($meta.location_name // (.title // "")) end) as $display_location
+          | ($meta.timezone // "UTC") as $timezone
+          | ($meta.latitude_label // "?") as $lat
+          | ($meta.longitude_label // "?") as $lon
+          | normalize_item(.; $display_location; $timezone; $lat; $lon)
+        )
+      else
+        .items |= map(
+          . + {
+            "valid": false,
+            "arg": (if ((.arg // "") | length) == 0 then (.title // "") else .arg end)
+          }
+        )
       end
     end
   ' <<<"$json_output"
@@ -351,7 +403,12 @@ if [[ "$period" != "hourly" ]]; then
       exit 0
     fi
 
-    printf '%s\n' "$json_output"
+    if ! normalized_output="$(normalize_alfred_items "$json_output" 2>/dev/null)"; then
+      print_error_item "$period" "weather-cli returned malformed Alfred JSON"
+      exit 0
+    fi
+
+    printf '%s\n' "$normalized_output"
     exit 0
   fi
 

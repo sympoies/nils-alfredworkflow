@@ -208,6 +208,8 @@ done
 summary="Cloudy"
 summary_en="Cloudy"
 rain_label="rain"
+timezone_display="Asia/Tokyo (UTC+9)"
+utc_offset_label="UTC+9"
 
 resolve_stub_context() {
   local city="${1:-}"
@@ -215,6 +217,8 @@ resolve_stub_context() {
   summary_en="Cloudy"
   location="city:${city}"
   timezone="Asia/Tokyo"
+  timezone_display="Asia/Tokyo (UTC+9)"
+  utc_offset_label="UTC+9"
   lat_out="35.6762"
   lon_out="139.6503"
 
@@ -225,15 +229,23 @@ resolve_stub_context() {
     case "${lat},${lon}" in
     35.6762,139.6503 | 35.68,139.69)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       ;;
     34.6937,135.5023)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       ;;
     25.0330,121.5654 | 25.03,121.56)
       timezone="Asia/Taipei"
+      timezone_display="Asia/Taipei (UTC+8)"
+      utc_offset_label="UTC+8"
       ;;
     *)
       timezone="UTC"
+      timezone_display="UTC (UTC+0)"
+      utc_offset_label="UTC+0"
       ;;
     esac
   elif [[ -n "$city" ]]; then
@@ -241,39 +253,53 @@ resolve_stub_context() {
     case "$(printf '%s' "$city" | tr '[:upper:]' '[:lower:]')" in
     tokyo)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       lat_out="35.6762"
       lon_out="139.6503"
       ;;
     osaka)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       lat_out="34.6937"
       lon_out="135.5023"
       ;;
     kyoto)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       lat_out="35.0116"
       lon_out="135.7681"
       summary_en="Mainly clear"
       ;;
     taipei)
       timezone="Asia/Taipei"
+      timezone_display="Asia/Taipei (UTC+8)"
+      utc_offset_label="UTC+8"
       lat_out="25.0330"
       lon_out="121.5654"
       ;;
     taichung)
       timezone="Asia/Taipei"
+      timezone_display="Asia/Taipei (UTC+8)"
+      utc_offset_label="UTC+8"
       lat_out="24.1477"
       lon_out="120.6736"
       summary_en="Partly cloudy"
       ;;
     "los angeles")
       timezone="America/Los_Angeles"
+      timezone_display="America/Los_Angeles (UTC-8)"
+      utc_offset_label="UTC-8"
       lat_out="34.0522"
       lon_out="-118.2437"
       summary_en="Clear sky"
       ;;
     *)
       timezone="Asia/Tokyo"
+      timezone_display="Asia/Tokyo (UTC+9)"
+      utc_offset_label="UTC+9"
       lat_out="35.0000"
       lon_out="139.0000"
       ;;
@@ -408,16 +434,19 @@ if [[ "$period" == "today" && ${#cities[@]} -gt 1 ]]; then
     item="$(jq -nc \
       --arg location "$location" \
       --arg timezone "$timezone" \
+      --arg timezone_display "$timezone_display" \
+      --arg utc_offset_label "$utc_offset_label" \
       --arg lat "$lat_out" \
       --arg lon "$lon_out" \
+      --arg lang "$lang" \
       --arg summary "$summary" \
       --arg display_summary "$display_summary" \
       --arg icon_key "$current_icon_key" \
       --arg rain_label "$rain_label" \
       --argjson weather_code "$weather_code" \
       '{
-        title: ($location + " 12.0~18.0°C " + $display_summary + " 10%"),
-        subtitle: ("2026-02-12 " + $timezone + " " + $lat + "," + $lon),
+        title: ($location + " " + (if $lang == "zh" then "週四" else "Thu" end) + " 12.0~18.0°C " + $display_summary + " 10%"),
+        subtitle: ("2026-02-12 " + (if $lang == "zh" then "週四" else "Thu" end) + " " + $timezone + " " + $lat + "," + $lon),
         arg: "2026-02-12",
         valid: true,
         icon: {
@@ -426,6 +455,8 @@ if [[ "$period" == "today" && ${#cities[@]} -gt 1 ]]; then
         weather_meta: {
           item_kind: "daily",
           date: "2026-02-12",
+          date_with_weekday: ("2026-02-12 " + (if $lang == "zh" then "週四" else "Thu" end)),
+          weekday_label: (if $lang == "zh" then "週四" else "Thu" end),
           summary: $summary,
           weather_code: $weather_code,
           icon_key: $icon_key,
@@ -435,6 +466,8 @@ if [[ "$period" == "today" && ${#cities[@]} -gt 1 ]]; then
           precip_prob_max_pct_label: "10",
           location_name: $location,
           timezone: $timezone,
+          timezone_display: $timezone_display,
+          utc_offset_label: $utc_offset_label,
           latitude_label: $lat,
           longitude_label: $lon
         }
@@ -450,8 +483,11 @@ if [[ "$period" == "hourly" ]]; then
   jq -nc \
     --arg location "$location" \
     --arg timezone "$timezone" \
+    --arg timezone_display "$timezone_display" \
+    --arg utc_offset_label "$utc_offset_label" \
     --arg lat "$lat_out" \
     --arg lon "$lon_out" \
+    --arg lang "$lang" \
     --arg summary "$summary" \
     --arg summary_en "$summary_en" \
     --arg rain_label "$rain_label" \
@@ -479,6 +515,7 @@ if [[ "$period" == "hourly" ]]; then
               item_kind: "header",
               location_name: $location,
               timezone: $timezone,
+              timezone_display: $timezone_display,
               latitude_label: $lat,
               longitude_label: $lon
             }
@@ -499,6 +536,10 @@ if [[ "$period" == "hourly" ]]; then
               weather_meta: {
                 item_kind: "hourly",
                 date: "2026-02-12",
+                date_with_weekday: ("2026-02-12 " + (if $lang == "zh" then "週四" else "Thu" end)),
+                weekday_label: (if $lang == "zh" then "週四" else "Thu" end),
+                timezone_display: $timezone_display,
+                utc_offset_label: $utc_offset_label,
                 time: ($hour + ":00"),
                 datetime: ("2026-02-12T" + $hour + ":00"),
                 summary: $summary,
@@ -520,8 +561,11 @@ if [[ "$period" == "week" ]]; then
   jq -nc \
     --arg location "$location" \
     --arg timezone "$timezone" \
+    --arg timezone_display "$timezone_display" \
+    --arg utc_offset_label "$utc_offset_label" \
     --arg lat "$lat_out" \
     --arg lon "$lon_out" \
+    --arg lang "$lang" \
     --arg summary "$summary" \
     --arg summary_en "$summary_en" \
     --arg rain_label "$rain_label" \
@@ -533,6 +577,12 @@ if [[ "$period" == "week" ]]; then
         elif $summary_en == "Mainly clear" then "mainly-clear-day"
         elif $summary_en == "Partly cloudy" then "partly-cloudy-day"
         else "cloudy"
+        end;
+      def weekday_label($day_index; $lang):
+        if $lang == "zh" then
+          ["週四", "週五", "週六", "週日", "週一", "週二", "週三"][$day_index]
+        else
+          ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][$day_index]
         end;
       {
       items: (
@@ -546,6 +596,7 @@ if [[ "$period" == "week" ]]; then
               item_kind: "header",
               location_name: $location,
               timezone: $timezone,
+              timezone_display: $timezone_display,
               latitude_label: $lat,
               longitude_label: $lon
             }
@@ -566,6 +617,10 @@ if [[ "$period" == "week" ]]; then
               weather_meta: {
                 item_kind: "daily",
                 date: $date,
+                date_with_weekday: ($date + " " + weekday_label($day_index; $lang)),
+                weekday_label: weekday_label($day_index; $lang),
+                timezone_display: $timezone_display,
+                utc_offset_label: $utc_offset_label,
                 summary: $summary,
                 weather_code: $weather_code,
                 icon_key: $icon_key,
@@ -587,8 +642,11 @@ if [[ "$period" == "today" ]]; then
   jq -nc \
     --arg location "$location" \
     --arg timezone "$timezone" \
+    --arg timezone_display "$timezone_display" \
+    --arg utc_offset_label "$utc_offset_label" \
     --arg lat "$lat_out" \
     --arg lon "$lon_out" \
+    --arg lang "$lang" \
     --arg summary "$summary" \
     --arg rain_label "$rain_label" \
     --arg period "$period" \
@@ -605,6 +663,7 @@ if [[ "$period" == "today" ]]; then
             item_kind: "header",
             location_name: $location,
             timezone: $timezone,
+            timezone_display: $timezone_display,
             latitude_label: $lat,
             longitude_label: $lon
           }
@@ -620,6 +679,10 @@ if [[ "$period" == "today" ]]; then
           weather_meta: {
             item_kind: "daily",
             date: "2026-02-12",
+            date_with_weekday: ("2026-02-12 " + (if $lang == "zh" then "週四" else "Thu" end)),
+            weekday_label: (if $lang == "zh" then "週四" else "Thu" end),
+            timezone_display: $timezone_display,
+            utc_offset_label: $utc_offset_label,
             summary: $summary,
             weather_code: $weather_code,
             icon_key: $icon_key,
@@ -727,6 +790,7 @@ jq -nc '
           item_kind: "header",
           location_name: "25.0330,121.5654",
           timezone: "Asia/Taipei",
+          timezone_display: "Asia/Taipei (UTC+8)",
           latitude_label: "25.0330",
           longitude_label: "121.5654"
         }
@@ -740,6 +804,10 @@ jq -nc '
         weather_meta: {
           item_kind: "hourly",
           date: "2026-02-12",
+          date_with_weekday: "2026-02-12 Thu",
+          weekday_label: "Thu",
+          timezone_display: "Asia/Taipei (UTC+8)",
+          utc_offset_label: "UTC+8",
           time: "00:00",
           datetime: "2026-02-12T00:00",
           summary: "Cloudy",
@@ -761,8 +829,8 @@ export ALFRED_WORKFLOW_CACHE="$tmp_dir/empty-cache"
 
 today_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "Taipei"; })"
 assert_jq_json "$today_stage_one_json" '.items | type == "array" and length == 1' "today stage one should keep original single-row display"
-assert_jq_json "$today_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "today stage one should keep original today row title"
-assert_jq_json "$today_stage_one_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "today stage one should keep original subtitle format"
+assert_jq_json "$today_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "today stage one title should not include weekday"
+assert_jq_json "$today_stage_one_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "today stage one subtitle should show timezone with UTC offset"
 assert_jq_json "$today_stage_one_json" '.items[0].icon.path == "assets/icons/weather/cloudy.png"' "today stage one should keep weather icon mapping"
 assert_jq_json "$today_stage_one_json" '.items[0].valid == false' "today stage one row must be non-actionable for stage two transition"
 assert_jq_json "$today_stage_one_json" '.items[0].autocomplete == "city::Taipei"' "today stage one should add city token for stage two"
@@ -770,10 +838,10 @@ assert_jq_json "$today_stage_one_json" '.items[0].autocomplete == "city::Taipei"
 today_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_stage_one_json")"
 today_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "$today_stage_two_query"; })"
 assert_jq_json "$today_stage_two_json" '.items | type == "array" and length == 4' "today stage two must return hourly rows"
-assert_jq_json "$today_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should render normalized hourly row"
-assert_jq_json "$today_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "today stage two subtitle should show date timezone and coordinates"
+assert_jq_json "$today_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two title should not include weekday"
+assert_jq_json "$today_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "today stage two subtitle should show timezone with UTC offset"
 assert_jq_json "$today_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy-night.png"' "today hourly row should map to night weather icon after dark"
-assert_jq_json "$today_stage_two_json" '.items[3].title == "Taipei 03:00 12.0°C cloudy 10%"' "today stage two should keep later hourly rows"
+assert_jq_json "$today_stage_two_json" '.items[3].title == "Taipei 03:00 12.0°C cloudy 10%"' "today stage two should keep later hourly rows without weekday"
 
 today_legacy_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
 assert_jq_json "$today_legacy_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should keep legacy city token compatibility"
@@ -784,7 +852,7 @@ cat >"$tmp_dir/cache/weather-cli/geocode/city-taipei.json" <<'EOS'
 EOS
 today_cached_city_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-city-fails-latlon-ok" ALFRED_WORKFLOW_CACHE="$tmp_dir/cache" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
 assert_jq_json "$today_cached_city_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C cloudy 10%"' "today stage two should resolve cached city coordinates before hourly fetch"
-assert_jq_json "$today_cached_city_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "cached city coordinates should preserve normalized subtitle output"
+assert_jq_json "$today_cached_city_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "cached city coordinates should preserve timezone offset subtitle output"
 
 today_clear_day_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_ICON_LOCAL_HOUR_OVERRIDE=10 "$workflow_dir/scripts/script_filter_today.sh" "Los Angeles"; })"
 assert_jq_json "$today_clear_day_json" '.items[0].icon.path == "assets/icons/weather/clear-day.png"' "today stage one should keep day clear icon during daytime"
@@ -805,17 +873,17 @@ today_la_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$w
 today_la_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_la_stage_one_json")"
 today_la_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "$today_la_stage_two_query"; })"
 assert_jq_json "$today_la_stage_two_json" '.items | type == "array" and length == 4' "today stage two should support negative longitude coordinate tokens"
-assert_jq_json "$today_la_stage_two_json" '.items[0].title == "Los Angeles 00:00 12.0°C clear sky 10%"' "negative longitude city token stage two should preserve the display location"
-assert_jq_json "$today_la_stage_two_json" '.items[0].subtitle == "2026-02-12 America/Los_Angeles 34.0522,-118.2437"' "negative longitude city token stage two should keep the negative longitude in subtitle"
+assert_jq_json "$today_la_stage_two_json" '.items[0].title == "Los Angeles 00:00 12.0°C clear sky 10%"' "negative longitude city token stage two should preserve the display location without weekday in title"
+assert_jq_json "$today_la_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • America/Los_Angeles (UTC-8) • 34.0522,-118.2437"' "negative longitude city token stage two should keep timezone offset and negative longitude"
 
 today_zh_stage_one_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_LOCALE="zh" "$workflow_dir/scripts/script_filter_today.sh" "Taipei"; })"
-assert_jq_json "$today_zh_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C 陰天 10%"' "today stage one zh should keep original localized title"
+assert_jq_json "$today_zh_stage_one_json" '.items[0].title == "Taipei 12.0~18.0°C 陰天 10%"' "today stage one zh title should not include weekday"
 assert_jq_json "$today_zh_stage_one_json" '.items[0].autocomplete == "city::Taipei"' "today stage one zh should emit city token for stage two"
 
 today_zh_stage_two_query="$(jq -r '.items[0].autocomplete' <<<"$today_zh_stage_one_json")"
 today_zh_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_LOCALE="zh" "$workflow_dir/scripts/script_filter_today.sh" "$today_zh_stage_two_query"; })"
-assert_jq_json "$today_zh_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C 陰天 10%"' "zh locale should use chinese summary for hourly rows"
-assert_jq_json "$today_zh_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "zh locale hourly subtitle should show date timezone and coordinates"
+assert_jq_json "$today_zh_stage_two_json" '.items[0].title == "Taipei 00:00 12.0°C 陰天 10%"' "zh locale should use chinese summary without weekday in title"
+assert_jq_json "$today_zh_stage_two_json" '.items[0].subtitle == "2026-02-12 週四 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "zh locale hourly subtitle should show timezone with UTC offset"
 assert_jq_json "$today_zh_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy-night.png"' "zh hourly row should map to same night cloudy icon"
 
 week_city_picker_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_week.sh" "Taipei"; })"
@@ -837,19 +905,19 @@ assert_jq_json "$week_default_picker_json" '.items[1].title == "Osaka"' "week de
 
 week_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_week.sh" "city::Taipei"; })"
 assert_jq_json "$week_stage_two_json" '.items | type == "array" and length == 7' "week stage two must return fixed 7 rows"
-assert_jq_json "$week_stage_two_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "week stage two should render normalized weather row"
-assert_jq_json "$week_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.0330,121.5654"' "week stage two subtitle should show date timezone and coordinates"
+assert_jq_json "$week_stage_two_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "week stage two should render normalized weather row without weekday in title"
+assert_jq_json "$week_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "week stage two subtitle should show timezone with UTC offset"
 assert_jq_json "$week_stage_two_json" '.items[0].icon.path == "assets/icons/weather/cloudy.png"' "week stage two should map to weather icon"
-assert_jq_json "$week_stage_two_json" '.items[6].subtitle == "2026-02-18 Asia/Taipei 25.0330,121.5654"' "week stage two should keep 7th day row"
+assert_jq_json "$week_stage_two_json" '.items[6].subtitle == "Wed, Feb 18 • Asia/Taipei (UTC+8) • 25.0330,121.5654"' "week stage two should keep timezone offset on 7th day row"
 
 week_coordinate_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_week.sh" "city::25.03,121.56"; })"
 assert_jq_json "$week_coordinate_stage_two_json" '.items | type == "array" and length == 7' "week coordinate city token should still produce 7 rows"
-assert_jq_json "$week_coordinate_stage_two_json" '.items[0].title == "25.03,121.56 12.0~18.0°C cloudy 10%"' "week coordinate stage two should include coordinate location in title"
-assert_jq_json "$week_coordinate_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.03,121.56"' "week coordinate stage two subtitle should show local timezone for coordinates"
+assert_jq_json "$week_coordinate_stage_two_json" '.items[0].title == "25.03,121.56 12.0~18.0°C cloudy 10%"' "week coordinate stage two should include coordinate location without weekday in title"
+assert_jq_json "$week_coordinate_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.03,121.56"' "week coordinate stage two subtitle should show timezone with UTC offset"
 
 empty_today_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "  "; })"
 assert_jq_json "$empty_today_json" '.items | type == "array" and length == 1' "empty today query should keep original today result count"
-assert_jq_json "$empty_today_json" '.items[0].title == "Tokyo 12.0~18.0°C cloudy 10%"' "empty today query should keep original Tokyo row"
+assert_jq_json "$empty_today_json" '.items[0].title == "Tokyo 12.0~18.0°C cloudy 10%"' "empty today query should keep default Tokyo row title without weekday"
 assert_jq_json "$empty_today_json" '.items[0].autocomplete == "city::Tokyo"' "empty today query should add city token for stage two"
 
 empty_today_multi_default_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" WEATHER_DEFAULT_CITIES="Tokyo,Osaka" "$workflow_dir/scripts/script_filter_today.sh" "  "; })"
@@ -861,11 +929,12 @@ multi_city_query_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$wor
 assert_jq_json "$multi_city_query_json" '.items | type == "array" and length == 2' "multi-city query should keep original row-per-city today display"
 assert_jq_json "$multi_city_query_json" 'any(.items[]; .title == "Taipei 12.0~18.0°C cloudy 10%")' "multi-city query should include Taipei today row"
 assert_jq_json "$multi_city_query_json" 'any(.items[]; .title == "Tokyo 12.0~18.0°C cloudy 10%")' "multi-city query should include Tokyo today row"
+assert_jq_json "$multi_city_query_json" 'any(.items[]; .subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654")' "multi-city query should include timezone offset subtitle"
 
 today_coordinate_stage_two_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-ok" "$workflow_dir/scripts/script_filter_today.sh" "city::25.03,121.56"; })"
 assert_jq_json "$today_coordinate_stage_two_json" '.items | type == "array" and length == 4' "today coordinate city token should still produce hourly rows"
-assert_jq_json "$today_coordinate_stage_two_json" '.items[0].title == "25.03,121.56 00:00 12.0°C cloudy 10%"' "today coordinate stage two should include coordinate location in title"
-assert_jq_json "$today_coordinate_stage_two_json" '.items[0].subtitle == "2026-02-12 Asia/Taipei 25.03,121.56"' "today coordinate stage two subtitle should show local timezone for coordinates"
+assert_jq_json "$today_coordinate_stage_two_json" '.items[0].title == "25.03,121.56 00:00 12.0°C cloudy 10%"' "today coordinate stage two should include coordinate location without weekday in title"
+assert_jq_json "$today_coordinate_stage_two_json" '.items[0].subtitle == "Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.03,121.56"' "today coordinate stage two subtitle should show timezone with UTC offset"
 
 invalid_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-invalid" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
 assert_jq_json "$invalid_json" '.items[0].title == "Invalid location input"' "invalid input title mapping mismatch"

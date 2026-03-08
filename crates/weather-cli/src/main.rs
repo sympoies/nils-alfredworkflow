@@ -1,4 +1,7 @@
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime, Datelike, LocalResult, NaiveDate, NaiveDateTime, Offset, TimeZone, Utc, Weekday,
+};
+use chrono_tz::Tz;
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::json;
 use workflow_common::{
@@ -480,6 +483,11 @@ fn render_alfred_json(
     ));
     for day in &output.forecast {
         let summary = localized_summary(day, language);
+        let date_with_weekday = format_date_with_weekday(&day.date, language);
+        let weekday_label = weekday_label_for_date(&day.date, language);
+        let utc_offset_label = timezone_offset_label_for_date(&output.timezone, &day.date);
+        let timezone_display =
+            timezone_display_label(&output.timezone, utc_offset_label.as_deref());
         let icon_key = if output.period == ForecastPeriod::Today {
             weather_cli::weather_icon::current_conditions_icon_key(
                 day.weather_code,
@@ -493,7 +501,7 @@ fn render_alfred_json(
         items.push(json!({
             "title": format!(
                 "{} {} {:.1}~{:.1}°C",
-                day.date, summary, day.temp_min_c, day.temp_max_c
+                date_with_weekday, summary, day.temp_min_c, day.temp_max_c
             ),
             "subtitle": format!("{}:{}%", precip_label(language), day.precip_prob_max_pct),
             "arg": day.date,
@@ -504,6 +512,10 @@ fn render_alfred_json(
             "weather_meta": {
                 "item_kind": "daily",
                 "date": day.date,
+                "date_with_weekday": date_with_weekday,
+                "weekday_label": weekday_label,
+                "utc_offset_label": utc_offset_label,
+                "timezone_display": timezone_display,
                 "summary": summary,
                 "weather_code": day.weather_code,
                 "icon_key": icon_key,
@@ -581,10 +593,15 @@ fn render_hourly_alfred_json(
         let icon_key =
             weather_cli::weather_icon::hourly_forecast_icon_key(hour.weather_code, &hour.datetime);
         let (date, time) = split_datetime_label(&hour.datetime);
+        let date_with_weekday = format_date_with_weekday(date, language);
+        let weekday_label = weekday_label_for_datetime(&hour.datetime, language);
+        let utc_offset_label = timezone_offset_label_for_datetime(&output.timezone, &hour.datetime);
+        let timezone_display =
+            timezone_display_label(&output.timezone, utc_offset_label.as_deref());
         items.push(json!({
             "title": format!(
                 "{} {} {:.1}°C",
-                display_hour_label(&hour.datetime),
+                display_hour_label(&hour.datetime, language),
                 summary,
                 hour.temp_c
             ),
@@ -597,6 +614,10 @@ fn render_hourly_alfred_json(
             "weather_meta": {
                 "item_kind": "hourly",
                 "date": date,
+                "date_with_weekday": date_with_weekday,
+                "weekday_label": weekday_label,
+                "utc_offset_label": utc_offset_label,
+                "timezone_display": timezone_display,
                 "time": time,
                 "datetime": hour.datetime,
                 "summary": summary,
@@ -687,7 +708,7 @@ fn format_text_output(output: &ForecastOutput, language: OutputLanguage) -> Stri
         let summary = localized_summary(day, language);
         lines.push(format!(
             "{} {} {:.1}~{:.1}°C {}:{}%",
-            day.date,
+            format_date_with_weekday(&day.date, language),
             summary,
             day.temp_min_c,
             day.temp_max_c,
@@ -730,7 +751,7 @@ fn format_hourly_text_output(output: &HourlyForecastOutput, language: OutputLang
         let summary = localized_summary_by_code(hour.weather_code, language);
         lines.push(format!(
             "{} {} {:.1}°C {}:{}%",
-            display_hour_label(&hour.datetime),
+            display_hour_label(&hour.datetime, language),
             summary,
             hour.temp_c,
             precip_label(language),
@@ -752,7 +773,124 @@ fn localized_summary_by_code(weather_code: i32, language: OutputLanguage) -> Str
     }
 }
 
-fn display_hour_label(datetime: &str) -> String {
+fn localized_weekday_label(weekday: Weekday, language: OutputLanguage) -> &'static str {
+    match language {
+        OutputLanguage::En => match weekday {
+            Weekday::Mon => "Mon",
+            Weekday::Tue => "Tue",
+            Weekday::Wed => "Wed",
+            Weekday::Thu => "Thu",
+            Weekday::Fri => "Fri",
+            Weekday::Sat => "Sat",
+            Weekday::Sun => "Sun",
+        },
+        OutputLanguage::Zh => match weekday {
+            Weekday::Mon => "週一",
+            Weekday::Tue => "週二",
+            Weekday::Wed => "週三",
+            Weekday::Thu => "週四",
+            Weekday::Fri => "週五",
+            Weekday::Sat => "週六",
+            Weekday::Sun => "週日",
+        },
+    }
+}
+
+fn weekday_label_for_date(date: &str, language: OutputLanguage) -> Option<&'static str> {
+    NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .ok()
+        .map(|parsed| localized_weekday_label(parsed.weekday(), language))
+}
+
+fn parse_local_datetime(datetime: &str) -> Option<NaiveDateTime> {
+    NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M")
+        .or_else(|_| NaiveDateTime::parse_from_str(datetime, "%Y-%m-%d %H:%M"))
+        .ok()
+}
+
+fn parse_timezone(timezone: &str) -> Option<Tz> {
+    timezone.parse::<Tz>().ok()
+}
+
+fn resolve_localized_datetime(
+    timezone: &str,
+    local_datetime: NaiveDateTime,
+) -> Option<DateTime<Tz>> {
+    let tz = parse_timezone(timezone)?;
+    match tz.from_local_datetime(&local_datetime) {
+        LocalResult::Single(datetime) => Some(datetime),
+        LocalResult::Ambiguous(datetime, _) => Some(datetime),
+        LocalResult::None => None,
+    }
+}
+
+fn timezone_offset_seconds_for_date(timezone: &str, date: &str) -> Option<i32> {
+    let local_date = NaiveDate::parse_from_str(date, "%Y-%m-%d").ok()?;
+    let local_datetime = local_date.and_hms_opt(12, 0, 0)?;
+    resolve_localized_datetime(timezone, local_datetime)
+        .map(|datetime| datetime.offset().fix().local_minus_utc())
+}
+
+fn timezone_offset_seconds_for_datetime(timezone: &str, datetime: &str) -> Option<i32> {
+    let local_datetime = parse_local_datetime(datetime)?;
+    resolve_localized_datetime(timezone, local_datetime)
+        .map(|datetime| datetime.offset().fix().local_minus_utc())
+}
+
+fn format_utc_offset_label(offset_seconds: i32) -> String {
+    let sign = if offset_seconds >= 0 { '+' } else { '-' };
+    let absolute_seconds = offset_seconds.unsigned_abs();
+    let hours = absolute_seconds / 3600;
+    let minutes = (absolute_seconds % 3600) / 60;
+    let seconds = absolute_seconds % 60;
+
+    if seconds > 0 {
+        return format!("UTC{sign}{hours}:{minutes:02}:{seconds:02}");
+    }
+
+    if minutes > 0 {
+        return format!("UTC{sign}{hours}:{minutes:02}");
+    }
+
+    format!("UTC{sign}{hours}")
+}
+
+fn timezone_offset_label_for_date(timezone: &str, date: &str) -> Option<String> {
+    timezone_offset_seconds_for_date(timezone, date).map(format_utc_offset_label)
+}
+
+fn timezone_offset_label_for_datetime(timezone: &str, datetime: &str) -> Option<String> {
+    timezone_offset_seconds_for_datetime(timezone, datetime).map(format_utc_offset_label)
+}
+
+fn timezone_display_label(timezone: &str, offset_label: Option<&str>) -> String {
+    match offset_label {
+        Some(offset_label) => format!("{timezone} ({offset_label})"),
+        None => timezone.to_string(),
+    }
+}
+
+fn weekday_label_for_datetime(datetime: &str, language: OutputLanguage) -> Option<&'static str> {
+    parse_local_datetime(datetime).map(|parsed| localized_weekday_label(parsed.weekday(), language))
+}
+
+fn format_date_with_weekday(date: &str, language: OutputLanguage) -> String {
+    match weekday_label_for_date(date, language) {
+        Some(label) => format!("{date} {label}"),
+        None => date.to_string(),
+    }
+}
+
+fn display_hour_label(datetime: &str, language: OutputLanguage) -> String {
+    if let Some(parsed) = parse_local_datetime(datetime) {
+        return format!(
+            "{} {} {}",
+            parsed.format("%Y-%m-%d"),
+            localized_weekday_label(parsed.weekday(), language),
+            parsed.format("%H:%M")
+        );
+    }
+
     datetime.replace('T', " ")
 }
 
@@ -783,6 +921,13 @@ fn alfred_daily_city_item(
     } else {
         summary.clone()
     };
+    let weekday_label = weekday_label_for_date(&day.date, language);
+    let weekday_segment = weekday_label
+        .map(|label| format!(" {label}"))
+        .unwrap_or_default();
+    let date_with_weekday = format_date_with_weekday(&day.date, language);
+    let utc_offset_label = timezone_offset_label_for_date(&output.timezone, &day.date);
+    let timezone_display = timezone_display_label(&output.timezone, utc_offset_label.as_deref());
     let icon_key = if use_current_conditions_icon {
         weather_cli::weather_icon::current_conditions_icon_key(
             day.weather_code,
@@ -795,8 +940,9 @@ fn alfred_daily_city_item(
 
     json!({
         "title": format!(
-            "{} {:.1}~{:.1}°C {} {}%",
+            "{}{} {:.1}~{:.1}°C {} {}%",
             output.location.name,
+            weekday_segment,
             day.temp_min_c,
             day.temp_max_c,
             rendered_summary,
@@ -804,7 +950,7 @@ fn alfred_daily_city_item(
         ),
         "subtitle": format!(
             "{} {} {:.4},{:.4}",
-            day.date,
+            date_with_weekday,
             output.timezone,
             output.location.latitude,
             output.location.longitude
@@ -817,6 +963,10 @@ fn alfred_daily_city_item(
         "weather_meta": {
             "item_kind": "daily",
             "date": day.date,
+            "date_with_weekday": date_with_weekday,
+            "weekday_label": weekday_label,
+            "utc_offset_label": utc_offset_label,
+            "timezone_display": timezone_display,
             "summary": summary,
             "weather_code": day.weather_code,
             "icon_key": icon_key,
@@ -1326,6 +1476,7 @@ mod tests {
 
         assert!(output.contains("Taipei City"));
         assert!(output.contains("source=open_meteo"));
+        assert!(output.contains("2026-02-11 Wed"));
         assert!(output.contains("Cloudy"));
         assert!(output.contains("rain:20%"));
     }
@@ -1337,6 +1488,7 @@ mod tests {
             .expect("zh text mode");
 
         assert!(output.contains("陰天"));
+        assert!(output.contains("2026-02-11 週三"));
         assert!(output.contains("降雨:20%"));
     }
 
@@ -1368,7 +1520,7 @@ mod tests {
             .and_then(|items| items.get(1))
             .and_then(|item| item.get("title"))
             .and_then(Value::as_str);
-        assert_eq!(second_item_title, Some("2026-02-11 Cloudy 14.5~20.1°C"));
+        assert_eq!(second_item_title, Some("2026-02-11 Wed Cloudy 14.5~20.1°C"));
 
         let second_item_icon = json
             .get("items")
@@ -1387,6 +1539,33 @@ mod tests {
             .and_then(|meta| meta.get("icon_key"))
             .and_then(Value::as_str);
         assert_eq!(second_item_icon_key, Some("cloudy"));
+
+        let second_item_weekday = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("weekday_label"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_weekday, Some("Wed"));
+
+        let second_item_timezone_display = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("timezone_display"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_timezone_display, Some("Asia/Taipei (UTC+8)"));
+
+        let second_item_utc_offset = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("utc_offset_label"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_utc_offset, Some("UTC+8"));
     }
 
     #[test]
@@ -1412,7 +1591,25 @@ mod tests {
             .and_then(|items| items.get(1))
             .and_then(|item| item.get("title"))
             .and_then(Value::as_str);
-        assert_eq!(second_item_title, Some("2026-02-11 陰天 14.5~20.1°C"));
+        assert_eq!(second_item_title, Some("2026-02-11 週三 陰天 14.5~20.1°C"));
+
+        let second_item_weekday = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("weekday_label"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_weekday, Some("週三"));
+
+        let second_item_timezone_display = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("timezone_display"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_timezone_display, Some("Asia/Taipei (UTC+8)"));
     }
 
     #[test]
@@ -1443,7 +1640,16 @@ mod tests {
                 .and_then(|items| items.first())
                 .and_then(|item| item.get("title"))
                 .and_then(Value::as_str),
-            Some("Taipei 14.5~20.1°C cloudy 20%")
+            Some("Taipei Wed 14.5~20.1°C cloudy 20%")
+        );
+        assert_eq!(
+            json.get("items")
+                .and_then(Value::as_array)
+                .and_then(|items| items.first())
+                .and_then(|item| item.get("weather_meta"))
+                .and_then(|meta| meta.get("timezone_display"))
+                .and_then(Value::as_str),
+            Some("Asia/Taipei (UTC+8)")
         );
         assert_eq!(
             json.get("items")
@@ -1451,7 +1657,7 @@ mod tests {
                 .and_then(|items| items.get(1))
                 .and_then(|item| item.get("title"))
                 .and_then(Value::as_str),
-            Some("Tokyo 5.2~12.6°C partly cloudy 10%")
+            Some("Tokyo Wed 5.2~12.6°C partly cloudy 10%")
         );
         assert_eq!(providers.batch_calls.get(), 1);
     }
@@ -1479,7 +1685,10 @@ mod tests {
             .and_then(|items| items.get(1))
             .and_then(|item| item.get("title"))
             .and_then(Value::as_str);
-        assert_eq!(second_item_title, Some("2026-02-11 00:00 Cloudy 16.1°C"));
+        assert_eq!(
+            second_item_title,
+            Some("2026-02-11 Wed 00:00 Cloudy 16.1°C")
+        );
 
         let second_item_icon = json
             .get("items")
@@ -1501,6 +1710,15 @@ mod tests {
             .and_then(|meta| meta.get("time"))
             .and_then(Value::as_str);
         assert_eq!(second_item_time, Some("00:00"));
+
+        let second_item_timezone_display = json
+            .get("items")
+            .and_then(Value::as_array)
+            .and_then(|items| items.get(1))
+            .and_then(|item| item.get("weather_meta"))
+            .and_then(|meta| meta.get("timezone_display"))
+            .and_then(Value::as_str);
+        assert_eq!(second_item_timezone_display, Some("Asia/Taipei (UTC+8)"));
     }
 
     #[test]

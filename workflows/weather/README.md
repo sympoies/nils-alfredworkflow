@@ -42,7 +42,7 @@ Set these via Alfred's `Configure Workflow...` UI:
 - `wt` stage-one row format: `City min~max°C Summary x%`.
 - `wt` stage-two row format: `City HH:MM Temp°C Summary x%`.
 - `ww` stage-one rows are city-picker items; `ww` stage-two rows use `City min~max°C Summary x%`.
-- Subtitle shows `Date Timezone Latitude,Longitude`.
+- Subtitle shows `Thu, Feb 12 • Asia/Taipei (UTC+8) • 25.0330,121.5654` style separators for English output.
 - Result rows consume `weather-cli` icon metadata and render PNG assets under `assets/icons/weather/*.png`.
 - Editable SVG source lives under `assets-src/icons/weather/*.svg`;
   `scripts/generate_weather_icons.sh` converts every source SVG to runtime PNG via

@@ -172,7 +172,10 @@ The `result` payload shape depends on the command.
 - Batch `today` / `week` outputs are already flattened into forecast rows and do
   not include a header item.
 - Forecast rows carry `weather_meta` fields such as `item_kind`, `summary`,
-  `weather_code`, `icon_key`, `is_night`, timezone, and coordinate labels.
+  `weather_code`, `icon_key`, `is_night`, timezone, coordinate labels, plus
+  locale-aware weekday metadata (`weekday_label`, `date_with_weekday`) for
+  workflow display and timezone display metadata (`utc_offset_label`,
+  `timezone_display`).
 - Icon selection is Rust-owned and based on `weather_code` plus local time where
   applicable; workflow shell should not infer icons from summary strings.
 
