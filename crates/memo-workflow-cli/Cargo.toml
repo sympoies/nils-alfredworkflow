@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
 clap.workspace = true
-nils-memo-cli = "=0.6.3"
+nils-memo-cli = "=0.6.5"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

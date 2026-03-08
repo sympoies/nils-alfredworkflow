@@ -671,7 +671,7 @@
         <true/>
       </dict>
       <key>description</key>
-      <string>Optional absolute path override for codex-cli. Leave empty to use PATH (cargo install nils-codex-cli --version 0.6.3).</string>
+      <string>Optional absolute path override for codex-cli. Leave empty to use PATH (cargo install nils-codex-cli --version 0.6.5).</string>
       <key>label</key>
       <string>CODEX_CLI_BIN</string>
       <key>type</key>

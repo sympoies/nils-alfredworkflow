@@ -3,7 +3,7 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked`
-- Cargo.lock SHA256: `e88b78bf3bdb84c21eb00e1eda7d55eab0f746990c02ea3f6b685f65f5687a1c`
+- Cargo.lock SHA256: `41d3e3c6478a66f7a5ba1fb30d200c89f8d500455c0cf3b89ea3a3cab1d770da`
 - Third-party crates (`source != null`): 323
 
 ## Notice Extraction Policy
@@ -1150,14 +1150,14 @@ This file documents third-party notice-file discovery for Rust crates used by th
 - License file references:
   - `LICENSE`
 
-### nils-common 0.6.3
+### nils-common 0.6.5
 
 - License: `MIT`
 - Source: `crates.io`
 - Notice files: No explicit NOTICE file discovered.
 - License file reference: none declared
 
-### nils-memo-cli 0.6.3
+### nils-memo-cli 0.6.5
 
 - License: `MIT`
 - Source: `crates.io`
