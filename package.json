@@ -1,7 +1,7 @@
 {
   "name": "nils-alfredworkflow",
   "private": true,
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Node tooling for nils-alfredworkflow Playwright scraper tests",
   "license": "CC0-1.0",
   "engines": {
