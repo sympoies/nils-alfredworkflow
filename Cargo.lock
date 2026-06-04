@@ -2547,9 +2547,9 @@ dependencies = [
 
 [[package]]
 name = "nils-build-info"
-version = "1.0.0"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9d7ff2fe5745878dcec02298e856675bc35b311ca913c60317de88c2bd5ca7a"
+checksum = "2217d9856d96d96c4dc11f9454754c5e7d1b8ed2198b4efe96de2863de5afb77"
 
 [[package]]
 name = "nils-cambridge-cli"
@@ -2566,9 +2566,9 @@ dependencies = [
 
 [[package]]
 name = "nils-common"
-version = "1.0.0"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2109db8eb03b6549a4b660a68f45519d70e2f0f82d90b2a032cdd0bd51a6c8b7"
+checksum = "6a30cfbf4ec884536d881526e2d40eefe1f248360b887b4911a876a08f886c58"
 dependencies = [
  "anyhow",
  "base64",
@@ -2632,9 +2632,9 @@ dependencies = [
 
 [[package]]
 name = "nils-memo"
-version = "1.0.0"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dafb65f3c1d4835496eb544868a9c95be6e695f24bbcc1481bbbdacaa655bcc"
+checksum = "40b3cc1bb444ec0babcd436ece0a14117efa1f14f7708f468d8357342c73b81e"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2718,9 +2718,9 @@ dependencies = [
 
 [[package]]
 name = "nils-term"
-version = "1.0.0"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93ab6c5c40eb10ca6905f09e87d53d658f3dc934e3c9eaf695042a2a3bbf6494"
+checksum = "098f0d72020e5416806eebf135c35d827da11fbc661d558cf9eabac87de64bc7"
 dependencies = [
  "indicatif",
 ]
