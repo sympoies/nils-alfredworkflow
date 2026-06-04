@@ -1,6 +1,6 @@
 # Memo Add - Alfred Workflow
 
-Capture memo text quickly into SQLite-backed `nils-memo@1.0.0` storage.
+Capture memo text quickly into SQLite-backed `nils-memo@1.0.7` storage.
 
 ## Screenshot
 
