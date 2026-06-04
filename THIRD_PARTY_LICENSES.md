@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `03340d5efde6713a756a5d6dcbbbbd36a6fe5a71389df492bbaa7c5fbff04ec9`
+- Data source fingerprint (SHA256): `1e85afc9ae1c952595b720d6c643e93e51a5e0a2c6360102132c04465326fdb4`
 - Runtime metadata fingerprint (SHA256): `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `b1a9c19f2a893627ab1095b40b64731e6e676145e77a8c73f26b107ab39daac4` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `e3486c294bec52bcf0457ac33a247ec86b4622bf20780eede959411e447054a9` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `43b5e7c233ea9073ecbe959c267abd51224f64ad901d9901d6a99392fdac8392` | `jq package-lock extraction` |
 | Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `65863452d659031214590bf2d8e8ee4b1a21d70c546647d30d373053ea7ad036` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
 | Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.7.3> | `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20` | `curl crates.io API plus jq normalized fields` |
@@ -289,10 +289,10 @@ Do not edit manually.
 | minimal-lexical | 0.2.1 | MIT/Apache-2.0 | <https://github.com/Alexhuszagh/minimal-lexical> |
 | mio | 1.2.0 | MIT | <https://github.com/tokio-rs/mio> |
 | murmurhash32 | 0.3.1 | MIT | <https://github.com/quickwit-inc/murmurhash32> |
-| nils-build-info | 1.0.0 | MIT | <https://github.com/sympoies/nils-cli> |
-| nils-common | 1.0.0 | MIT | <https://github.com/sympoies/nils-cli> |
-| nils-memo | 1.0.0 | MIT | <https://github.com/sympoies/nils-cli> |
-| nils-term | 1.0.0 | MIT | <https://github.com/sympoies/nils-cli> |
+| nils-build-info | 1.0.7 | MIT | <https://github.com/sympoies/nils-cli> |
+| nils-common | 1.0.7 | MIT | <https://github.com/sympoies/nils-cli> |
+| nils-memo | 1.0.7 | MIT | <https://github.com/sympoies/nils-cli> |
+| nils-term | 1.0.7 | MIT | <https://github.com/sympoies/nils-cli> |
 | nom | 7.1.3 | MIT | <https://github.com/Geal/nom> |
 | nu-ansi-term | 0.50.3 | MIT | <https://github.com/nushell/nu-ansi-term> |
 | num | 0.4.3 | MIT OR Apache-2.0 | <https://github.com/rust-num/num> |
@@ -492,7 +492,7 @@ Do not edit manually.
 | utf8-ranges | 1.0.5 | Unlicense/MIT | <https://github.com/BurntSushi/utf8-ranges> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.23.1 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.23.2 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | vcpkg | 0.2.15 | MIT/Apache-2.0 | <https://github.com/mcgoo/vcpkg-rs> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |

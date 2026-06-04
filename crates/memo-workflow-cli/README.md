@@ -1,6 +1,6 @@
 # nils-memo-workflow-cli
 
-Workflow adapter CLI for Alfred memo capture actions backed by `nils-memo@1.0.0`.
+Workflow adapter CLI for Alfred memo capture actions backed by `nils-memo@1.0.7`.
 
 ## Commands
 
