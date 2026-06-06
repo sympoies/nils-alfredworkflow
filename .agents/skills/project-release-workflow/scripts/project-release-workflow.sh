@@ -575,6 +575,31 @@ ensure_upstream_ready() {
   RELEASE_UPSTREAM_BRANCH="${upstream_ref#*/}"
 }
 
+push_existing_release_bump_if_ahead() {
+  local remote="$1"
+  local upstream_branch="$2"
+  local upstream_ref="${remote}/${upstream_branch}"
+  local counts behind_count ahead_count
+
+  counts="$(git rev-list --left-right --count "${upstream_ref}...HEAD")"
+  read -r behind_count ahead_count <<<"$counts"
+  if [[ -z "$behind_count" || -z "$ahead_count" ]]; then
+    fail 3 "failed to parse ahead/behind counts for ${upstream_ref}"
+  fi
+
+  if (( behind_count != 0 )); then
+    fail 3 "local branch is behind ${upstream_ref}; pull/rebase before release"
+  fi
+
+  if (( ahead_count == 0 )); then
+    return 0
+  fi
+
+  echo "note: versions already synced, but HEAD is ${ahead_count} commit(s) ahead of ${upstream_ref}; pushing before CI wait"
+  git push "$remote" "HEAD:${upstream_branch}"
+  echo "ok: pushed existing release bump commit to $remote/${upstream_branch}"
+}
+
 remote="origin"
 dry_run=0
 version=""
@@ -734,6 +759,8 @@ EOF
 
   git push "$remote" "HEAD:${RELEASE_UPSTREAM_BRANCH}"
   echo "ok: pushed version bump commit to $remote/${RELEASE_UPSTREAM_BRANCH}"
+else
+  push_existing_release_bump_if_ahead "$remote" "$RELEASE_UPSTREAM_BRANCH"
 fi
 
 if [[ -n "$github_repo_path" ]]; then

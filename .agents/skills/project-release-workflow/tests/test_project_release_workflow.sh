@@ -184,4 +184,37 @@ if [[ "$rc" -ne 3 ]]; then
   exit 1
 fi
 
+python3 - <<'PY'
+from pathlib import Path
+
+for rel in [
+    "Cargo.toml",
+    "Cargo.lock",
+    "package.json",
+    "package-lock.json",
+    "workflows/open-project/workflow.toml",
+    "workflows/bangumi-search/src/info.plist.template",
+]:
+    path = Path(rel)
+    path.write_text(path.read_text().replace("0.2.0", "0.3.0"))
+PY
+git add Cargo.toml Cargo.lock package.json package-lock.json \
+  workflows/open-project/workflow.toml workflows/bangumi-search/src/info.plist.template
+git commit -q -m "chore(release): bump version to 0.3.0"
+local_only_head="$(git rev-parse HEAD)"
+remote_before="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+if [[ "$local_only_head" == "$remote_before" ]]; then
+  echo "error: retry fixture expected local release bump to be ahead of origin/main" >&2
+  exit 1
+fi
+
+"$entrypoint" v0.3.0 >/dev/null
+remote_after="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+if [[ "$remote_after" != "$local_only_head" ]]; then
+  echo "error: expected already-synced local release bump to be pushed to origin/main" >&2
+  exit 1
+fi
+git rev-parse -q --verify refs/tags/v0.3.0 >/dev/null
+git ls-remote --exit-code --tags origin refs/tags/v0.3.0 >/dev/null
+
 echo "ok: project skill smoke checks passed"
