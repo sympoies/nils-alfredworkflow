@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `2064017664abf648c04032eccc3311dd374f6a7c068eb8c9db1021ce748c4d3a`
+- Data source fingerprint (SHA256): `840c39953804205a143f58178c66bc6ffffd0206903884055ef3e8092cf618ad`
 - Runtime metadata fingerprint (SHA256): `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `370abdb983c8722e59f59fc7b7158f6e6bf2b1abcf0b8dc094cb189b2525fb1f` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `eafe54a0798adf64b308a7708252b1161d75e693caa7ad28b7fae3e25a86003a` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `43b5e7c233ea9073ecbe959c267abd51224f64ad901d9901d6a99392fdac8392` | `jq package-lock extraction` |
 | Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `65863452d659031214590bf2d8e8ee4b1a21d70c546647d30d373053ea7ad036` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
 | Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.7.3> | `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20` | `curl crates.io API plus jq normalized fields` |
@@ -376,7 +376,7 @@ Do not edit manually.
 | rtoolbox | 0.0.5 | Apache-2.0 | <https://github.com/conradkleinespel/rtoolbox> |
 | rusqlite | 0.40.0 | MIT | <https://github.com/rusqlite/rusqlite> |
 | rust-stemmers | 1.2.0 | MIT/BSD-3-Clause | <https://github.com/CurrySoftware/rust-stemmers> |
-| rust_decimal | 1.42.0 | MIT | <https://github.com/paupino/rust-decimal> |
+| rust_decimal | 1.42.1 | MIT | <https://github.com/paupino/rust-decimal> |
 | rustc-hash | 1.1.0 | Apache-2.0/MIT | <https://github.com/rust-lang-nursery/rustc-hash> |
 | rustc-hash | 2.1.2 | Apache-2.0 OR MIT | <https://github.com/rust-lang/rustc-hash> |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | <https://github.com/djc/rustc-version-rs> |
