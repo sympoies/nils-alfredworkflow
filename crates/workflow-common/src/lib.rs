@@ -29,6 +29,8 @@ pub use feedback::{
 };
 pub use git::{normalize_remote, web_url_for_project};
 pub use list_parser::{parse_ordered_list_with, split_ordered_list};
+#[cfg(feature = "clap")]
+pub use output_contract::ScriptFilterOutputModeArg;
 pub use output_contract::{
     ENVELOPE_SCHEMA_VERSION, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
     build_error_details_json, build_error_envelope, build_feedback_result_envelope,

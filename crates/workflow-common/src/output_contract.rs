@@ -26,6 +26,35 @@ impl OutputMode {
     }
 }
 
+/// Clap value-enum mirror of the `--output` flag offered by Alfred Script
+/// Filter CLIs that expose only `json` and `alfred-json`.
+///
+/// This centralizes what used to be a byte-identical `OutputModeArg` copy in
+/// every Script Filter CLI crate. Consumers enable the `clap` feature and
+/// import it, conventionally as
+/// `use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;`, then
+/// convert into [`OutputMode`] via `From`.
+#[cfg(feature = "clap")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+#[value(rename_all = "kebab-case")]
+pub enum ScriptFilterOutputModeArg {
+    /// Service envelope JSON (`json`).
+    Json,
+    /// Alfred Script Filter JSON (`alfred-json`); the Script Filter default.
+    #[default]
+    AlfredJson,
+}
+
+#[cfg(feature = "clap")]
+impl From<ScriptFilterOutputModeArg> for OutputMode {
+    fn from(value: ScriptFilterOutputModeArg) -> Self {
+        match value {
+            ScriptFilterOutputModeArg::Json => Self::Json,
+            ScriptFilterOutputModeArg::AlfredJson => Self::AlfredJson,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnvelopePayloadKind {
     Result,
