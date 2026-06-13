@@ -12,8 +12,15 @@ path = "src/lib.rs"
 [dependencies]
 alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
 chrono.workspace = true
+clap = { workspace = true, optional = true }
 thiserror.workspace = true
 walkdir.workspace = true
+
+[features]
+# Opt-in clap value-enum mirror of the Script Filter `--output` flag.
+# Consumers that build a clap CLI enable this to reuse
+# `ScriptFilterOutputModeArg` instead of redefining it per crate.
+clap = ["dep:clap"]
 
 [dev-dependencies]
 tempfile.workspace = true

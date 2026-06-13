@@ -20,7 +20,7 @@ scraper-bridge = []
 
 [dependencies]
 alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
-workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3" }
+workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["clap"] }
 clap.workspace = true
 reqwest.workspace = true
 serde.workspace = true

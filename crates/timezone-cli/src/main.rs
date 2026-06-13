@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
 use timezone_cli::{
     convert,
@@ -7,6 +7,7 @@ use timezone_cli::{
     feedback, local_tz,
     parser::{self, TimezoneEntry},
 };
+use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
     EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
@@ -32,22 +33,6 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
         output: OutputModeArg,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[value(rename_all = "kebab-case")]
-enum OutputModeArg {
-    Json,
-    AlfredJson,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
 }
 
 impl Cli {

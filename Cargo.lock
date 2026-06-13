@@ -2783,6 +2783,7 @@ name = "nils-workflow-common"
 version = "1.3.2"
 dependencies = [
  "chrono",
+ "clap",
  "nils-alfred-core",
  "tempfile",
  "thiserror 2.0.18",

@@ -4,8 +4,9 @@
 // compactness — see the `#[allow]` on `mod tests` below.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use randomer_cli::{RandomerError, generate_feedback, list_formats_feedback, list_types_feedback};
+use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
     EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
@@ -49,22 +50,6 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
         output: OutputModeArg,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[value(rename_all = "kebab-case")]
-enum OutputModeArg {
-    Json,
-    AlfredJson,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
 }
 
 impl Cli {

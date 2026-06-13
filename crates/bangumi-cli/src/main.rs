@@ -11,6 +11,7 @@ use bangumi_cli::{
     image_cache::{self, ImageCacheManager},
     input::{self, ParsedInput, SubjectType},
 };
+use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
     EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
@@ -45,22 +46,6 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
         output: OutputModeArg,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[value(rename_all = "kebab-case")]
-enum OutputModeArg {
-    Json,
-    AlfredJson,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
