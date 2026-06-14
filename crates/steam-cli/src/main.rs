@@ -8,7 +8,7 @@ use steam_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -53,63 +53,26 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_STEAM_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_STEAM_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
+fn from_steam_api(error: SteamStoreApiError) -> AppError {
+    match error {
+        SteamStoreApiError::Http { status, message } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!("steam store api error ({status}): {message}"),
+        ),
+        SteamStoreApiError::Transport { .. } => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "steam store request failed".to_string())
         }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_steam_api(error: SteamStoreApiError) -> Self {
-        match error {
-            SteamStoreApiError::Http { status, message } => {
-                AppError::runtime(format!("steam store api error ({status}): {message}"))
-            }
-            SteamStoreApiError::Transport { .. } => {
-                AppError::runtime("steam store request failed".to_string())
-            }
-            SteamStoreApiError::InvalidResponse(_) => {
-                AppError::runtime("invalid steam store response".to_string())
-            }
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_STEAM_001",
-            ErrorKind::Runtime => "NILS_STEAM_002",
-        }
+        SteamStoreApiError::InvalidResponse(_) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "invalid steam store response".to_string(),
+        ),
     }
 }
 
@@ -128,7 +91,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -163,11 +126,11 @@ where
         Commands::Search { query, output } => {
             let query = query.trim();
             if query.is_empty() {
-                return Err(AppError::user("query must not be empty"));
+                return Err(AppError::user(ERROR_CODE_USER, "query must not be empty"));
             }
 
-            let config = load_config().map_err(AppError::from_config)?;
-            let results = search_apps(&config, query).map_err(AppError::from_steam_api)?;
+            let config = load_config().map_err(from_config)?;
+            let results = search_apps(&config, query).map_err(from_steam_api)?;
 
             let payload = feedback::search_results_to_feedback(
                 &config.region,
@@ -180,8 +143,8 @@ where
             render_feedback(output.into(), "search", payload)
         }
         Commands::Specials { output } => {
-            let config = load_config().map_err(AppError::from_config)?;
-            let results = fetch_specials(&config).map_err(AppError::from_steam_api)?;
+            let config = load_config().map_err(from_config)?;
+            let results = fetch_specials(&config).map_err(from_steam_api)?;
 
             let payload =
                 feedback::specials_to_feedback(&config.region, &config.language, &results);
@@ -196,12 +159,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -214,12 +183,14 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
     use steam_cli::config::SteamSearchApi;
@@ -390,8 +361,8 @@ mod tests {
         )
         .expect_err("empty query must fail");
 
-        assert_eq!(error.kind, ErrorKind::User);
-        assert_eq!(error.message, "query must not be empty");
+        assert_eq!(error.kind(), CliErrorKind::User);
+        assert_eq!(error.message(), "query must not be empty");
     }
 
     #[test]
@@ -408,8 +379,8 @@ mod tests {
         )
         .expect_err("invalid config should fail");
 
-        assert_eq!(error.kind, ErrorKind::User);
-        assert!(error.message.contains("invalid STEAM_REGION"));
+        assert_eq!(error.kind(), CliErrorKind::User);
+        assert!(error.message().contains("invalid STEAM_REGION"));
     }
 
     #[test]
@@ -429,9 +400,9 @@ mod tests {
         )
         .expect_err("api failure should fail");
 
-        assert_eq!(error.kind, ErrorKind::Runtime);
+        assert_eq!(error.kind(), CliErrorKind::Runtime);
         assert_eq!(
-            error.message,
+            error.message(),
             "steam store api error (503): upstream unavailable"
         );
     }
@@ -508,12 +479,15 @@ mod tests {
         )
         .expect_err("api failure should fail");
 
-        assert_eq!(error.kind, ErrorKind::Runtime);
+        assert_eq!(error.kind(), CliErrorKind::Runtime);
     }
 
     #[test]
     fn serialize_service_error_emits_required_fields() {
-        let payload = serialize_service_error("search", &AppError::user("query must not be empty"));
+        let payload = serialize_service_error(
+            "search",
+            &AppError::user(ERROR_CODE_USER, "query must not be empty"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("payload must be valid JSON");
 
         assert_eq!(

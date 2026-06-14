@@ -8,7 +8,7 @@ use youtube_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -45,63 +45,26 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_YOUTUBE_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_YOUTUBE_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
+fn from_youtube_api(error: YouTubeApiError) -> AppError {
+    match error {
+        YouTubeApiError::Http { status, message } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!("youtube api error ({status}): {message}"),
+        ),
+        YouTubeApiError::Transport { .. } => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "youtube api request failed".to_string())
         }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_youtube_api(error: YouTubeApiError) -> Self {
-        match error {
-            YouTubeApiError::Http { status, message } => {
-                AppError::runtime(format!("youtube api error ({status}): {message}"))
-            }
-            YouTubeApiError::Transport { .. } => {
-                AppError::runtime("youtube api request failed".to_string())
-            }
-            YouTubeApiError::InvalidResponse(_) => {
-                AppError::runtime("invalid youtube api response".to_string())
-            }
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_YOUTUBE_001",
-            ErrorKind::Runtime => "NILS_YOUTUBE_002",
-        }
+        YouTubeApiError::InvalidResponse(_) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "invalid youtube api response".to_string(),
+        ),
     }
 }
 
@@ -120,7 +83,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -148,11 +111,11 @@ where
         Commands::Search { query, output } => {
             let query = query.trim();
             if query.is_empty() {
-                return Err(AppError::user("query must not be empty"));
+                return Err(AppError::user(ERROR_CODE_USER, "query must not be empty"));
             }
 
-            let config = load_config().map_err(AppError::from_config)?;
-            let videos = search_videos(&config, query).map_err(AppError::from_youtube_api)?;
+            let config = load_config().map_err(from_config)?;
+            let videos = search_videos(&config, query).map_err(from_youtube_api)?;
 
             let payload = feedback::videos_to_feedback(&videos);
             render_feedback(output.into(), "search", payload)
@@ -166,12 +129,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -184,12 +153,14 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -288,8 +259,8 @@ mod tests {
         )
         .expect_err("empty query should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "query must not be empty");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "query must not be empty");
     }
 
     #[test]
@@ -303,8 +274,8 @@ mod tests {
         )
         .expect_err("missing config should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "missing YOUTUBE_API_KEY");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "missing YOUTUBE_API_KEY");
     }
 
     #[test]
@@ -323,8 +294,8 @@ mod tests {
         )
         .expect_err("api errors should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
-        assert_eq!(err.message, "youtube api error (403): invalid key");
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
+        assert_eq!(err.message(), "youtube api error (403): invalid key");
     }
 
     #[test]
@@ -337,7 +308,10 @@ mod tests {
 
     #[test]
     fn main_service_error_envelope_has_required_error_fields() {
-        let payload = serialize_service_error("search", &AppError::user("query must not be empty"));
+        let payload = serialize_service_error(
+            "search",
+            &AppError::user(ERROR_CODE_USER, "query must not be empty"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(
