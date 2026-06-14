@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use randomer_cli::{RandomerError, generate_feedback, list_formats_feedback, list_types_feedback};
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -70,52 +70,13 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
-}
+const ERROR_CODE_USER: &str = "NILS_RANDOMER_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_RANDOMER_002";
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_randomer(error: RandomerError) -> Self {
-        match error {
-            RandomerError::UnknownFormat(_) | RandomerError::InvalidCount(_) => {
-                Self::user(error.to_string())
-            }
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_RANDOMER_001",
-            ErrorKind::Runtime => "NILS_RANDOMER_002",
+fn from_randomer(error: RandomerError) -> AppError {
+    match error {
+        RandomerError::UnknownFormat(_) | RandomerError::InvalidCount(_) => {
+            AppError::user(ERROR_CODE_USER, error.to_string())
         }
     }
 }
@@ -135,7 +96,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -161,8 +122,7 @@ fn run(cli: Cli) -> Result<String, AppError> {
             count,
             output,
         } => {
-            let payload =
-                generate_feedback(format.as_str(), count).map_err(AppError::from_randomer)?;
+            let payload = generate_feedback(format.as_str(), count).map_err(from_randomer)?;
             render_feedback(output.into(), "generate", payload)
         }
     }
@@ -175,11 +135,17 @@ fn render_feedback(
 ) -> Result<String, AppError> {
     match mode {
         OutputMode::AlfredJson => payload.to_json().map_err(|error| {
-            AppError::runtime(format!("failed to serialize Alfred feedback: {error}"))
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize Alfred feedback: {error}"),
+            )
         }),
         OutputMode::Json => {
             let result = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize Alfred feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize Alfred feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -192,13 +158,15 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -322,9 +290,9 @@ mod tests {
         let cli = Cli::parse_from(["randomer-cli", "generate", "--format", "not-a-format"]);
         let error = run(cli).expect_err("unknown format should fail");
 
-        assert_eq!(error.kind, ErrorKind::User);
+        assert_eq!(error.kind(), CliErrorKind::User);
         assert_eq!(error.exit_code(), 2);
-        assert_eq!(error.message, "unknown format: not-a-format");
+        assert_eq!(error.message(), "unknown format: not-a-format");
     }
 
     #[test]
@@ -336,7 +304,10 @@ mod tests {
 
     #[test]
     fn service_error_envelope_has_required_error_fields() {
-        let payload = serialize_service_error("generate", &AppError::user("unknown format: bad"));
+        let payload = serialize_service_error(
+            "generate",
+            &AppError::user(ERROR_CODE_USER, "unknown format: bad"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(
