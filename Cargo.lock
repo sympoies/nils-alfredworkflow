@@ -2605,6 +2605,7 @@ dependencies = [
  "keyring-core",
  "mail-builder",
  "mime_guess",
+ "nils-workflow-common",
  "open",
  "reqwest",
  "serde",
