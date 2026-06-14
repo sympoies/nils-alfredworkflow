@@ -10,7 +10,7 @@ use quote_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -47,54 +47,15 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_QUOTE_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_QUOTE_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_refresh(error: RefreshError) -> Self {
-        AppError::runtime(error.to_string())
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_QUOTE_001",
-            ErrorKind::Runtime => "NILS_QUOTE_002",
-        }
-    }
+fn from_refresh(error: RefreshError) -> AppError {
+    AppError::runtime(ERROR_CODE_RUNTIME, error.to_string())
 }
 
 fn main() {
@@ -112,7 +73,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -146,8 +107,8 @@ where
 {
     match cli.command {
         Commands::Feed { query, output } => {
-            let config = load_config().map_err(AppError::from_config)?;
-            let outcome = refresh_quotes(&config).map_err(AppError::from_refresh)?;
+            let config = load_config().map_err(from_config)?;
+            let outcome = refresh_quotes(&config).map_err(from_refresh)?;
 
             let payload = feedback::quotes_to_feedback(
                 &outcome.quotes,
@@ -167,12 +128,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -185,12 +152,14 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -284,9 +253,9 @@ mod tests {
         )
         .expect_err("invalid config should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
+        assert_eq!(err.kind(), CliErrorKind::User);
         assert_eq!(err.exit_code(), 2);
-        assert!(err.message.contains("invalid QUOTE_REFRESH_INTERVAL"));
+        assert!(err.message().contains("invalid QUOTE_REFRESH_INTERVAL"));
     }
 
     #[test]
@@ -304,9 +273,9 @@ mod tests {
         )
         .expect_err("storage errors should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(err.exit_code(), 1);
-        assert!(err.message.contains("quote storage operation failed"));
+        assert!(err.message().contains("quote storage operation failed"));
     }
 
     #[test]
@@ -321,7 +290,7 @@ mod tests {
     fn main_service_error_envelope_has_required_error_fields() {
         let payload = serialize_service_error(
             "feed",
-            &AppError::user("invalid QUOTE_REFRESH_INTERVAL: bad"),
+            &AppError::user(ERROR_CODE_USER, "invalid QUOTE_REFRESH_INTERVAL: bad"),
         );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 

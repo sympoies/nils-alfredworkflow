@@ -9,7 +9,7 @@ use cambridge_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -46,80 +46,54 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_CAMBRIDGE_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_CAMBRIDGE_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_bridge(error: BridgeError) -> Self {
-        match error {
-            BridgeError::Spawn { program, .. } => AppError::runtime(format!(
+fn from_bridge(error: BridgeError) -> AppError {
+    match error {
+        BridgeError::Spawn { program, .. } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!(
                 "failed to run CAMBRIDGE_NODE_BIN `{program}`; install Node.js or fix CAMBRIDGE_NODE_BIN"
-            )),
-            BridgeError::Timeout { timeout_ms } => AppError::runtime(format!(
+            ),
+        ),
+        BridgeError::Timeout { timeout_ms } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!(
                 "cambridge scraper timed out after {timeout_ms}ms; adjust CAMBRIDGE_TIMEOUT_MS and retry"
-            )),
-            BridgeError::NonZeroExit { code, stderr } => AppError::runtime(format!(
+            ),
+        ),
+        BridgeError::NonZeroExit { code, stderr } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!(
                 "cambridge scraper exited with code {}: {stderr}",
                 code.map_or_else(|| "unknown".to_string(), |value| value.to_string())
-            )),
-            BridgeError::InvalidJson(_) => {
-                AppError::runtime("cambridge scraper returned invalid JSON")
-            }
-            BridgeError::UnsupportedStage(stage) => AppError::runtime(format!(
-                "cambridge scraper returned unsupported stage: {stage}"
-            )),
-            BridgeError::StageMismatch { expected, actual } => AppError::runtime(format!(
-                "cambridge scraper stage mismatch: expected {expected}, got {actual}"
-            )),
-            BridgeError::InvalidUtf8Stdout => {
-                AppError::runtime("cambridge scraper stdout is not valid UTF-8")
-            }
-            BridgeError::Wait { .. }
-            | BridgeError::ReadStdout { .. }
-            | BridgeError::ReadStderr { .. } => {
-                AppError::runtime("cambridge scraper process failed")
-            }
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_CAMBRIDGE_001",
-            ErrorKind::Runtime => "NILS_CAMBRIDGE_002",
+            ),
+        ),
+        BridgeError::InvalidJson(_) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "cambridge scraper returned invalid JSON",
+        ),
+        BridgeError::UnsupportedStage(stage) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!("cambridge scraper returned unsupported stage: {stage}"),
+        ),
+        BridgeError::StageMismatch { expected, actual } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!("cambridge scraper stage mismatch: expected {expected}, got {actual}"),
+        ),
+        BridgeError::InvalidUtf8Stdout => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "cambridge scraper stdout is not valid UTF-8",
+        ),
+        BridgeError::Wait { .. }
+        | BridgeError::ReadStdout { .. }
+        | BridgeError::ReadStderr { .. } => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "cambridge scraper process failed")
         }
     }
 }
@@ -139,7 +113,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -170,9 +144,9 @@ where
                 QueryToken::DefineMissingEntry => feedback::missing_define_target_feedback(),
                 QueryToken::SuggestMissingQuery => feedback::missing_suggest_target_feedback(),
                 QueryToken::Smart { query } => {
-                    let config = load_config().map_err(AppError::from_config)?;
-                    let response = run_scraper(&config, ScraperStage::Suggest, &query)
-                        .map_err(AppError::from_bridge)?;
+                    let config = load_config().map_err(from_config)?;
+                    let response =
+                        run_scraper(&config, ScraperStage::Suggest, &query).map_err(from_bridge)?;
 
                     if !response.ok {
                         feedback::suggest_feedback(&response)
@@ -180,22 +154,22 @@ where
                         feedback::define_feedback(&response, &query, config.dict_mode)
                     } else if let Some(entry) = exact_suggest_match(&response, &query) {
                         let detail_response = run_scraper(&config, ScraperStage::Define, &entry)
-                            .map_err(AppError::from_bridge)?;
+                            .map_err(from_bridge)?;
                         feedback::define_feedback(&detail_response, &entry, config.dict_mode)
                     } else {
                         feedback::suggest_feedback(&response)
                     }
                 }
                 QueryToken::SuggestOnly { query } => {
-                    let config = load_config().map_err(AppError::from_config)?;
-                    let response = run_scraper(&config, ScraperStage::Suggest, &query)
-                        .map_err(AppError::from_bridge)?;
+                    let config = load_config().map_err(from_config)?;
+                    let response =
+                        run_scraper(&config, ScraperStage::Suggest, &query).map_err(from_bridge)?;
                     feedback::suggest_feedback(&response)
                 }
                 QueryToken::Define { entry } => {
-                    let config = load_config().map_err(AppError::from_config)?;
-                    let response = run_scraper(&config, ScraperStage::Define, &entry)
-                        .map_err(AppError::from_bridge)?;
+                    let config = load_config().map_err(from_config)?;
+                    let response =
+                        run_scraper(&config, ScraperStage::Define, &entry).map_err(from_bridge)?;
                     feedback::define_feedback(&response, &entry, config.dict_mode)
                 }
             };
@@ -245,12 +219,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -263,7 +243,7 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
@@ -273,6 +253,8 @@ mod tests {
     use std::path::PathBuf;
 
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
     use cambridge_cli::config::DictionaryMode;
@@ -639,9 +621,9 @@ mod tests {
         )
         .expect_err("config error should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
+        assert_eq!(err.kind(), CliErrorKind::User);
         assert_eq!(err.exit_code(), 2);
-        assert_eq!(err.message, "missing CAMBRIDGE_SCRAPER_SCRIPT");
+        assert_eq!(err.message(), "missing CAMBRIDGE_SCRAPER_SCRIPT");
     }
 
     #[test]
@@ -659,9 +641,9 @@ mod tests {
         )
         .expect_err("spawn failure should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(err.exit_code(), 1);
-        assert!(err.message.contains("CAMBRIDGE_NODE_BIN"));
+        assert!(err.message().contains("CAMBRIDGE_NODE_BIN"));
     }
 
     #[test]
@@ -674,9 +656,9 @@ mod tests {
         )
         .expect_err("timeout should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(err.exit_code(), 1);
-        assert!(err.message.contains("CAMBRIDGE_TIMEOUT_MS"));
+        assert!(err.message().contains("CAMBRIDGE_TIMEOUT_MS"));
     }
 
     #[test]
@@ -694,9 +676,9 @@ mod tests {
         )
         .expect_err("non-zero exit should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(err.exit_code(), 1);
-        assert!(err.message.contains("failed to scrape"));
+        assert!(err.message().contains("failed to scrape"));
     }
 
     #[test]
@@ -709,8 +691,10 @@ mod tests {
 
     #[test]
     fn main_service_error_envelope_has_required_error_fields() {
-        let payload =
-            serialize_service_error("query", &AppError::user("missing CAMBRIDGE_SCRAPER_SCRIPT"));
+        let payload = serialize_service_error(
+            "query",
+            &AppError::user(ERROR_CODE_USER, "missing CAMBRIDGE_SCRAPER_SCRIPT"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(
