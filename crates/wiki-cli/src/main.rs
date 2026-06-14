@@ -8,7 +8,7 @@ use wiki_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -45,58 +45,24 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_WIKI_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_WIKI_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
-}
-
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
+fn from_wiki_api(error: WikiApiError) -> AppError {
+    match error {
+        WikiApiError::Http { status, message } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            format!("wikipedia api error ({status}): {message}"),
+        ),
+        WikiApiError::Transport { .. } => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "wikipedia api request failed")
         }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_wiki_api(error: WikiApiError) -> Self {
-        match error {
-            WikiApiError::Http { status, message } => {
-                AppError::runtime(format!("wikipedia api error ({status}): {message}"))
-            }
-            WikiApiError::Transport { .. } => AppError::runtime("wikipedia api request failed"),
-            WikiApiError::InvalidResponse(_) => AppError::runtime("invalid wikipedia api response"),
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_WIKI_001",
-            ErrorKind::Runtime => "NILS_WIKI_002",
+        WikiApiError::InvalidResponse(_) => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "invalid wikipedia api response")
         }
     }
 }
@@ -116,7 +82,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -144,11 +110,11 @@ where
         Commands::Search { query, output } => {
             let query = query.trim();
             if query.is_empty() {
-                return Err(AppError::user("query must not be empty"));
+                return Err(AppError::user(ERROR_CODE_USER, "query must not be empty"));
             }
 
-            let config = load_config().map_err(AppError::from_config)?;
-            let results = search_articles(&config, query).map_err(AppError::from_wiki_api)?;
+            let config = load_config().map_err(from_config)?;
+            let results = search_articles(&config, query).map_err(from_wiki_api)?;
 
             let payload = feedback::search_results_to_feedback(
                 &config.language,
@@ -167,12 +133,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -185,12 +157,14 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -327,8 +301,8 @@ mod tests {
         let err = run_with(cli, || Ok(fixture_config()), |_, _| Ok(Vec::new()))
             .expect_err("empty query should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "query must not be empty");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "query must not be empty");
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -343,8 +317,8 @@ mod tests {
         )
         .expect_err("config errors should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "invalid WIKI_MAX_RESULTS: abc");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "invalid WIKI_MAX_RESULTS: abc");
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -364,9 +338,9 @@ mod tests {
         )
         .expect_err("api errors should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(
-            err.message,
+            err.message(),
             "wikipedia api error (503): service unavailable"
         );
         assert_eq!(err.exit_code(), 1);
@@ -388,8 +362,8 @@ mod tests {
         )
         .expect_err("invalid response should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
-        assert_eq!(err.message, "invalid wikipedia api response");
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
+        assert_eq!(err.message(), "invalid wikipedia api response");
         assert_eq!(err.exit_code(), 1);
     }
 
@@ -403,7 +377,10 @@ mod tests {
 
     #[test]
     fn main_service_error_envelope_has_required_error_fields() {
-        let payload = serialize_service_error("search", &AppError::user("query must not be empty"));
+        let payload = serialize_service_error(
+            "search",
+            &AppError::user(ERROR_CODE_USER, "query must not be empty"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(

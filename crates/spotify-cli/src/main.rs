@@ -9,7 +9,7 @@ use spotify_cli::{
 
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
+    AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
 
 #[derive(Debug, Parser)]
@@ -46,88 +46,67 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
+const ERROR_CODE_USER: &str = "NILS_SPOTIFY_001";
+const ERROR_CODE_RUNTIME: &str = "NILS_SPOTIFY_002";
+
+fn from_config(error: ConfigError) -> AppError {
+    AppError::user(ERROR_CODE_USER, error.to_string())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct AppError {
-    kind: ErrorKind,
-    message: String,
+fn from_spotify_auth(error: SpotifyAuthError) -> AppError {
+    match error {
+        SpotifyAuthError::Http { status, message } => match status {
+            400 | 401 | 403 => AppError::user(
+                ERROR_CODE_USER,
+                format!("spotify auth error ({status}): {message}"),
+            ),
+            429 => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify auth rate limit (429): {message}"),
+            ),
+            500..=599 => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify auth unavailable ({status}): {message}"),
+            ),
+            _ => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify auth error ({status}): {message}"),
+            ),
+        },
+        SpotifyAuthError::Transport { .. } => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "spotify auth request failed".to_string(),
+        ),
+        SpotifyAuthError::InvalidResponse(_) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "invalid spotify auth response".to_string(),
+        ),
+    }
 }
 
-impl AppError {
-    fn user(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            message: message.into(),
+fn from_spotify_api(error: SpotifyApiError) -> AppError {
+    match error {
+        SpotifyApiError::Http { status, message } => match status {
+            429 => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify api rate limit (429): {message}"),
+            ),
+            500..=599 => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify api unavailable ({status}): {message}"),
+            ),
+            _ => AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("spotify api error ({status}): {message}"),
+            ),
+        },
+        SpotifyApiError::Transport { .. } => {
+            AppError::runtime(ERROR_CODE_RUNTIME, "spotify api request failed".to_string())
         }
-    }
-
-    fn runtime(message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            message: message.into(),
-        }
-    }
-
-    fn from_config(error: ConfigError) -> Self {
-        AppError::user(error.to_string())
-    }
-
-    fn from_spotify_auth(error: SpotifyAuthError) -> Self {
-        match error {
-            SpotifyAuthError::Http { status, message } => match status {
-                400 | 401 | 403 => {
-                    AppError::user(format!("spotify auth error ({status}): {message}"))
-                }
-                429 => AppError::runtime(format!("spotify auth rate limit (429): {message}")),
-                500..=599 => {
-                    AppError::runtime(format!("spotify auth unavailable ({status}): {message}"))
-                }
-                _ => AppError::runtime(format!("spotify auth error ({status}): {message}")),
-            },
-            SpotifyAuthError::Transport { .. } => {
-                AppError::runtime("spotify auth request failed".to_string())
-            }
-            SpotifyAuthError::InvalidResponse(_) => {
-                AppError::runtime("invalid spotify auth response".to_string())
-            }
-        }
-    }
-
-    fn from_spotify_api(error: SpotifyApiError) -> Self {
-        match error {
-            SpotifyApiError::Http { status, message } => match status {
-                429 => AppError::runtime(format!("spotify api rate limit (429): {message}")),
-                500..=599 => {
-                    AppError::runtime(format!("spotify api unavailable ({status}): {message}"))
-                }
-                _ => AppError::runtime(format!("spotify api error ({status}): {message}")),
-            },
-            SpotifyApiError::Transport { .. } => {
-                AppError::runtime("spotify api request failed".to_string())
-            }
-            SpotifyApiError::InvalidResponse(_) => {
-                AppError::runtime("invalid spotify api response".to_string())
-            }
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
-        }
-    }
-
-    fn code(&self) -> &'static str {
-        match self.kind {
-            ErrorKind::User => "NILS_SPOTIFY_001",
-            ErrorKind::Runtime => "NILS_SPOTIFY_002",
-        }
+        SpotifyApiError::InvalidResponse(_) => AppError::runtime(
+            ERROR_CODE_RUNTIME,
+            "invalid spotify api response".to_string(),
+        ),
     }
 }
 
@@ -146,7 +125,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -181,13 +160,13 @@ where
         Commands::Search { query, output } => {
             let query = query.trim();
             if query.is_empty() {
-                return Err(AppError::user("query must not be empty"));
+                return Err(AppError::user(ERROR_CODE_USER, "query must not be empty"));
             }
 
-            let config = load_config().map_err(AppError::from_config)?;
-            let token = request_token(&config).map_err(AppError::from_spotify_auth)?;
+            let config = load_config().map_err(from_config)?;
+            let token = request_token(&config).map_err(from_spotify_auth)?;
             let tracks = search_tracks(&config, token.access_token.as_str(), query)
-                .map_err(AppError::from_spotify_api)?;
+                .map_err(from_spotify_api)?;
 
             let payload = feedback::tracks_to_feedback(&tracks);
             render_feedback(output.into(), "search", payload)
@@ -201,12 +180,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let payload_json = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -219,12 +204,14 @@ fn render_feedback(
 }
 
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error.code(), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -337,8 +324,8 @@ mod tests {
         )
         .expect_err("empty query should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "query must not be empty");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "query must not be empty");
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -354,8 +341,8 @@ mod tests {
         )
         .expect_err("missing config should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "missing SPOTIFY_CLIENT_ID");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "missing SPOTIFY_CLIENT_ID");
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -376,8 +363,8 @@ mod tests {
         )
         .expect_err("auth failures should fail");
 
-        assert_eq!(err.kind, ErrorKind::User);
-        assert_eq!(err.message, "spotify auth error (401): invalid_client");
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.message(), "spotify auth error (401): invalid_client");
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -398,8 +385,8 @@ mod tests {
         )
         .expect_err("auth failures should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
-        assert_eq!(err.message, "spotify auth rate limit (429): retry later");
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
+        assert_eq!(err.message(), "spotify auth rate limit (429): retry later");
         assert_eq!(err.exit_code(), 1);
     }
 
@@ -420,9 +407,9 @@ mod tests {
         )
         .expect_err("api failures should fail");
 
-        assert_eq!(err.kind, ErrorKind::Runtime);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
         assert_eq!(
-            err.message,
+            err.message(),
             "spotify api unavailable (503): service unavailable"
         );
         assert_eq!(err.exit_code(), 1);
@@ -438,7 +425,10 @@ mod tests {
 
     #[test]
     fn main_service_error_envelope_has_required_error_fields() {
-        let payload = serialize_service_error("search", &AppError::user("query must not be empty"));
+        let payload = serialize_service_error(
+            "search",
+            &AppError::user(ERROR_CODE_USER, "query must not be empty"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(

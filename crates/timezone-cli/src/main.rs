@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 
 use timezone_cli::{
     convert,
-    error::AppError,
+    error::{AppError, ERROR_CODE_RUNTIME},
     feedback, local_tz,
     parser::{self, TimezoneEntry},
 };
@@ -64,7 +64,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -109,11 +109,17 @@ fn render_feedback(
 ) -> Result<String, AppError> {
     match mode {
         OutputMode::AlfredJson => payload.to_json().map_err(|error| {
-            AppError::runtime(format!("failed to serialize timezone feedback: {error}"))
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize timezone feedback: {error}"),
+            )
         }),
         OutputMode::Json => {
             let result = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize timezone feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize timezone feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -125,15 +131,8 @@ fn render_feedback(
     }
 }
 
-fn error_code(error: &AppError) -> &'static str {
-    match error.kind {
-        timezone_cli::error::ErrorKind::User => "NILS_TIMEZONE_001",
-        timezone_cli::error::ErrorKind::Runtime => "NILS_TIMEZONE_002",
-    }
-}
-
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error_code(error), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 fn resolve_zones<DetectLocal>(
@@ -160,7 +159,10 @@ where
 mod tests {
     use chrono_tz::Tz;
     use serde_json::Value;
-    use timezone_cli::{error::ErrorKind, local_tz::LocalTimezoneSource};
+    use timezone_cli::{
+        error::{ERROR_CODE_USER, ErrorKind},
+        local_tz::LocalTimezoneSource,
+    };
 
     use super::*;
 
@@ -280,9 +282,9 @@ mod tests {
 
         let error = run_with(cli, fixed_now, || fixed_local("UTC")).expect_err("invalid input");
 
-        assert_eq!(error.kind, ErrorKind::User);
+        assert_eq!(error.kind(), ErrorKind::User);
         assert_eq!(error.exit_code(), 2);
-        assert!(error.message.contains("invalid timezone"));
+        assert!(error.message().contains("invalid timezone"));
     }
 
     #[test]
@@ -295,7 +297,8 @@ mod tests {
 
     #[test]
     fn service_error_envelope_has_required_error_fields() {
-        let payload = serialize_service_error("now", &AppError::user("invalid timezone"));
+        let payload =
+            serialize_service_error("now", &AppError::user(ERROR_CODE_USER, "invalid timezone"));
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(

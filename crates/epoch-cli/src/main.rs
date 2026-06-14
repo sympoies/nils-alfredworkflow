@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use epoch_cli::{
     clipboard,
     convert::{self, ConversionRow},
-    error::AppError,
+    error::{AppError, ERROR_CODE_RUNTIME},
     feedback,
     parser::{self, QueryInput},
 };
@@ -62,7 +62,7 @@ fn main() {
                     println!("{}", serialize_service_error(command, &error));
                 }
                 OutputMode::AlfredJson => {
-                    eprintln!("error: {}", error.message);
+                    eprintln!("error: {}", error.message());
                 }
                 OutputMode::Human => {
                     unreachable!("only json and alfred-json output modes are supported")
@@ -110,12 +110,18 @@ fn render_feedback(
     payload: alfred_core::Feedback,
 ) -> Result<String, AppError> {
     match mode {
-        OutputMode::AlfredJson => payload
-            .to_json()
-            .map_err(|error| AppError::runtime(format!("failed to serialize feedback: {error}"))),
+        OutputMode::AlfredJson => payload.to_json().map_err(|error| {
+            AppError::runtime(
+                ERROR_CODE_RUNTIME,
+                format!("failed to serialize feedback: {error}"),
+            )
+        }),
         OutputMode::Json => {
             let result = payload.to_json().map_err(|error| {
-                AppError::runtime(format!("failed to serialize feedback: {error}"))
+                AppError::runtime(
+                    ERROR_CODE_RUNTIME,
+                    format!("failed to serialize feedback: {error}"),
+                )
             })?;
             Ok(build_success_envelope(
                 command,
@@ -127,15 +133,8 @@ fn render_feedback(
     }
 }
 
-fn error_code(error: &AppError) -> &'static str {
-    match error.kind {
-        epoch_cli::error::ErrorKind::User => "NILS_EPOCH_001",
-        epoch_cli::error::ErrorKind::Runtime => "NILS_EPOCH_002",
-    }
-}
-
 fn serialize_service_error(command: &'static str, error: &AppError) -> String {
-    build_error_envelope(command, error_code(error), &error.message, None)
+    build_error_envelope(command, error.code(), error.message(), None)
 }
 
 fn rows_for_query(
@@ -178,7 +177,7 @@ fn best_effort_clipboard_rows(
 #[cfg(test)]
 mod tests {
     use chrono::{NaiveDate, TimeZone, Utc};
-    use epoch_cli::error::ErrorKind;
+    use epoch_cli::error::{ERROR_CODE_USER, ErrorKind};
     use serde_json::Value;
 
     use super::*;
@@ -282,9 +281,9 @@ mod tests {
 
         let error = run_with(cli, fixed_now, || None).expect_err("invalid query should fail");
 
-        assert_eq!(error.kind, ErrorKind::User);
+        assert_eq!(error.kind(), ErrorKind::User);
         assert_eq!(error.exit_code(), 2);
-        assert_eq!(error.message, "unsupported query format: invalid query");
+        assert_eq!(error.message(), "unsupported query format: invalid query");
     }
 
     #[test]
@@ -297,8 +296,10 @@ mod tests {
 
     #[test]
     fn main_service_error_envelope_has_required_error_fields() {
-        let payload =
-            serialize_service_error("convert", &AppError::user("unsupported query format"));
+        let payload = serialize_service_error(
+            "convert",
+            &AppError::user(ERROR_CODE_USER, "unsupported query format"),
+        );
         let json: Value = serde_json::from_str(&payload).expect("service error should be json");
 
         assert_eq!(
