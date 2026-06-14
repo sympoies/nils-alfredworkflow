@@ -22,7 +22,7 @@ pub use config::{
     DEFAULT_OPEN_PROJECT_MAX_RESULTS, DEFAULT_PROJECT_DIRS, DEFAULT_USAGE_FILE,
     DEFAULT_VSCODE_PATH, RuntimeConfig, expand_home_tokens, parse_project_dirs,
 };
-pub use error::{CliErrorKind, WorkflowError};
+pub use error::{AppError, CliErrorKind, WorkflowError};
 pub use feedback::{
     ScriptFilterMode, build_script_filter_feedback, build_script_filter_feedback_with_mode,
     no_projects_feedback, subtitle_format,

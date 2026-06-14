@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use rust_decimal::Decimal;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_alfred_error_feedback, build_error_details_json,
-    build_error_envelope, build_success_envelope, redact_sensitive,
+    AppError as CliError, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
+    build_error_details_json, build_error_envelope, build_success_envelope, redact_sensitive,
 };
 
 use market_cli::{
@@ -91,38 +91,6 @@ impl From<OutputModeArg> for OutputMode {
             OutputModeArg::Human => OutputMode::Human,
             OutputModeArg::Json => OutputMode::Json,
             OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CliError {
-    kind: market_cli::error::ErrorKind,
-    code: &'static str,
-    message: String,
-}
-
-impl CliError {
-    fn user(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: market_cli::error::ErrorKind::User,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: market_cli::error::ErrorKind::Runtime,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            market_cli::error::ErrorKind::User => 2,
-            market_cli::error::ErrorKind::Runtime => 1,
         }
     }
 }
@@ -560,23 +528,23 @@ fn format_expr_human_output(alfred_json: &str) -> Result<String, CliError> {
 fn emit_error(command: &str, output_mode: OutputMode, error: &CliError) {
     match output_mode {
         OutputMode::Json => {
-            let details = build_error_details_json(error_kind_label(error.kind), error.exit_code());
+            let details = build_error_details_json(error.kind().as_str(), error.exit_code());
             println!(
                 "{}",
-                build_error_envelope(command, error.code, &error.message, Some(&details))
+                build_error_envelope(command, error.code(), error.message(), Some(&details))
             );
         }
         OutputMode::AlfredJson => {
             println!(
                 "{}",
-                build_alfred_error_feedback(error.code, &error.message)
+                build_alfred_error_feedback(error.code(), error.message())
             );
         }
         OutputMode::Human => {
             eprintln!(
                 "error[{}]: {}",
-                error.code,
-                redact_sensitive(&error.message)
+                error.code(),
+                redact_sensitive(error.message())
             );
         }
     }
@@ -601,13 +569,6 @@ fn map_app_error(error: AppError) -> CliError {
     }
 }
 
-fn error_kind_label(kind: market_cli::error::ErrorKind) -> &'static str {
-    match kind {
-        market_cli::error::ErrorKind::User => "user",
-        market_cli::error::ErrorKind::Runtime => "runtime",
-    }
-}
-
 fn cache_status_label(status: market_cli::model::CacheStatus) -> &'static str {
     match status {
         market_cli::model::CacheStatus::Live => "live",
@@ -628,6 +589,7 @@ mod tests {
         providers::ProviderError,
     };
     use serde_json::Value;
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -922,8 +884,8 @@ mod tests {
 
         let err = run_with(cli, &config_in_tempdir(), &FakeProviders::ok(), fixed_now)
             .expect_err("must fail");
-        assert_eq!(err.kind, market_cli::error::ErrorKind::User);
-        assert_eq!(err.code, ERROR_CODE_USER_INVALID_INPUT);
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.code(), ERROR_CODE_USER_INVALID_INPUT);
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -951,8 +913,8 @@ mod tests {
 
         let err =
             run_with(cli, &config_in_tempdir(), &providers, fixed_now).expect_err("must fail");
-        assert_eq!(err.kind, market_cli::error::ErrorKind::Runtime);
-        assert_eq!(err.code, ERROR_CODE_RUNTIME_PROVIDER_FAILED);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
+        assert_eq!(err.code(), ERROR_CODE_RUNTIME_PROVIDER_FAILED);
         assert_eq!(err.exit_code(), 1);
     }
 
@@ -977,8 +939,8 @@ mod tests {
         let err = run_with(cli, &config_in_tempdir(), &FakeProviders::ok(), fixed_now)
             .expect_err("must fail");
 
-        assert_eq!(err.kind, market_cli::error::ErrorKind::User);
-        assert_eq!(err.code, ERROR_CODE_USER_INVALID_INPUT);
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.code(), ERROR_CODE_USER_INVALID_INPUT);
         assert_eq!(err.exit_code(), 2);
     }
 
