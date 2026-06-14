@@ -5,6 +5,7 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::{ApiFallbackPolicy, DEFAULT_USER_AGENT, RuntimeConfig};
 use crate::input::{ParsedInput, SubjectType};
@@ -95,9 +96,7 @@ pub fn search_subjects(
     config: &RuntimeConfig,
     query: &ParsedInput,
 ) -> Result<Vec<BangumiSubject>, BangumiApiError> {
-    let client = Client::builder()
-        .timeout(Duration::from_millis(config.timeout_ms))
-        .build()
+    let client = build_blocking_client(None, Some(Duration::from_millis(config.timeout_ms)))
         .map_err(|source| BangumiApiError::Transport { source })?;
 
     search_subjects_with(

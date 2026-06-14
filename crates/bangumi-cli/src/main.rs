@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use alfred_core::Feedback;
 use clap::{Parser, Subcommand, ValueEnum};
-use reqwest::blocking::Client;
 
 use bangumi_cli::{
     bangumi_api::{self, BangumiApiError, BangumiSubject},
@@ -12,6 +11,7 @@ use bangumi_cli::{
     input::{self, ParsedInput, SubjectType},
 };
 use workflow_common::ScriptFilterOutputModeArg as OutputModeArg;
+use workflow_common::http::build_blocking_client;
 use workflow_common::{
     AppError, EnvelopePayloadKind, OutputMode, build_error_envelope, build_success_envelope,
 };
@@ -209,9 +209,7 @@ fn render_feedback_with_cache(
 ) -> Feedback {
     let cache = ImageCacheManager::new(config);
 
-    let client = Client::builder()
-        .timeout(Duration::from_millis(config.timeout_ms))
-        .build();
+    let client = build_blocking_client(None, Some(Duration::from_millis(config.timeout_ms)));
 
     match client {
         Ok(client) => feedback::subjects_to_feedback_with_icons(

@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use reqwest::blocking::Client;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::{PROVIDER_TIMEOUT_SECS, RetryPolicy};
 use crate::model::MarketQuote;
@@ -25,9 +26,7 @@ pub struct HttpProviders {
 
 impl HttpProviders {
     pub fn new() -> Result<Self, ProviderError> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(PROVIDER_TIMEOUT_SECS))
-            .build()
+        let client = build_blocking_client(None, Some(Duration::from_secs(PROVIDER_TIMEOUT_SECS)))
             .map_err(|error| ProviderError::Transport(error.to_string()))?;
 
         Ok(Self {

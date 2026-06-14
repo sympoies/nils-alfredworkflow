@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
@@ -17,11 +18,11 @@ pub fn search_suggestions(
     config: &RuntimeConfig,
     query: &str,
 ) -> Result<Vec<SuggestionTerm>, BilibiliApiError> {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent(config.user_agent.clone())
-        .timeout(Duration::from_millis(config.timeout_ms))
-        .build()
-        .map_err(|source| BilibiliApiError::Transport { source })?;
+    let client = build_blocking_client(
+        Some(config.user_agent.as_str()),
+        Some(Duration::from_millis(config.timeout_ms)),
+    )
+    .map_err(|source| BilibiliApiError::Transport { source })?;
 
     let params = build_query_params(query, config);
 

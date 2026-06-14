@@ -2,14 +2,13 @@ use std::time::Duration;
 
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 const ENDPOINT: &str = "https://zenquotes.io/api/random";
 const USER_AGENT: &str = "nils-alfredworkflow-quote-feed/0.1.5";
 
 pub fn fetch_quotes(fetch_count: usize, timeout_secs: u64) -> Result<Vec<String>, ZenQuotesError> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(timeout_secs))
-        .build()
+    let client = build_blocking_client(None, Some(Duration::from_secs(timeout_secs)))
         .map_err(ZenQuotesError::BuildClient)?;
 
     let mut quotes = Vec::new();

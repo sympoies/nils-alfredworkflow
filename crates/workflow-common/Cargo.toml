@@ -13,14 +13,19 @@ path = "src/lib.rs"
 alfred-core = { package = "nils-alfred-core", path = "../alfred-core", version = "1.0.3" }
 chrono.workspace = true
 clap = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
 thiserror.workspace = true
 walkdir.workspace = true
 
 [features]
+default = []
 # Opt-in clap value-enum mirror of the Script Filter `--output` flag.
 # Consumers that build a clap CLI enable this to reuse
 # `ScriptFilterOutputModeArg` instead of redefining it per crate.
 clap = ["dep:clap"]
+# Opt-in blocking HTTP client builder primitive for workflow CLIs that already
+# construct reqwest clients locally.
+http = ["dep:reqwest"]
 
 [dev-dependencies]
 tempfile.workspace = true
