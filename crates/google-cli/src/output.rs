@@ -1,10 +1,9 @@
 use std::io::{self, Write};
 
 use serde_json::{Value, json};
+use workflow_common::{EnvelopePayloadKind, build_error_envelope, build_success_envelope};
 
-use crate::error::{AppError, ErrorKind, redact_sensitive};
-
-pub const ENVELOPE_SCHEMA_VERSION: &str = "cli-envelope@v1";
+use crate::error::{AppError, redact_sensitive};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputMode {
@@ -76,39 +75,36 @@ pub fn render_error(command_id: &str, mode: OutputMode, error: &AppError) -> Ren
 }
 
 fn format_success_envelope(command_id: &str, payload: Value) -> String {
-    json!({
-        "schema_version": ENVELOPE_SCHEMA_VERSION,
-        "command": command_id,
-        "ok": true,
-        "result": payload,
-    })
-    .to_string()
+    let payload_json = payload.to_string();
+    let envelope = build_success_envelope(command_id, EnvelopePayloadKind::Result, &payload_json);
+    canonicalize_envelope_json(&envelope)
 }
 
 fn format_error_envelope(command_id: &str, error: &AppError) -> String {
-    let kind = match error.kind() {
-        ErrorKind::User => "user",
-        ErrorKind::Runtime => "runtime",
-    };
-    let mut envelope = json!({
-        "schema_version": ENVELOPE_SCHEMA_VERSION,
-        "command": command_id,
-        "ok": false,
-        "error": {
-            "code": error.code(),
-            "message": redact_sensitive(error.message()),
-            "details": {
-                "kind": kind,
-                "exit_code": error.exit_code(),
-            }
-        }
+    let mut details = json!({
+        "kind": error.kind().as_str(),
+        "exit_code": error.exit_code(),
     });
 
-    if let Some(details) = error.details() {
-        envelope["error"]["details"]["context"] = details.clone();
+    if let Some(context) = error.details() {
+        details["context"] = context.clone();
     }
 
-    envelope.to_string()
+    let details_json = details.to_string();
+    let envelope = build_error_envelope(
+        command_id,
+        error.code(),
+        error.message(),
+        Some(&details_json),
+    );
+    canonicalize_envelope_json(&envelope)
+}
+
+fn canonicalize_envelope_json(envelope: &str) -> String {
+    match serde_json::from_str::<Value>(envelope) {
+        Ok(value) => value.to_string(),
+        Err(_) => envelope.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -142,6 +138,10 @@ mod tests {
                 .and_then(Value::as_array)
                 .is_some()
         );
+        assert_eq!(
+            output.stdout,
+            "{\"command\":\"google.auth.list\",\"ok\":true,\"result\":{\"accounts\":[\"me@example.com\"]},\"schema_version\":\"cli-envelope@v1\"}"
+        );
     }
 
     #[test]
@@ -162,6 +162,10 @@ mod tests {
                 .and_then(|value| value.get("kind"))
                 .and_then(Value::as_str),
             Some("auth_invalid_input")
+        );
+        assert_eq!(
+            output.stdout,
+            "{\"command\":\"google.auth.add\",\"error\":{\"code\":\"NILS_GOOGLE_005\",\"details\":{\"context\":{\"kind\":\"auth_invalid_input\"},\"exit_code\":2,\"kind\":\"user\"},\"message\":\"missing account\"},\"ok\":false,\"schema_version\":\"cli-envelope@v1\"}"
         );
     }
 

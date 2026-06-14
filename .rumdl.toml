@@ -7,3 +7,4 @@ tables = false
 [per-file-ignores]
 "crates/workflow-readme-cli/tests/fixtures/codex-cli-readme.md" = ["MD057"]
 "crates/workflow-readme-cli/tests/fixtures/expected/codex-cli-readme-alfred.md" = ["MD057"]
+"docs/reports/repo-docs-comprehensive-cleanup-plan.md" = ["MD046"]
