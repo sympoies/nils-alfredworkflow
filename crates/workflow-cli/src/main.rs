@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, RuntimeConfig, ScriptFilterMode, WorkflowError,
+    AppError, EnvelopePayloadKind, OutputMode, RuntimeConfig, ScriptFilterMode, WorkflowError,
     build_alfred_error_feedback, build_error_details_json, build_error_envelope,
     build_script_filter_feedback_with_mode, build_success_envelope, record_usage,
     web_url_for_project,
@@ -71,44 +71,6 @@ impl From<OutputModeArg> for OutputMode {
             OutputModeArg::Human => OutputMode::Human,
             OutputModeArg::Json => OutputMode::Json,
             OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ErrorKind {
-    User,
-    Runtime,
-}
-
-#[derive(Debug)]
-struct AppError {
-    kind: ErrorKind,
-    code: &'static str,
-    message: String,
-}
-
-impl AppError {
-    fn user(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => 2,
-            ErrorKind::Runtime => 1,
         }
     }
 }
@@ -213,32 +175,25 @@ fn render_script_filter_human(feedback: &workflow_common::Feedback) -> String {
 fn emit_error(command: &str, output_mode: OutputMode, error: &AppError) {
     match output_mode {
         OutputMode::Json => {
-            let details = build_error_details_json(error_kind_label(error.kind), error.exit_code());
+            let details = build_error_details_json(error.kind().as_str(), error.exit_code());
             println!(
                 "{}",
-                build_error_envelope(command, error.code, &error.message, Some(&details))
+                build_error_envelope(command, error.code(), error.message(), Some(&details))
             );
         }
         OutputMode::AlfredJson => {
             println!(
                 "{}",
-                build_alfred_error_feedback(error.code, &error.message)
+                build_alfred_error_feedback(error.code(), error.message())
             );
         }
         OutputMode::Human => {
             eprintln!(
                 "error[{}]: {}",
-                error.code,
-                workflow_common::redact_sensitive(&error.message),
+                error.code(),
+                workflow_common::redact_sensitive(error.message()),
             );
         }
-    }
-}
-
-fn error_kind_label(kind: ErrorKind) -> &'static str {
-    match kind {
-        ErrorKind::User => "user",
-        ErrorKind::Runtime => "runtime",
     }
 }
 
@@ -302,6 +257,7 @@ mod tests {
     use std::process::Command;
 
     use tempfile::tempdir;
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -458,15 +414,15 @@ mod tests {
         .expect_err("missing project should produce user error");
 
         assert_eq!(
-            err.kind,
-            ErrorKind::User,
+            err.kind(),
+            CliErrorKind::User,
             "missing path should be treated as user error"
         );
         assert!(
-            err.message.contains(missing.to_string_lossy().as_ref()),
+            err.message().contains(missing.to_string_lossy().as_ref()),
             "error message should include offending path"
         );
-        assert_eq!(err.code, ERROR_CODE_USER_INVALID_PATH);
+        assert_eq!(err.code(), ERROR_CODE_USER_INVALID_PATH);
     }
 
     #[test]

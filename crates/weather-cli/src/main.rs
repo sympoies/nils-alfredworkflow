@@ -5,8 +5,8 @@ use chrono_tz::Tz;
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::json;
 use workflow_common::{
-    EnvelopePayloadKind, OutputMode, build_alfred_error_feedback, build_error_details_json,
-    build_error_envelope, build_success_envelope, redact_sensitive,
+    AppError as CliError, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
+    build_error_details_json, build_error_envelope, build_success_envelope, redact_sensitive,
 };
 
 use weather_cli::{
@@ -105,38 +105,6 @@ enum LanguageArg {
 enum OutputLanguage {
     En,
     Zh,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CliError {
-    kind: weather_cli::error::ErrorKind,
-    code: &'static str,
-    message: String,
-}
-
-impl CliError {
-    fn user(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: weather_cli::error::ErrorKind::User,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn runtime(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: weather_cli::error::ErrorKind::Runtime,
-            code,
-            message: message.into(),
-        }
-    }
-
-    fn exit_code(&self) -> i32 {
-        match self.kind {
-            weather_cli::error::ErrorKind::User => 2,
-            weather_cli::error::ErrorKind::Runtime => 1,
-        }
-    }
 }
 
 impl From<OutputModeArg> for OutputMode {
@@ -619,23 +587,23 @@ fn render_hourly_alfred_json(
 fn emit_error(command: &str, output_mode: OutputMode, error: &CliError) {
     match output_mode {
         OutputMode::Json => {
-            let details = build_error_details_json(error_kind_label(error.kind), error.exit_code());
+            let details = build_error_details_json(error.kind().as_str(), error.exit_code());
             println!(
                 "{}",
-                build_error_envelope(command, error.code, &error.message, Some(&details))
+                build_error_envelope(command, error.code(), error.message(), Some(&details))
             );
         }
         OutputMode::AlfredJson => {
             println!(
                 "{}",
-                build_alfred_error_feedback(error.code, &error.message)
+                build_alfred_error_feedback(error.code(), error.message())
             );
         }
         OutputMode::Human => {
             eprintln!(
                 "error[{}]: {}",
-                error.code,
-                redact_sensitive(&error.message)
+                error.code(),
+                redact_sensitive(error.message())
             );
         }
     }
@@ -661,13 +629,6 @@ fn map_app_error(error: AppError) -> CliError {
         weather_cli::error::ErrorKind::Runtime => {
             runtime_error(ERROR_CODE_RUNTIME_PROVIDER_FAILED, error.message)
         }
-    }
-}
-
-fn error_kind_label(kind: weather_cli::error::ErrorKind) -> &'static str {
-    match kind {
-        weather_cli::error::ErrorKind::User => "user",
-        weather_cli::error::ErrorKind::Runtime => "runtime",
     }
 }
 
@@ -1011,6 +972,7 @@ fn freshness_label(status: weather_cli::model::FreshnessStatus) -> &'static str 
 mod tests {
     use chrono::TimeZone;
     use serde_json::Value;
+    use workflow_common::CliErrorKind;
 
     use super::*;
 
@@ -1436,8 +1398,8 @@ mod tests {
         let err = run_with(cli, &config_in_tempdir(), &FakeProviders::ok(), fixed_now)
             .expect_err("must fail");
 
-        assert_eq!(err.kind, weather_cli::error::ErrorKind::User);
-        assert_eq!(err.code, ERROR_CODE_USER_INVALID_INPUT);
+        assert_eq!(err.kind(), CliErrorKind::User);
+        assert_eq!(err.code(), ERROR_CODE_USER_INVALID_INPUT);
         assert_eq!(err.exit_code(), 2);
     }
 
@@ -1463,8 +1425,8 @@ mod tests {
 
         let err =
             run_with(cli, &config_in_tempdir(), &providers, fixed_now).expect_err("must fail");
-        assert_eq!(err.kind, weather_cli::error::ErrorKind::Runtime);
-        assert_eq!(err.code, ERROR_CODE_RUNTIME_PROVIDER_FAILED);
+        assert_eq!(err.kind(), CliErrorKind::Runtime);
+        assert_eq!(err.code(), ERROR_CODE_RUNTIME_PROVIDER_FAILED);
         assert_eq!(err.exit_code(), 1);
     }
 

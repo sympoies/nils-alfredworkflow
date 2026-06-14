@@ -158,7 +158,7 @@ fn emit_success(command: &str, output_mode: OutputMode, summary: &ConvertSummary
 fn emit_error(command: &str, output_mode: OutputMode, error: &AppError) {
     match output_mode {
         OutputMode::Json => {
-            let details = build_error_details_json(error_kind_label(error), error.exit_code());
+            let details = build_error_details_json(error.kind().as_str(), error.exit_code());
             println!(
                 "{}",
                 build_error_envelope(command, error.code(), error.message(), Some(&details))
@@ -172,12 +172,5 @@ fn emit_error(command: &str, output_mode: OutputMode, error: &AppError) {
             );
         }
         OutputMode::AlfredJson => unreachable!("workflow-readme does not expose alfred-json mode"),
-    }
-}
-
-fn error_kind_label(error: &AppError) -> &'static str {
-    match error.kind() {
-        workflow_readme_cli::ErrorKind::User => "user",
-        workflow_readme_cli::ErrorKind::Runtime => "runtime",
     }
 }

@@ -1,10 +1,8 @@
 use std::collections::BTreeSet;
-use std::fmt;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-pub const EXIT_CODE_RUNTIME: i32 = 1;
-pub const EXIT_CODE_USER: i32 = 2;
+pub use workflow_common::{AppError, CliErrorKind as ErrorKind};
 
 const ERROR_CODE_USER_INVALID_WORKFLOW_ROOT: &str = "NILS_WORKFLOW_README_001";
 const ERROR_CODE_USER_INVALID_README_SOURCE: &str = "NILS_WORKFLOW_README_002";
@@ -18,64 +16,6 @@ const ERROR_CODE_RUNTIME_READ_FAILED: &str = "NILS_WORKFLOW_README_009";
 const ERROR_CODE_RUNTIME_WRITE_FAILED: &str = "NILS_WORKFLOW_README_010";
 const ERROR_CODE_RUNTIME_CREATE_DIR_FAILED: &str = "NILS_WORKFLOW_README_011";
 const ERROR_CODE_RUNTIME_COPY_FAILED: &str = "NILS_WORKFLOW_README_012";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ErrorKind {
-    User,
-    Runtime,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AppError {
-    kind: ErrorKind,
-    code: &'static str,
-    message: String,
-}
-
-impl AppError {
-    pub fn user(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::User,
-            code,
-            message: message.into(),
-        }
-    }
-
-    pub fn runtime(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: ErrorKind::Runtime,
-            code,
-            message: message.into(),
-        }
-    }
-
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
-    }
-
-    pub fn code(&self) -> &'static str {
-        self.code
-    }
-
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    pub fn exit_code(&self) -> i32 {
-        match self.kind {
-            ErrorKind::User => EXIT_CODE_USER,
-            ErrorKind::Runtime => EXIT_CODE_RUNTIME,
-        }
-    }
-}
-
-impl fmt::Display for AppError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for AppError {}
 
 #[derive(Debug, Clone)]
 pub struct ConvertRequest {
