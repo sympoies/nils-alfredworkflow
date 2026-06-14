@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use reqwest::blocking::Client;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::{
     ICON_GENERIC_BASENAME, ICON_PNG_VARIANT_DIR, ICON_SOURCE_CDN_BASE_URL, RuntimeConfig,
@@ -21,10 +22,8 @@ enum FetchOutcome {
 }
 
 pub fn resolve_icon_path(config: &RuntimeConfig, symbol: &str) -> Option<PathBuf> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(ICON_FETCH_TIMEOUT_SECS))
-        .build()
-        .ok()?;
+    let client =
+        build_blocking_client(None, Some(Duration::from_secs(ICON_FETCH_TIMEOUT_SECS))).ok()?;
 
     resolve_icon_path_with(config, symbol, &mut |url| fetch_icon_bytes(&client, url))
 }

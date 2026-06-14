@@ -7,12 +7,15 @@
 //! - `feedback`: Alfred item assembly.
 //! - `output_contract`: shared output modes + JSON envelope helpers.
 //! - `list_parser`: ordered comma/newline list parsing utilities.
+//! - `http`: opt-in blocking reqwest client builder primitive.
 
 pub mod config;
 pub mod discovery;
 pub mod error;
 pub mod feedback;
 pub mod git;
+#[cfg(feature = "http")]
+pub mod http;
 pub mod list_parser;
 pub mod output_contract;
 pub mod usage_log;

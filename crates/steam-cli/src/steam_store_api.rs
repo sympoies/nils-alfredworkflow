@@ -7,6 +7,7 @@ use base64::Engine as _;
 use prost::Message;
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::{RuntimeConfig, SteamSearchApi};
 
@@ -224,10 +225,7 @@ fn cache_covers(results: &mut [SteamSearchResult], base_cache_dir: &str) {
         .collect();
 
     if !jobs.is_empty()
-        && let Ok(client) = reqwest::blocking::Client::builder()
-            .user_agent(USER_AGENT)
-            .timeout(COVER_REQUEST_TIMEOUT)
-            .build()
+        && let Ok(client) = build_blocking_client(Some(USER_AGENT), Some(COVER_REQUEST_TIMEOUT))
     {
         let worker_count = jobs.len().min(COVER_MAX_WORKERS);
         let next = AtomicUsize::new(0);

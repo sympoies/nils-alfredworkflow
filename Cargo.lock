@@ -2786,6 +2786,7 @@ dependencies = [
  "chrono",
  "clap",
  "nils-alfred-core",
+ "reqwest",
  "tempfile",
  "thiserror 2.0.18",
  "walkdir",
