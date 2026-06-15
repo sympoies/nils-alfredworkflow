@@ -15,7 +15,7 @@ name = "weather-cli"
 path = "src/main.rs"
 
 [dependencies]
-workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["http"] }
+workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["clap", "http"] }
 chrono.workspace = true
 chrono-tz = "0.10"
 clap.workspace = true

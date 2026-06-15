@@ -26,8 +26,8 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = ScriptFilterModeArg::Open)]
         mode: ScriptFilterModeArg,
         /// Canonical output mode (`human`, `json`, or `alfred-json`).
-        #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::AlfredJson)]
+        output: OutputMode,
     },
     /// Record usage timestamp for a selected project path.
     RecordUsage {
@@ -58,23 +58,6 @@ impl From<ScriptFilterModeArg> for ScriptFilterMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum OutputModeArg {
-    Human,
-    Json,
-    AlfredJson,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Human => OutputMode::Human,
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
-}
-
 const ERROR_CODE_USER_INVALID_PATH: &str = "NILS_WORKFLOW_001";
 const ERROR_CODE_RUNTIME_GIT: &str = "NILS_WORKFLOW_002";
 const ERROR_CODE_RUNTIME_USAGE_WRITE: &str = "NILS_WORKFLOW_003";
@@ -91,7 +74,7 @@ impl Cli {
 
     fn output_mode_hint(&self) -> OutputMode {
         match &self.command {
-            Commands::ScriptFilter { output, .. } => (*output).into(),
+            Commands::ScriptFilter { output, .. } => *output,
             Commands::RecordUsage { .. } | Commands::GithubUrl { .. } => OutputMode::Human,
         }
     }
@@ -125,7 +108,7 @@ fn run_with_config(cli: Cli, config: &RuntimeConfig) -> Result<String, AppError>
             mode,
             output,
         } => {
-            let output_mode: OutputMode = output.into();
+            let output_mode = output;
             let feedback = build_script_filter_feedback_with_mode(&query, config, mode.into());
             let alfred_json = feedback.to_json().map_err(|error| {
                 AppError::runtime(
@@ -280,7 +263,7 @@ mod tests {
                 command: Commands::ScriptFilter {
                     query: String::new(),
                     mode: ScriptFilterModeArg::Open,
-                    output: OutputModeArg::Json,
+                    output: OutputMode::Json,
                 },
             },
             &config,
@@ -444,7 +427,7 @@ mod tests {
                 command: Commands::ScriptFilter {
                     query: String::new(),
                     mode: ScriptFilterModeArg::Github,
-                    output: OutputModeArg::AlfredJson,
+                    output: OutputMode::AlfredJson,
                 },
             },
             &config,
@@ -496,7 +479,7 @@ mod tests {
                 command: Commands::ScriptFilter {
                     query: String::new(),
                     mode: ScriptFilterModeArg::Github,
-                    output: OutputModeArg::AlfredJson,
+                    output: OutputMode::AlfredJson,
                 },
             },
             &config,
@@ -535,7 +518,7 @@ mod tests {
                 command: Commands::ScriptFilter {
                     query: String::new(),
                     mode: ScriptFilterModeArg::Open,
-                    output: OutputModeArg::AlfredJson,
+                    output: OutputMode::AlfredJson,
                 },
             },
             &config,

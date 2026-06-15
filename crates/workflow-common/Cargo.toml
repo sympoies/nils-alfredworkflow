@@ -19,9 +19,9 @@ walkdir.workspace = true
 
 [features]
 default = []
-# Opt-in clap value-enum mirror of the Script Filter `--output` flag.
-# Consumers that build a clap CLI enable this to reuse
-# `ScriptFilterOutputModeArg` instead of redefining it per crate.
+# Opt-in clap value-enum support for shared output-mode argument types.
+# Consumers that build a clap CLI enable this to reuse `OutputMode` and
+# `ScriptFilterOutputModeArg` instead of redefining them per crate.
 clap = ["dep:clap"]
 # Opt-in blocking HTTP client builder primitive for workflow CLIs that already
 # construct reqwest clients locally.

@@ -1,6 +1,6 @@
 use alfred_core::{Feedback, Item, ItemIcon};
 use chrono::{DateTime, Utc};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use rust_decimal::Decimal;
 use workflow_common::{
     AppError as CliError, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
@@ -35,8 +35,8 @@ enum Commands {
         quote: String,
         #[arg(long)]
         amount: String,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::Human)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
     },
     /// Query crypto spot price (Coinbase with Kraken fallback).
     Crypto {
@@ -46,8 +46,8 @@ enum Commands {
         quote: String,
         #[arg(long)]
         amount: String,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::Human)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
     },
     /// Evaluate market expressions and return Alfred Script Filter JSON.
     Expr {
@@ -55,8 +55,8 @@ enum Commands {
         query: String,
         #[arg(long, default_value = "USD")]
         default_fiat: String,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::AlfredJson)]
+        output: OutputMode,
     },
     /// Render configured market favorites as non-actionable Alfred rows.
     Favorites {
@@ -64,8 +64,8 @@ enum Commands {
         list: Option<String>,
         #[arg(long, default_value = "USD")]
         default_fiat: String,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::AlfredJson)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::AlfredJson)]
+        output: OutputMode,
     },
 }
 
@@ -77,23 +77,6 @@ const FAVORITES_PROMPT_TITLE: &str = "Enter a market expression";
 const FAVORITES_PROMPT_EXAMPLE: &str = "Example: 1 BTC + 3 ETH to JPY";
 const FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE: &str =
     "Favorite quote. Type an expression to convert. Quote unavailable.";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum OutputModeArg {
-    Human,
-    Json,
-    AlfredJson,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Human => OutputMode::Human,
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
-}
 
 impl Cli {
     fn command_name(&self) -> &'static str {
@@ -110,7 +93,7 @@ impl Cli {
             Commands::Fx { output, .. }
             | Commands::Crypto { output, .. }
             | Commands::Expr { output, .. }
-            | Commands::Favorites { output, .. } => (*output).into(),
+            | Commands::Favorites { output, .. } => *output,
         }
     }
 }
@@ -192,7 +175,7 @@ where
             let feedback =
                 expression::evaluate_query(config, providers, now_fn, &query, &default_fiat)
                     .map_err(map_app_error)?;
-            let output_mode: OutputMode = output.into();
+            let output_mode = output;
             let alfred_json = feedback.to_json().map_err(|error| {
                 runtime_error(
                     ERROR_CODE_RUNTIME_SERIALIZE,
@@ -219,7 +202,7 @@ where
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
             let default_fiat = normalize_fx_symbol(&default_fiat, "default_fiat")
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
-            let output_mode: OutputMode = output.into();
+            let output_mode = output;
 
             match output_mode {
                 OutputMode::Human => Ok(format_favorites_human_output(&favorites)),
@@ -254,7 +237,7 @@ struct MarketCommandArgs<'a> {
     base: &'a str,
     quote: &'a str,
     amount: &'a str,
-    output: OutputModeArg,
+    output: OutputMode,
 }
 
 fn run_market_command<P, N>(
@@ -267,7 +250,7 @@ where
     P: ProviderApi,
     N: Fn() -> DateTime<Utc>,
 {
-    let output_mode: OutputMode = args.output.into();
+    let output_mode = args.output;
     let request = MarketRequest::new(args.kind, args.base, args.quote, args.amount)
         .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
     let result =
