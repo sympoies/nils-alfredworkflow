@@ -48,8 +48,8 @@ enum Commands {
         lat: Option<f64>,
         #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::Human)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
         #[arg(long, value_enum)]
         lang: Option<LanguageArg>,
     },
@@ -61,8 +61,8 @@ enum Commands {
         lat: Option<f64>,
         #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::Human)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
         #[arg(long, value_enum)]
         lang: Option<LanguageArg>,
     },
@@ -74,8 +74,8 @@ enum Commands {
         lat: Option<f64>,
         #[arg(long, allow_hyphen_values = true)]
         lon: Option<f64>,
-        #[arg(long, value_enum, default_value_t = OutputModeArg::Human)]
-        output: OutputModeArg,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
         #[arg(long, value_enum)]
         lang: Option<LanguageArg>,
         #[arg(long, default_value_t = DEFAULT_HOURLY_COUNT)]
@@ -89,13 +89,6 @@ const ERROR_CODE_RUNTIME_PROVIDER_FAILED: &str = "NILS_WEATHER_002";
 const ERROR_CODE_RUNTIME_SERIALIZE: &str = "NILS_COMMON_005";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum OutputModeArg {
-    Human,
-    Json,
-    AlfredJson,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum LanguageArg {
     En,
     Zh,
@@ -105,16 +98,6 @@ enum LanguageArg {
 enum OutputLanguage {
     En,
     Zh,
-}
-
-impl From<OutputModeArg> for OutputMode {
-    fn from(value: OutputModeArg) -> Self {
-        match value {
-            OutputModeArg::Human => OutputMode::Human,
-            OutputModeArg::Json => OutputMode::Json,
-            OutputModeArg::AlfredJson => OutputMode::AlfredJson,
-        }
-    }
 }
 
 impl From<LanguageArg> for OutputLanguage {
@@ -139,7 +122,7 @@ impl Cli {
         match &self.command {
             Commands::Today { output, .. }
             | Commands::Week { output, .. }
-            | Commands::Hourly { output, .. } => (*output).into(),
+            | Commands::Hourly { output, .. } => *output,
         }
     }
 }
@@ -246,7 +229,7 @@ struct CommandArgs<'a> {
     cities: &'a [String],
     lat: Option<f64>,
     lon: Option<f64>,
-    output: OutputModeArg,
+    output: OutputMode,
     lang: Option<LanguageArg>,
 }
 
@@ -256,7 +239,7 @@ struct HourlyCommandArgs<'a> {
     city: Option<&'a str>,
     lat: Option<f64>,
     lon: Option<f64>,
-    output: OutputModeArg,
+    output: OutputMode,
     lang: Option<LanguageArg>,
     hours: usize,
 }
@@ -271,7 +254,7 @@ where
     P: ProviderApi,
     N: Fn() -> DateTime<Utc> + Copy,
 {
-    let output_mode: OutputMode = args.output.into();
+    let output_mode = args.output;
     let output_language = args.lang.map(Into::into).unwrap_or(OutputLanguage::En);
 
     if args.cities.len() > 1 {
@@ -330,7 +313,7 @@ where
     P: ProviderApi,
     N: Fn() -> DateTime<Utc> + Copy,
 {
-    let output_mode: OutputMode = args.output.into();
+    let output_mode = args.output;
     let output_language = args.lang.map(Into::into).unwrap_or(OutputLanguage::En);
     let location = resolve_location_query(args.city, args.lat, args.lon)?;
     let output =

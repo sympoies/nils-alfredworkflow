@@ -1,5 +1,7 @@
 pub const ENVELOPE_SCHEMA_VERSION: &str = "cli-envelope@v1";
 
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", value(rename_all = "kebab-case"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputMode {
     Human,
@@ -275,6 +277,34 @@ mod tests {
         assert_eq!(OutputMode::parse("alfred"), None);
         assert_eq!(OutputMode::parse("alfred_json"), None);
         assert_eq!(OutputMode::parse("invalid"), None);
+    }
+
+    #[cfg(feature = "clap")]
+    #[test]
+    fn output_mode_clap_value_enum_exposes_full_contract() {
+        let variants = <OutputMode as clap::ValueEnum>::value_variants();
+        assert_eq!(
+            variants,
+            &[OutputMode::Human, OutputMode::Json, OutputMode::AlfredJson]
+        );
+        assert_eq!(
+            <OutputMode as clap::ValueEnum>::to_possible_value(&OutputMode::Human)
+                .expect("human value")
+                .get_name(),
+            "human"
+        );
+        assert_eq!(
+            <OutputMode as clap::ValueEnum>::to_possible_value(&OutputMode::Json)
+                .expect("json value")
+                .get_name(),
+            "json"
+        );
+        assert_eq!(
+            <OutputMode as clap::ValueEnum>::to_possible_value(&OutputMode::AlfredJson)
+                .expect("alfred-json value")
+                .get_name(),
+            "alfred-json"
+        );
     }
 
     #[test]
