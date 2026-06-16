@@ -172,7 +172,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          mapfile -t bins < <(
+          bins=()
+          while IFS= read -r bin; do
+            bins+=("$bin")
+          done < <(
             awk -F'|' '
               /^[[:space:]]*($|#)/ { next }
               {
@@ -198,7 +201,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          mapfile -t bins < <(
+          bins=()
+          while IFS= read -r bin; do
+            bins+=("$bin")
+          done < <(
             awk -F'|' '
               /^[[:space:]]*($|#)/ { next }
               {

@@ -86,9 +86,7 @@ Current bundled binaries:
 - `bangumi-cli`
 - `bilibili-cli`
 - `epoch-cli`
-- `google-cli`
 - `market-cli`
-- `memo-workflow-cli`
 - `quote-cli`
 - `randomer-cli`
 - `steam-cli`
@@ -104,6 +102,10 @@ Excluded from the standalone bundle for now:
 - `spotify-cli`: requires Spotify credentials and is still legacy Alfred JSON-first.
 - `youtube-cli`: requires a YouTube API key and is still legacy Alfred JSON-first.
 - `cambridge-cli`: requires the external Node/Playwright scraper runtime.
+- `google-cli`: native auth/keyring support currently pulls native Turso/simsimd dependencies that are not yet stable
+  across the four standalone release targets.
+- `memo-workflow-cli`: local memo DB operations currently pull native Turso/simsimd dependencies that are not yet
+  stable across the four standalone release targets.
 
 To validate the bundle packaging locally without building release binaries:
 
@@ -114,7 +116,10 @@ To build a real local tarball for the current host target, first build the
 manifest binaries, then run the package script. Example:
 
 ```bash
-mapfile -t bins < <(awk -F'|' '/^[[:space:]]*($|#)/ { next } { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1 }' release/standalone-cli-bins.txt)
+bins=()
+while IFS= read -r bin; do
+  bins+=("$bin")
+done < <(awk -F'|' '/^[[:space:]]*($|#)/ { next } { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1 }' release/standalone-cli-bins.txt)
 args=(--release --locked)
 for bin in "${bins[@]}"; do
   args+=(--bin "$bin")

@@ -185,7 +185,10 @@ for required in "$license_source" "$license_artifact" "$notices_artifact"; do
   fi
 done
 
-mapfile -t entries < <(read_manifest "$manifest_path")
+entries=()
+while IFS= read -r entry; do
+  entries+=("$entry")
+done < <(read_manifest "$manifest_path")
 if ((${#entries[@]} == 0)); then
   echo "error: release manifest has no binaries: $manifest_path" >&2
   exit 1

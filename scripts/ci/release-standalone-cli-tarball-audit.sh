@@ -128,7 +128,10 @@ fi
 if [[ -n "$tag" ]]; then
   tarball="$dist_dir/${package_name}-${tag}-${target}.tar.gz"
 else
-  mapfile -t matches < <(find "$dist_dir" -maxdepth 1 -type f -name "${package_name}-*-${target}.tar.gz" -print | LC_ALL=C sort)
+  matches=()
+  while IFS= read -r match; do
+    matches+=("$match")
+  done < <(find "$dist_dir" -maxdepth 1 -type f -name "${package_name}-*-${target}.tar.gz" -print | LC_ALL=C sort)
   if ((${#matches[@]} == 0)); then
     echo "FAIL: no standalone CLI tarball found for target: ${target} in ${dist_dir}"
     exit 1
@@ -191,7 +194,10 @@ require_file "LICENSE"
 require_file "THIRD_PARTY_LICENSES.md"
 require_file "THIRD_PARTY_NOTICES.md"
 
-mapfile -t entries < <(read_manifest "$manifest_path")
+entries=()
+while IFS= read -r entry; do
+  entries+=("$entry")
+done < <(read_manifest "$manifest_path")
 if ((${#entries[@]} == 0)); then
   echo "error: release manifest has no binaries: $manifest_path" >&2
   exit 1

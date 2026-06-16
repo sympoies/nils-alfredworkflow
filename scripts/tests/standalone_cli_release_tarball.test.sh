@@ -46,7 +46,10 @@ manifest="$repo_root/release/standalone-cli-bins.txt"
 tarball="$dist_dir/nils-alfred-cli-${tag}-${target}.tar.gz"
 
 mkdir -p "$binary_dir"
-mapfile -t bins < <(manifest_bins "$manifest")
+bins=()
+while IFS= read -r bin; do
+  bins+=("$bin")
+done < <(manifest_bins "$manifest")
 ((${#bins[@]} > 0)) || fail "expected at least one manifest binary"
 
 for bin in "${bins[@]}"; do
