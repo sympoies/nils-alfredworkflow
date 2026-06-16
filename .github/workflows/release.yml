@@ -6,10 +6,82 @@ on:
       - "v*"
 
 jobs:
-  package:
+  verify_ci:
+    name: Verify CI gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - name: Require green CI on tagged commit
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requiredChecks = ["validate"];
+            const attempts = 60;
+            const intervalMs = 30_000;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const timestamp = (run) =>
+              Date.parse(run.completed_at || run.started_at || run.check_suite?.created_at || "") || 0;
+
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              const runs = await github.paginate(github.rest.checks.listForRef, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.sha,
+                per_page: 100,
+              });
+
+              const latest = new Map();
+              for (const run of runs) {
+                if (!requiredChecks.includes(run.name)) {
+                  continue;
+                }
+                const previous = latest.get(run.name);
+                if (!previous || timestamp(run) > timestamp(previous)) {
+                  latest.set(run.name, run);
+                }
+              }
+
+              const pending = [];
+              const failing = [];
+              for (const name of requiredChecks) {
+                const run = latest.get(name);
+                if (!run) {
+                  pending.push(`${name}: missing`);
+                } else if (run.status !== "completed") {
+                  pending.push(`${name}: ${run.status}`);
+                } else if (run.conclusion !== "success") {
+                  failing.push(`${name}: ${run.conclusion} (${run.html_url})`);
+                }
+              }
+
+              if (pending.length === 0 && failing.length === 0) {
+                core.info(`Tagged commit ${context.sha} has green CI checks: ${requiredChecks.join(", ")}`);
+                return;
+              }
+
+              if (failing.length > 0) {
+                core.setFailed(`Tagged commit ${context.sha} has failed CI checks: ${failing.join("; ")}`);
+                return;
+              }
+
+              if (attempt === attempts) {
+                core.setFailed(`Timed out waiting for CI checks on ${context.sha}: ${pending.join("; ")}`);
+                return;
+              }
+
+              core.info(`Waiting for CI checks on ${context.sha} (${attempt}/${attempts}): ${pending.join("; ")}`);
+              await sleep(intervalMs);
+            }
+
+  package_workflows:
+    name: Package Alfred workflows
+    needs: verify_ci
     runs-on: macos-14
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -34,12 +106,12 @@ jobs:
       - name: Run release package gates
         run: bash scripts/ci/ci-run-gates.sh release-package --tag "${GITHUB_REF_NAME}"
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v3
+      - name: Upload workflow release assets
+        uses: actions/upload-artifact@v7
         with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
+          name: workflow-release-assets
+          if-no-files-found: error
+          path: |
             dist/**/*.alfredworkflow
             dist/**/*.alfredworkflow.sha256
             dist/release-bundles/*.zip
@@ -50,3 +122,195 @@ jobs:
             dist/release-bundles/THIRD_PARTY_LICENSES.md.sha256
             dist/release-bundles/THIRD_PARTY_NOTICES.md
             dist/release-bundles/THIRD_PARTY_NOTICES.md.sha256
+
+  build_cli:
+    name: Build standalone CLI (${{ matrix.target }})
+    needs: verify_ci
+    runs-on: ${{ matrix.runs_on }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs_on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runs_on: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - runs_on: macos-14
+            target: x86_64-apple-darwin
+          - runs_on: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Regenerate third-party artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/generate-third-party-artifacts.sh --write
+          bash scripts/generate-third-party-artifacts.sh --check
+
+      - name: Install cross
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build standalone CLI binaries
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t bins < <(
+            awk -F'|' '
+              /^[[:space:]]*($|#)/ { next }
+              {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+                if ($1 != "") print $1
+              }
+            ' release/standalone-cli-bins.txt
+          )
+          if [[ ${#bins[@]} -eq 0 ]]; then
+            echo "error: no standalone CLI binaries configured" >&2
+            exit 1
+          fi
+
+          args=(--release --locked --target "${{ matrix.target }}")
+          for bin in "${bins[@]}"; do
+            args+=(--bin "$bin")
+          done
+          cargo build "${args[@]}"
+
+      - name: Build standalone CLI binaries (cross)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t bins < <(
+            awk -F'|' '
+              /^[[:space:]]*($|#)/ { next }
+              {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+                if ($1 != "") print $1
+              }
+            ' release/standalone-cli-bins.txt
+          )
+          if [[ ${#bins[@]} -eq 0 ]]; then
+            echo "error: no standalone CLI binaries configured" >&2
+            exit 1
+          fi
+
+          args=(--release --locked --target "${{ matrix.target }}")
+          for bin in "${bins[@]}"; do
+            args+=(--bin "$bin")
+          done
+          cross build "${args[@]}"
+
+      - name: Package standalone CLI tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/build-standalone-cli-release-tarball.sh \
+            --tag "${GITHUB_REF_NAME}" \
+            --target "${{ matrix.target }}"
+
+      - name: Audit standalone CLI tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/release-standalone-cli-tarball-audit.sh \
+            --tag "${GITHUB_REF_NAME}" \
+            --target "${{ matrix.target }}"
+
+      - name: Upload standalone CLI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nils-alfred-cli-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/nils-alfred-cli-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+            dist/nils-alfred-cli-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - package_workflows
+      - build_cli
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/**/*
+
+  dispatch_homebrew_tap:
+    name: Dispatch Homebrew tap update
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch formula update
+        uses: actions/github-script@v9
+        env:
+          HOMEBREW_TAP_DISPATCH_TOKEN: ${{ secrets.HOMEBREW_TAP_DISPATCH_TOKEN }}
+        with:
+          script: |
+            const token = process.env.HOMEBREW_TAP_DISPATCH_TOKEN;
+            if (!token) {
+              core.setFailed("Missing HOMEBREW_TAP_DISPATCH_TOKEN secret; cannot dispatch sympoies/homebrew-tap.");
+              return;
+            }
+
+            const tag = context.ref.replace("refs/tags/", "");
+            const version = tag.replace(/^v/, "");
+            const sourceRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const releaseUrl = `https://github.com/${sourceRepo}/releases/tag/${tag}`;
+
+            const response = await fetch("https://api.github.com/repos/sympoies/homebrew-tap/dispatches", {
+              method: "POST",
+              headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": `Bearer ${token}`,
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+              body: JSON.stringify({
+                event_type: "nils-alfred-cli-release",
+                client_payload: {
+                  formula: "nils-alfred-cli",
+                  package: "nils-alfred-cli",
+                  source_repo: sourceRepo,
+                  version,
+                  tag,
+                  release_url: releaseUrl,
+                },
+              }),
+            });
+
+            if (!response.ok) {
+              const body = await response.text();
+              core.setFailed(`Failed to dispatch sympoies/homebrew-tap: HTTP ${response.status} ${body}`);
+              return;
+            }
+            core.info(`Dispatched sympoies/homebrew-tap nils-alfred-cli formula update for ${tag}.`);

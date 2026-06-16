@@ -45,7 +45,83 @@ Artifacts are written to `dist/<workflow-id>/<version>/`.
 
 ## CI release
 
-Tag push (`v*`) triggers `.github/workflows/release.yml` and uploads built `.alfredworkflow` artifacts and checksums.
+Tag push (`v*`) triggers `.github/workflows/release.yml`.
+
+The workflow now publishes two release surfaces on the same GitHub Release:
+
+- Alfred workflow assets:
+  - built `.alfredworkflow` files
+  - `workflows-vX.Y.Z.zip`
+  - `workflow-clear-quarantine-standalone.sh`
+  - third-party compliance artifacts and checksums
+- Standalone CLI bundle assets:
+  - `nils-alfred-cli-vX.Y.Z-<target>.tar.gz`
+  - `nils-alfred-cli-vX.Y.Z-<target>.tar.gz.sha256`
+
+Standalone CLI targets match the `nils-cli` binary release flow:
+
+- `x86_64-unknown-linux-gnu`
+- `aarch64-unknown-linux-gnu`
+- `x86_64-apple-darwin`
+- `aarch64-apple-darwin`
+
+After the GitHub Release is published, release CI dispatches
+`nils-alfred-cli-release` to `sympoies/homebrew-tap`. The tap workflow updates
+the `nils-alfred-cli` formula, validates it on macOS and Linux, commits the
+formula through the GitHub Contents API, and creates a tap-side
+`nils-alfred-cli-vX.Y.Z` release.
+
+The release workflow requires the tagged commit to have a green `validate` CI
+check before packaging starts. Tag from a commit that has already passed CI on
+`main`.
+
+## Standalone CLI bundle
+
+The bundle manifest is [release/standalone-cli-bins.txt](../release/standalone-cli-bins.txt).
+It is the source of truth for release packaging, tarball audits, and CI build
+selection.
+
+Current bundled binaries:
+
+- `bangumi-cli`
+- `bilibili-cli`
+- `epoch-cli`
+- `google-cli`
+- `market-cli`
+- `memo-workflow-cli`
+- `quote-cli`
+- `randomer-cli`
+- `steam-cli`
+- `timezone-cli`
+- `weather-cli`
+- `wiki-cli`
+- `workflow-cli`
+- `workflow-readme-cli`
+
+Excluded from the standalone bundle for now:
+
+- `brave-cli`: requires a Brave API key and is still legacy Alfred JSON-first.
+- `spotify-cli`: requires Spotify credentials and is still legacy Alfred JSON-first.
+- `youtube-cli`: requires a YouTube API key and is still legacy Alfred JSON-first.
+- `cambridge-cli`: requires the external Node/Playwright scraper runtime.
+
+To validate the bundle packaging locally without building release binaries:
+
+1. `bash scripts/tests/standalone_cli_release_tarball.test.sh`
+2. `bash scripts/ci/release-standalone-cli-tarball-audit.sh --tag v9.9.9 --target x86_64-unknown-linux-gnu --dist-dir <test-dist-dir>`
+
+To build a real local tarball for the current host target, first build the
+manifest binaries, then run the package script. Example:
+
+```bash
+mapfile -t bins < <(awk -F'|' '/^[[:space:]]*($|#)/ { next } { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1 }' release/standalone-cli-bins.txt)
+args=(--release --locked)
+for bin in "${bins[@]}"; do
+  args+=(--bin "$bin")
+done
+cargo build "${args[@]}"
+bash scripts/ci/build-standalone-cli-release-tarball.sh --tag v0.0.0-test --target "$(rustc -vV | awk '/host:/ { print $2 }')"
+```
 
 ## Third-party artifacts release assets
 
