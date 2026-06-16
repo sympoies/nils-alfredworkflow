@@ -29,7 +29,7 @@ resolver = "2"
 edition = "2024"
 license = "CC0-1.0"
 repository = "https://github.com/sympoies/nils-alfredworkflow"
-version = "1.3.3"
+version = "1.3.4"
 
 [workspace.lints.clippy]
 # Surface every `unwrap()` / `expect()` as a clippy warning so the
