@@ -40,19 +40,28 @@ trim() {
 write_sha256() {
   local file_path="$1"
   local checksum_path="$2"
+  local checksum_abs file_dir file_name
+
+  if [[ "$checksum_path" == /* ]]; then
+    checksum_abs="$checksum_path"
+  else
+    checksum_abs="$(pwd)/$checksum_path"
+  fi
+  file_dir="$(cd "$(dirname "$file_path")" && pwd)"
+  file_name="$(basename "$file_path")"
 
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$file_path" >"$checksum_path"
+    (cd "$file_dir" && shasum -a 256 "$file_name") >"$checksum_abs"
     return
   fi
 
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$file_path" >"$checksum_path"
+    (cd "$file_dir" && sha256sum "$file_name") >"$checksum_abs"
     return
   fi
 
   if command -v openssl >/dev/null 2>&1; then
-    openssl dgst -sha256 -r "$file_path" >"$checksum_path"
+    (cd "$file_dir" && openssl dgst -sha256 -r "$file_name") >"$checksum_abs"
     return
   fi
 

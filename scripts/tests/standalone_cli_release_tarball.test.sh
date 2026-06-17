@@ -71,6 +71,23 @@ bash scripts/ci/build-standalone-cli-release-tarball.sh \
 assert_file "$tarball"
 assert_file "$tarball.sha256"
 
+checksum_target="$(awk '{print $2}' "$tarball.sha256")"
+expected_checksum_target="$(basename "$tarball")"
+if [[ "$checksum_target" != "$expected_checksum_target" ]]; then
+  fail "checksum should reference $expected_checksum_target, got $checksum_target"
+fi
+
+(
+  cd "$dist_dir"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 -c "$expected_checksum_target.sha256"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -c "$expected_checksum_target.sha256"
+  else
+    fail "missing checksum verification tool"
+  fi
+)
+
 bash scripts/ci/release-standalone-cli-tarball-audit.sh \
   --tag "$tag" \
   --target "$target" \
