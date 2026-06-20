@@ -174,10 +174,7 @@ cambridge_runtime_bootstrap_running() {
   pid="$(sed -n '1p' "$state_file" 2>/dev/null | tr -d '[:space:]')"
   if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
     local max_age age command
-    max_age="${CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS:-600}"
-    if [[ ! "$max_age" =~ ^[1-9][0-9]*$ ]]; then
-      max_age="600"
-    fi
+    max_age="$(cambridge_runtime_effective_stale_seconds)"
 
     if age="$(cambridge_runtime_state_file_age_seconds "$state_file" 2>/dev/null)" && [[ "$age" -le "$max_age" ]]; then
       return 0

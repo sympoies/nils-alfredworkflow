@@ -51,8 +51,9 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `0` so pasted/final queries do not wait twice. |
 | `CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.                 |
 | `CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER`      | Optional override for the bundled runtime bootstrap helper; mainly for testing.                   |
-| `CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS` | Max age before a bootstrap state file is treated as stale. Default `600`.                       |
-| `CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS` | Timeout for `playwright install chromium` during runtime bootstrap. Default `300`.          |
+| `CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS` | Max age before a bootstrap state file is treated as stale. Default `600`. The effective window is never below the install timeout plus the stale buffer. |
+| `CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_BUFFER_SECONDS` | Buffer added to the install timeout when computing the effective stale window, covering the surrounding `npm install`. Default `120`. |
+| `CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS` | Timeout for `playwright install chromium` during runtime bootstrap. Default `300`. Raising this also raises the effective stale window. |
 
 ## Runtime bootstrap
 

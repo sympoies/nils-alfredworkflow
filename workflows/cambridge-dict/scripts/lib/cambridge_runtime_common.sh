@@ -13,6 +13,38 @@ cambridge_runtime_install_timeout_seconds() {
   printf '%s\n' "$raw"
 }
 
+cambridge_runtime_bootstrap_stale_buffer_seconds() {
+  local raw="${CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_BUFFER_SECONDS:-120}"
+  if [[ ! "$raw" =~ ^[0-9]+$ ]]; then
+    raw="120"
+  fi
+  printf '%s\n' "$raw"
+}
+
+# Effective age (seconds) after which a running bootstrap is treated as stale.
+# The bootstrap writes its state file once and does not refresh the mtime during
+# a progressing install, so the stale window must never fall below the install
+# timeout plus a buffer for the surrounding npm install -- otherwise raising
+# CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS above the stale window would kill
+# an install that is still legitimately running.
+cambridge_runtime_effective_stale_seconds() {
+  local configured="${CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS:-600}"
+  if [[ ! "$configured" =~ ^[1-9][0-9]*$ ]]; then
+    configured="600"
+  fi
+
+  local install_timeout buffer floor
+  install_timeout="$(cambridge_runtime_install_timeout_seconds)"
+  buffer="$(cambridge_runtime_bootstrap_stale_buffer_seconds)"
+  floor=$((install_timeout + buffer))
+
+  if [[ "$configured" -lt "$floor" ]]; then
+    printf '%s\n' "$floor"
+    return 0
+  fi
+  printf '%s\n' "$configured"
+}
+
 cambridge_runtime_write_package_json() {
   local workflow_dir="$1"
   local playwright_version
@@ -99,7 +131,7 @@ cambridge_runtime_verify_headless_chromium_launch() {
     node --input-type=module -e "
       import('playwright').then(async ({ chromium }) => {
         const browser = await chromium.launch({ headless: true });
-        const executable = browser.process()?.spawnfile || chromium.executablePath();
+        const executable = chromium.executablePath();
         await browser.close();
         process.stdout.write('ok: headless chromium launched');
         if (executable) {
