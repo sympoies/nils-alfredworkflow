@@ -7,6 +7,11 @@ check_only=0
 install_browser=1
 wait_for_install=0
 quiet=0
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+# shellcheck disable=SC1091
+source "$repo_root/workflows/cambridge-dict/scripts/lib/cambridge_runtime_common.sh"
 
 usage() {
   cat <<'USAGE'
@@ -114,50 +119,27 @@ command -v npm >/dev/null 2>&1 || {
   exit 1
 }
 
-if [[ ! -f "$workflow_dir/package.json" ]]; then
-  cat >"$workflow_dir/package.json" <<'JSON'
-{
-  "name": "cambridge-dict-runtime",
-  "private": true,
-  "version": "1.0.0",
-  "dependencies": {
-    "playwright": "^1.54.0"
-  }
-}
-JSON
-  log "info: created $workflow_dir/package.json"
+expected_playwright_version="$(cambridge_runtime_playwright_version)"
+installed_playwright_version=""
+if [[ -f "$workflow_dir/package.json" ]]; then
+  installed_playwright_version="$(node -e "try { const pkg = require(process.argv[1]); process.stdout.write(String(pkg.dependencies?.playwright || '')); } catch (_) {}" "$workflow_dir/package.json")"
+fi
+
+if [[ "$installed_playwright_version" != "$expected_playwright_version" ]]; then
+  cambridge_runtime_write_package_json "$workflow_dir"
+  log "info: wrote $workflow_dir/package.json"
 fi
 
 if [[ "$check_only" -eq 0 ]]; then
   npm --prefix "$workflow_dir" install --omit=dev --no-audit --no-fund
 fi
 
-(
-  cd "$workflow_dir"
-  node --input-type=module -e "import('playwright').then(() => process.stdout.write('ok: playwright package resolved\n'))"
-)
-
-verify_chromium_binary() {
-  (
-    cd "$workflow_dir"
-    node --input-type=module -e "
-      import('playwright').then(async ({ chromium }) => {
-        const { existsSync } = await import('node:fs');
-        const expected = chromium.executablePath();
-        if (!expected || !existsSync(expected)) {
-          process.stderr.write('error: chromium binary missing at ' + (expected || '<unknown>') + '\n');
-          process.exit(1);
-        }
-        process.stdout.write('ok: chromium binary present at ' + expected + '\n');
-      });
-    "
-  )
-}
+cambridge_runtime_verify_playwright_package "$workflow_dir"
 
 if [[ "$check_only" -eq 1 ]]; then
   if [[ "$install_browser" -eq 1 ]]; then
-    if ! verify_chromium_binary; then
-      echo "error: chromium binary not installed; run scripts/setup-cambridge-workflow-runtime.sh to install" >&2
+    if ! cambridge_runtime_verify_headless_chromium_launch "$workflow_dir"; then
+      echo "error: headless chromium runtime unavailable; run scripts/setup-cambridge-workflow-runtime.sh to install" >&2
       exit 1
     fi
   else
@@ -168,9 +150,13 @@ if [[ "$check_only" -eq 1 ]]; then
 fi
 
 if [[ "$install_browser" -eq 1 ]]; then
-  npx --prefix "$workflow_dir" playwright install chromium
-  if ! verify_chromium_binary; then
-    echo "error: chromium binary still missing after 'playwright install chromium'" >&2
+  command -v npx >/dev/null 2>&1 || {
+    echo "error: npx is required" >&2
+    exit 1
+  }
+  cambridge_runtime_install_browsers "$workflow_dir"
+  if ! cambridge_runtime_verify_headless_chromium_launch "$workflow_dir"; then
+    echo "error: headless chromium runtime still unavailable after 'playwright install chromium'" >&2
     exit 1
   fi
   log "ok: playwright chromium installed"

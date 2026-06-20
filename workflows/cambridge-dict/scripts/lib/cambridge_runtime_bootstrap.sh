@@ -5,6 +5,10 @@ workflow_dir=""
 state_file=""
 log_file=""
 result_file=""
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck disable=SC1091
+source "$script_dir/cambridge_runtime_common.sh"
 
 append_path_entry() {
   local dir="${1:-}"
@@ -117,43 +121,24 @@ command -v npx >/dev/null 2>&1 || {
   exit 1
 }
 
-if [[ ! -f "$workflow_dir/package.json" ]]; then
-  cat >"$workflow_dir/package.json" <<'JSON'
-{
-  "name": "cambridge-dict-runtime",
-  "private": true,
-  "version": "1.0.0",
-  "dependencies": {
-    "playwright": "^1.54.0"
-  }
-}
-JSON
+expected_playwright_version="$(cambridge_runtime_playwright_version)"
+installed_playwright_version=""
+if [[ -f "$workflow_dir/package.json" ]]; then
+  installed_playwright_version="$(node -e "try { const pkg = require(process.argv[1]); process.stdout.write(String(pkg.dependencies?.playwright || '')); } catch (_) {}" "$workflow_dir/package.json")"
+fi
+
+if [[ "$installed_playwright_version" != "$expected_playwright_version" ]]; then
+  cambridge_runtime_write_package_json "$workflow_dir"
 fi
 
 {
   echo "info: bootstrapping Cambridge runtime at $workflow_dir"
   echo "info: PATH=$PATH"
   npm --prefix "$workflow_dir" install --omit=dev --no-audit --no-fund
-  (
-    cd "$workflow_dir"
-    node --input-type=module -e "import('playwright').then(() => process.stdout.write('ok: playwright package resolved\n'))"
-  )
+  cambridge_runtime_verify_playwright_package "$workflow_dir"
   npx --prefix "$workflow_dir" playwright --version
-  npx --prefix "$workflow_dir" playwright install chromium
-  (
-    cd "$workflow_dir"
-    node --input-type=module -e "
-      import('playwright').then(async ({ chromium }) => {
-        const { existsSync } = await import('node:fs');
-        const expected = chromium.executablePath();
-        if (!expected || !existsSync(expected)) {
-          process.stderr.write('error: chromium binary missing at ' + (expected || '<unknown>') + '\n');
-          process.exit(1);
-        }
-        process.stdout.write('ok: chromium binary present at ' + expected + '\n');
-      });
-    "
-  )
+  cambridge_runtime_install_browsers "$workflow_dir"
+  cambridge_runtime_verify_headless_chromium_launch "$workflow_dir"
   echo "ok: cambridge runtime ready"
 } >>"$log_file" 2>&1
 
