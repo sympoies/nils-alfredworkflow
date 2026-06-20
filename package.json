@@ -14,7 +14,7 @@
     "test:cambridge": "npm run test:cambridge-scraper && npm run test:cambridge-smoke"
   },
   "dependencies": {
-    "playwright": "^1.54.0"
+    "playwright": "1.58.2"
   },
   "devDependencies": {
     "rumdl": "0.1.62"

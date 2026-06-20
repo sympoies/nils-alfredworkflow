@@ -30,6 +30,11 @@ if ! wfhl_source_helper "$script_dir" "workflow_cli_resolver.sh"; then
   exit 0
 fi
 
+if ! wfhl_source_helper "$script_dir" "cambridge_runtime_common.sh"; then
+  sfej_emit_error_item_json "Workflow helper missing" "Cannot locate cambridge_runtime_common.sh runtime helper."
+  exit 0
+fi
+
 normalize_error_message() {
   sfej_normalize_error_message "${1-}"
 }
@@ -168,11 +173,42 @@ cambridge_runtime_bootstrap_running() {
 
   pid="$(sed -n '1p' "$state_file" 2>/dev/null | tr -d '[:space:]')"
   if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-    return 0
+    local max_age age command
+    max_age="${CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS:-600}"
+    if [[ ! "$max_age" =~ ^[1-9][0-9]*$ ]]; then
+      max_age="600"
+    fi
+
+    if age="$(cambridge_runtime_state_file_age_seconds "$state_file" 2>/dev/null)" && [[ "$age" -le "$max_age" ]]; then
+      return 0
+    fi
+
+    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$command" == *"cambridge_runtime_bootstrap.sh"* ]]; then
+      cambridge_runtime_terminate_tree "$pid"
+    fi
+    rm -f "$state_file"
+    return 1
   fi
 
   rm -f "$state_file"
   return 1
+}
+
+cambridge_runtime_state_file_age_seconds() {
+  local state_file="$1"
+  local modified_at now
+
+  if modified_at="$(stat -f %m "$state_file" 2>/dev/null)"; then
+    :
+  elif modified_at="$(stat -c %Y "$state_file" 2>/dev/null)"; then
+    :
+  else
+    return 1
+  fi
+
+  now="$(date +%s)"
+  printf '%s\n' "$((now - modified_at))"
 }
 
 cambridge_runtime_recent_failure() {

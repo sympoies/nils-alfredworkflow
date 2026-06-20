@@ -25,6 +25,7 @@ for required in \
   scripts/cambridge_scraper.mjs \
   scripts/lib/cambridge_routes.mjs \
   scripts/lib/cambridge_selectors.mjs \
+  scripts/lib/cambridge_runtime_common.sh \
   scripts/lib/cambridge_runtime_bootstrap.sh \
   scripts/lib/extract_suggest.mjs \
   scripts/lib/extract_define.mjs \
@@ -373,6 +374,14 @@ printf 'err\t%s\n' "$(date +%s)" >"$runtime_bootstrap_fail_state_dir/bootstrap.r
 runtime_bootstrap_fail_json="$({ ALFRED_WORKFLOW_CACHE="$runtime_bootstrap_fail_cache" CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/cambridge-runtime-bootstrap-fail" "$workflow_dir/scripts/script_filter.sh" "open"; })"
 assert_jq_json "$runtime_bootstrap_fail_json" '.items[0].title == "Automatic Cambridge runtime setup failed"' "recent runtime bootstrap failure should surface dedicated item"
 
+runtime_bootstrap_stale_cache="$tmp_dir/alfred-cache-runtime-stale"
+runtime_bootstrap_stale_state_dir="$runtime_bootstrap_stale_cache/cambridge-runtime"
+mkdir -p "$runtime_bootstrap_stale_state_dir"
+printf '%s\n' "$$" >"$runtime_bootstrap_stale_state_dir/bootstrap.state"
+touch -t 200001010000 "$runtime_bootstrap_stale_state_dir/bootstrap.state"
+runtime_bootstrap_stale_json="$({ ALFRED_WORKFLOW_CACHE="$runtime_bootstrap_stale_cache" CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS=1 CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/missing-runtime-bootstrap" "$workflow_dir/scripts/script_filter.sh" "open"; })"
+assert_jq_json "$runtime_bootstrap_stale_json" '.items[0].title == "Node/Playwright runtime unavailable"' "stale runtime bootstrap state must not keep Alfred pending forever"
+
 runtime_json_cache="$tmp_dir/alfred-cache-runtime-json"
 mkdir -p "$runtime_json_cache"
 runtime_json_no_helper="$({ ALFRED_WORKFLOW_CACHE="$runtime_json_cache" CAMBRIDGE_CLI_BIN="$tmp_dir/stubs/cambridge-cli-runtime-json" CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER="$tmp_dir/stubs/missing-runtime-bootstrap" "$workflow_dir/scripts/script_filter.sh" "open"; })"
@@ -396,6 +405,7 @@ chmod +x "$missing_script"
 mkdir -p "$missing_layout/workflows/cambridge-dict/scripts/lib"
 cp "$repo_root/scripts/lib/script_filter_query_policy.sh" "$missing_layout/workflows/cambridge-dict/scripts/lib/script_filter_query_policy.sh"
 cp "$repo_root/scripts/lib/script_filter_async_coalesce.sh" "$missing_layout/workflows/cambridge-dict/scripts/lib/script_filter_async_coalesce.sh"
+cp "$workflow_dir/scripts/lib/cambridge_runtime_common.sh" "$missing_layout/workflows/cambridge-dict/scripts/lib/cambridge_runtime_common.sh"
 missing_binary_json="$({ CAMBRIDGE_CLI_BIN="$missing_layout/does-not-exist/cambridge-cli" "$missing_script" "open"; })"
 assert_jq_json "$missing_binary_json" '.items[0].title == "cambridge-cli binary not found"' "missing binary title mapping mismatch"
 
@@ -471,6 +481,7 @@ run_layout_check() {
   mkdir -p "$layout/workflows/cambridge-dict/scripts/lib"
   cp "$repo_root/scripts/lib/script_filter_query_policy.sh" "$layout/workflows/cambridge-dict/scripts/lib/script_filter_query_policy.sh"
   cp "$repo_root/scripts/lib/script_filter_async_coalesce.sh" "$layout/workflows/cambridge-dict/scripts/lib/script_filter_async_coalesce.sh"
+  cp "$workflow_dir/scripts/lib/cambridge_runtime_common.sh" "$layout/workflows/cambridge-dict/scripts/lib/cambridge_runtime_common.sh"
 
   case "$mode" in
   packaged)
@@ -531,6 +542,7 @@ assert_file "$packaged_dir/bin/cambridge-cli"
 assert_file "$packaged_dir/scripts/cambridge_scraper.mjs"
 assert_file "$packaged_dir/scripts/lib/cambridge_routes.mjs"
 assert_file "$packaged_dir/scripts/lib/cambridge_selectors.mjs"
+assert_file "$packaged_dir/scripts/lib/cambridge_runtime_common.sh"
 assert_file "$packaged_dir/scripts/lib/cambridge_runtime_bootstrap.sh"
 assert_file "$packaged_dir/scripts/lib/extract_suggest.mjs"
 assert_file "$packaged_dir/scripts/lib/extract_define.mjs"

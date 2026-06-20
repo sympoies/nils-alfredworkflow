@@ -51,11 +51,15 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS` | Optional coalesce settle window (seconds). Default `0` so pasted/final queries do not wait twice. |
 | `CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS`  | Optional Alfred rerun interval while waiting for coalesced result. Default `0.4`.                 |
 | `CAMBRIDGE_RUNTIME_BOOTSTRAP_HELPER`      | Optional override for the bundled runtime bootstrap helper; mainly for testing.                   |
+| `CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS` | Max age before a bootstrap state file is treated as stale. Default `600`.                       |
+| `CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS` | Timeout for `playwright install chromium` during runtime bootstrap. Default `300`.          |
 
 ## Runtime bootstrap
 
 On a packaged workflow install, the first live lookup that detects missing Playwright/Chromium will bootstrap the
 workflow-local runtime automatically inside the installed Alfred workflow directory.
+Bootstrap writes an exact-pinned Playwright runtime package and verifies runtime readiness by launching headless
+Chromium, matching the workflow's default scraper mode.
 
 Manual fallback remains available if Alfred cannot see `node`/`npm`:
 
