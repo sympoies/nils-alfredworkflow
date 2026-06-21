@@ -147,31 +147,49 @@ fn split_target_clause(
 }
 
 fn evaluate_numeric_feedback(parsed: &ParsedExpression) -> Result<Feedback, AppError> {
-    let mut values = parsed.terms.iter();
-    let first = values
-        .next()
-        .expect("numeric expression always has at least one term");
-    let mut total = match first {
+    // Numeric mode guarantees every term is numeric (see `parse_expression`),
+    // and the parser guarantees at least one term with
+    // `operators.len() + 1 == terms.len()`.
+    let numeric_value = |term: &ParsedTerm| match term {
         ParsedTerm::Numeric(value) => *value,
         ParsedTerm::Asset { .. } => unreachable!("numeric mode cannot include asset term"),
     };
+    let values: Vec<Decimal> = parsed.terms.iter().map(numeric_value).collect();
 
-    for (operator, term) in parsed.operators.iter().zip(values) {
-        let value = match term {
-            ParsedTerm::Numeric(value) => *value,
-            ParsedTerm::Asset { .. } => unreachable!("numeric mode cannot include asset term"),
-        };
+    // Apply standard operator precedence: `*` and `/` bind tighter than `+`/`-`.
+    // The first pass folds each run of multiplicative operators into a single
+    // additive operand, so `2 + 3 * 4` collapses to the operands `[2, 12]`
+    // joined by `+` (yielding 14) rather than the left-to-right `((2 + 3) * 4)`
+    // which would give 20.
+    let mut operands: Vec<Decimal> = Vec::with_capacity(values.len());
+    let mut additive_ops: Vec<char> = Vec::new();
+    let mut current = values[0];
 
+    for (operator, value) in parsed.operators.iter().zip(values.iter().skip(1)) {
         match operator {
-            '+' => total += value,
-            '-' => total -= value,
-            '*' => total *= value,
+            '*' => current *= *value,
             '/' => {
-                total = total
-                    .checked_div(value)
+                current = current
+                    .checked_div(*value)
                     .ok_or_else(|| AppError::user("division by zero is not allowed"))?;
             }
+            '+' | '-' => {
+                operands.push(current);
+                additive_ops.push(*operator);
+                current = *value;
+            }
             _ => unreachable!("parser only permits +, -, * and /"),
+        }
+    }
+    operands.push(current);
+
+    // The second pass folds the additive operators left-to-right.
+    let mut total = operands[0];
+    for (operator, value) in additive_ops.iter().zip(operands.iter().skip(1)) {
+        match operator {
+            '+' => total += *value,
+            '-' => total -= *value,
+            _ => unreachable!("additive pass only contains + and -"),
         }
     }
 
@@ -760,6 +778,26 @@ mod tests {
 
         assert_eq!(feedback.items.len(), 1);
         assert_eq!(feedback.items[0].title, "12");
+    }
+
+    #[test]
+    fn expression_numeric_mode_respects_operator_precedence() {
+        let providers = FakeProviders::new();
+        let config = config_in_tempdir();
+
+        // `*` and `/` must bind tighter than `+` and `-` (standard precedence),
+        // rather than being folded strictly left-to-right.
+        for (query, expected) in [
+            ("2+3*4", "14"),   // 2 + (3*4), not (2+3)*4 == 20
+            ("1+10/2", "6"),   // 1 + (10/2), not (1+10)/2 == 5.5
+            ("2*3+4*5", "26"), // (2*3) + (4*5)
+            ("10-2*3", "4"),   // 10 - (2*3), not (10-2)*3 == 24
+        ] {
+            let feedback =
+                evaluate_query(&config, &providers, fixed_now, query, "USD").expect("must pass");
+            assert_eq!(feedback.items.len(), 1, "{query}");
+            assert_eq!(feedback.items[0].title, expected, "{query}");
+        }
     }
 
     #[test]

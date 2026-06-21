@@ -89,7 +89,12 @@ pub fn record_usage(project_path: &Path, usage_file: &Path) -> Result<(), Workfl
         source,
     })?;
 
-    let temp_file = usage_file.with_extension("tmp");
+    // Use a per-process temp name so two concurrent `record-usage` invocations
+    // (Alfred can dispatch an action while another runs) cannot write the same
+    // temp path and corrupt/truncate each other's content. The final rename is
+    // atomic, so the log always ends up as one complete write rather than an
+    // interleaved one.
+    let temp_file = usage_file.with_extension(format!("tmp.{}", std::process::id()));
     fs::write(&temp_file, output).map_err(|source| WorkflowError::UsageWrite {
         path: temp_file.clone(),
         source,

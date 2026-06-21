@@ -1,10 +1,15 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
 pub const SEARCH_ENDPOINT: &str = "https://api.search.brave.com/res/v1/web/search";
 const AUTH_HEADER: &str = "X-Subscription-Token";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebSearchResult {
@@ -17,7 +22,8 @@ pub fn search_web(
     config: &RuntimeConfig,
     query: &str,
 ) -> Result<Vec<WebSearchResult>, BraveApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT))
+        .map_err(|source| BraveApiError::Transport { source })?;
     let params = build_query_params(config, query);
 
     let response = client

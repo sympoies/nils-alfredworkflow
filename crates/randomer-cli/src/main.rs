@@ -75,9 +75,9 @@ const ERROR_CODE_RUNTIME: &str = "NILS_RANDOMER_002";
 
 fn from_randomer(error: RandomerError) -> AppError {
     match error {
-        RandomerError::UnknownFormat(_) | RandomerError::InvalidCount(_) => {
-            AppError::user(ERROR_CODE_USER, error.to_string())
-        }
+        RandomerError::UnknownFormat(_)
+        | RandomerError::InvalidCount(_)
+        | RandomerError::CountTooLarge(_) => AppError::user(ERROR_CODE_USER, error.to_string()),
     }
 }
 

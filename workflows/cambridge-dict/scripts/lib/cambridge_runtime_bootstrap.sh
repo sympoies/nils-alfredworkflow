@@ -96,14 +96,22 @@ mkdir -p "$(dirname "$state_file")" "$(dirname "$log_file")" "$(dirname "$result
 : >"$log_file"
 rm -f "$result_file"
 
+# Default the status before installing the EXIT trap: cleanup() reads
+# $bootstrap_status, so any failure between trap-install and the first
+# assignment below (e.g. ensure_common_runtime_path) would otherwise make the
+# trap itself abort under `set -u` with an unbound-variable error, leaving the
+# result file unwritten and the state file orphaned (defeating the
+# recent-failure cooldown).
+bootstrap_status="err"
+
 cleanup() {
   printf '%s\t%s\n' "$bootstrap_status" "$(date +%s)" >"$result_file"
   rm -f "$state_file"
+  cambridge_runtime_release_bootstrap_lock "$state_file"
 }
 trap cleanup EXIT
 
 ensure_common_runtime_path
-bootstrap_status="err"
 printf '%s\n' "$$" >"$state_file"
 
 command -v node >/dev/null 2>&1 || {

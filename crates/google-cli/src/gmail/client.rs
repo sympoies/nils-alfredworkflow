@@ -2,12 +2,14 @@ use std::collections::{BTreeMap, BTreeSet, hash_map::DefaultHasher};
 use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
+use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use reqwest::blocking::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use workflow_common::http::build_blocking_client;
 
 use crate::auth::account::resolve_account;
 use crate::auth::config::{AuthPaths, load_credentials, load_metadata};
@@ -17,6 +19,10 @@ use crate::cmd::common::GlobalOptions;
 use crate::error::{AppError, redact_sensitive};
 
 const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/users/me";
+// Bound Gmail HTTP calls so a stalled server cannot hang the CLI indefinitely.
+// Gmail requests can be slower than a plain API read, so 15s leaves headroom
+// while still failing fast on a dead connection.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const GOOGLE_CLI_GMAIL_FIXTURE_PATH_ENV: &str = "GOOGLE_CLI_GMAIL_FIXTURE_PATH";
 const GOOGLE_CLI_GMAIL_FIXTURE_JSON_ENV: &str = "GOOGLE_CLI_GMAIL_FIXTURE_JSON";
 
@@ -184,11 +190,15 @@ impl GmailSession {
             refreshed
         };
 
+        let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
+            AppError::gmail_failure(format!("failed to build Gmail HTTP client: {error}"))
+        })?;
+
         Ok(Self {
             account: resolved.account,
             account_source: resolved.source.as_str().to_string(),
             access_token: active_token.access_token,
-            client: Client::new(),
+            client,
             fixture,
         })
     }

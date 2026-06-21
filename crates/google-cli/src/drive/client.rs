@@ -3,10 +3,12 @@ use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use reqwest::blocking::{Client, Response, multipart};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use workflow_common::http::build_blocking_client;
 
 use crate::auth::account::resolve_account;
 use crate::auth::config::{AuthPaths, load_credentials, load_metadata};
@@ -19,6 +21,10 @@ use super::mime::resolve_mime_type;
 
 const DRIVE_API_BASE: &str = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_BASE: &str = "https://www.googleapis.com/upload/drive/v3";
+// Bound Drive HTTP calls so a stalled server cannot hang the CLI indefinitely.
+// Drive downloads/uploads can be slower than a plain API read, so 15s leaves
+// headroom while still failing fast on a dead connection.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const GOOGLE_CLI_DRIVE_FIXTURE_PATH_ENV: &str = "GOOGLE_CLI_DRIVE_FIXTURE_PATH";
 const GOOGLE_CLI_DRIVE_FIXTURE_JSON_ENV: &str = "GOOGLE_CLI_DRIVE_FIXTURE_JSON";
 
@@ -156,11 +162,15 @@ impl DriveSession {
             refreshed
         };
 
+        let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
+            AppError::drive_failure(format!("failed to build Drive HTTP client: {error}"))
+        })?;
+
         Ok(Self {
             account: resolved.account,
             account_source: resolved.source.as_str().to_string(),
             access_token: active_token.access_token,
-            client: Client::new(),
+            client,
             fixture,
         })
     }

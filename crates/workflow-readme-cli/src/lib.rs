@@ -271,9 +271,31 @@ fn format_table_row(headers: &[String], row: &[String]) -> String {
 }
 
 pub fn extract_markdown_image_targets(markdown: &str) -> Result<Vec<String>, AppError> {
-    let bytes = markdown.as_bytes();
-    let mut index = 0usize;
     let mut targets: Vec<String> = Vec::new();
+    let mut in_fence = false;
+
+    // Skip fenced code blocks: image-like syntax inside a ``` / ~~~ fence is a
+    // documentation example, not a real asset reference. Without this, a README
+    // that documents `![alt](https://example.com/x.png)` inside a fence would be
+    // treated as a remote image and abort the whole conversion.
+    for line in markdown.lines() {
+        if is_fence_delimiter(line) {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+
+        extract_line_image_targets(line, &mut targets)?;
+    }
+
+    Ok(targets)
+}
+
+fn extract_line_image_targets(line: &str, targets: &mut Vec<String>) -> Result<(), AppError> {
+    let bytes = line.as_bytes();
+    let mut index = 0usize;
 
     while index + 1 < bytes.len() {
         if bytes[index] == b'!' && bytes[index + 1] == b'[' {
@@ -294,7 +316,7 @@ pub fn extract_markdown_image_targets(markdown: &str) -> Result<Vec<String>, App
                 ));
             };
 
-            let raw_target = &markdown[alt_end + 2..target_end];
+            let raw_target = &line[alt_end + 2..target_end];
             let destination = parse_image_destination(raw_target)?;
             targets.push(destination);
 
@@ -305,7 +327,7 @@ pub fn extract_markdown_image_targets(markdown: &str) -> Result<Vec<String>, App
         index += 1;
     }
 
-    Ok(targets)
+    Ok(())
 }
 
 fn find_unescaped_byte(bytes: &[u8], mut index: usize, target: u8) -> Option<usize> {
@@ -543,5 +565,23 @@ mod tests {
             injected,
             "<dict><key>readme</key><string>hello &amp; &lt;world&gt;</string></dict>"
         );
+    }
+
+    #[test]
+    fn extract_image_targets_collects_real_images() {
+        let markdown = "intro\n![logo](assets/logo.png)\nmore\n";
+        let targets = extract_markdown_image_targets(markdown).expect("extraction must succeed");
+        assert_eq!(targets, vec!["assets/logo.png".to_string()]);
+    }
+
+    #[test]
+    fn extract_image_targets_skips_fenced_code_blocks() {
+        // Image-like syntax inside a fenced code block documents the syntax and
+        // must not be treated as a real asset. Regression: a fenced remote-image
+        // example previously parsed as a real remote image and aborted the whole
+        // conversion.
+        let markdown = "# Title\n\n```markdown\n![logo](https://example.com/logo.png)\n```\n\n![real](assets/real.png)\n";
+        let targets = extract_markdown_image_targets(markdown).expect("extraction must succeed");
+        assert_eq!(targets, vec!["assets/real.png".to_string()]);
     }
 }

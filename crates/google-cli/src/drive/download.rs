@@ -142,6 +142,11 @@ fn parse_download_args(args: &[String]) -> Result<DownloadRequest, AppError> {
 }
 
 fn resolve_output_path(file_name: &str, request: &DownloadRequest) -> Result<PathBuf, AppError> {
+    // An explicit `--out` is treated as intentional: the user typing an
+    // absolute or relative path is honored verbatim. Only the
+    // server-controlled file `name` is sanitized below to prevent path
+    // traversal / arbitrary overwrite (e.g. a shared file named
+    // `../../../x` or an absolute path).
     if let Some(path) = &request.out {
         return Ok(path.clone());
     }
@@ -152,10 +157,8 @@ fn resolve_output_path(file_name: &str, request: &DownloadRequest) -> Result<Pat
             sanitize_file_stem(file_name, &request.file_id),
             format
         )
-    } else if file_name.trim().is_empty() {
-        request.file_id.clone()
     } else {
-        file_name.to_string()
+        sanitize_server_file_name(file_name, &request.file_id)
     };
 
     let output = Path::new(&fallback).to_path_buf();
@@ -168,6 +171,27 @@ fn resolve_output_path(file_name: &str, request: &DownloadRequest) -> Result<Pat
     Ok(output)
 }
 
+/// Reduces a server-controlled file name to a single, safe path component.
+///
+/// Strips any directory components, then rejects results that are empty, `.`,
+/// `..`, or that still contain a path separator. When the sanitized name is
+/// unusable, falls back to the file id so the write always stays inside the
+/// intended output directory.
+fn sanitize_server_file_name(name: &str, fallback: &str) -> String {
+    let candidate = Path::new(name)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .unwrap_or("");
+
+    let is_separator = |value: &str| value.contains('/') || value.contains('\\');
+    if candidate.is_empty() || candidate == "." || candidate == ".." || is_separator(candidate) {
+        return fallback.to_string();
+    }
+
+    candidate.to_string()
+}
+
 fn sanitize_file_stem(name: &str, fallback: &str) -> String {
     let path = Path::new(name);
     let stem = path
@@ -178,5 +202,64 @@ fn sanitize_file_stem(name: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         stem.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Component, Path};
+
+    use super::{DownloadRequest, resolve_output_path};
+
+    fn request_without_out(file_id: &str) -> DownloadRequest {
+        DownloadRequest {
+            file_id: file_id.to_string(),
+            out: None,
+            format: None,
+            overwrite: false,
+        }
+    }
+
+    fn has_parent_escape(path: &Path) -> bool {
+        path.components()
+            .any(|component| matches!(component, Component::ParentDir | Component::RootDir))
+    }
+
+    #[test]
+    fn resolve_output_path_strips_directory_traversal_from_server_name() {
+        let request = request_without_out("file-123");
+        let resolved = resolve_output_path("../escape.txt", &request).expect("resolve output path");
+
+        assert_eq!(
+            resolved.file_name().and_then(|value| value.to_str()),
+            Some("escape.txt")
+        );
+        assert!(
+            !has_parent_escape(&resolved),
+            "resolved path must not escape the output directory: {}",
+            resolved.display()
+        );
+    }
+
+    #[test]
+    fn resolve_output_path_keeps_plain_server_name() {
+        let request = request_without_out("file-123");
+        let resolved = resolve_output_path("report.csv", &request).expect("resolve output path");
+        assert_eq!(resolved.to_str(), Some("report.csv"));
+    }
+
+    #[test]
+    fn resolve_output_path_falls_back_to_file_id_for_unusable_name() {
+        let request = request_without_out("file-123");
+        let resolved = resolve_output_path("..", &request).expect("resolve output path");
+        assert_eq!(resolved.to_str(), Some("file-123"));
+    }
+
+    #[test]
+    fn resolve_output_path_honors_explicit_out_verbatim() {
+        let mut request = request_without_out("file-123");
+        request.out = Some(std::path::PathBuf::from("/abs/custom/path.txt"));
+        let resolved = resolve_output_path("../escape.txt", &request).expect("resolve output path");
+        assert_eq!(resolved.to_str(), Some("/abs/custom/path.txt"));
     }
 }

@@ -176,14 +176,23 @@ cambridge_runtime_bootstrap_running() {
     local max_age age command
     max_age="$(cambridge_runtime_effective_stale_seconds)"
 
+    # A live PID is not proof the bootstrap is still running: if the helper was
+    # SIGKILLed (so the state file survived because the EXIT trap never ran) and
+    # the OS later recycled that PID for an unrelated process, the recorded PID
+    # is alive but is not our bootstrap. Verify the command line in both the
+    # within-window and stale branches so a recycled PID can never pin the
+    # Script Filter to a phantom "Installing..." item.
+    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$command" != *"cambridge_runtime_bootstrap.sh"* ]]; then
+      rm -f "$state_file"
+      return 1
+    fi
+
     if age="$(cambridge_runtime_state_file_age_seconds "$state_file" 2>/dev/null)" && [[ "$age" -le "$max_age" ]]; then
       return 0
     fi
 
-    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-    if [[ "$command" == *"cambridge_runtime_bootstrap.sh"* ]]; then
-      cambridge_runtime_terminate_tree "$pid"
-    fi
+    cambridge_runtime_terminate_tree "$pid"
     rm -f "$state_file"
     return 1
   fi
@@ -272,7 +281,23 @@ handle_runtime_bootstrap() {
     return 0
   fi
 
+  # Atomically claim the spawn lock before launching. Alfred re-runs the Script
+  # Filter on every keystroke, and the spawned helper writes its PID to the
+  # state file only after it has started -- so two near-simultaneous runs could
+  # both see "not running" and each launch a bootstrap, racing two
+  # npm/playwright installs against the same prefix. The lock collapses that
+  # window: if the claim fails, another run is already starting/running the
+  # bootstrap, so we surface the pending item instead of spawning a duplicate.
+  local state_file
+  state_file="$(cambridge_runtime_state_file)"
+  if ! cambridge_runtime_claim_bootstrap_lock "$state_file"; then
+    emit_runtime_bootstrap_pending_item
+    return 0
+  fi
+
   if ! start_cambridge_runtime_bootstrap; then
+    # The helper never started, so its EXIT trap will not release the lock.
+    cambridge_runtime_release_bootstrap_lock "$state_file"
     return 1
   fi
 
@@ -447,59 +472,70 @@ cambridge_query_fetch_json() {
   return 1
 }
 
-if ! wfhl_source_helper "$script_dir" "script_filter_query_policy.sh"; then
-  emit_error_item "Workflow helper missing" "Cannot locate script_filter_query_policy.sh runtime helper."
-  exit 0
+cambridge_script_filter_main() {
+  if ! wfhl_source_helper "$script_dir" "script_filter_query_policy.sh"; then
+    emit_error_item "Workflow helper missing" "Cannot locate script_filter_query_policy.sh runtime helper."
+    exit 0
+  fi
+
+  if ! wfhl_source_helper "$script_dir" "script_filter_async_coalesce.sh"; then
+    emit_error_item "Workflow helper missing" "Cannot locate script_filter_async_coalesce.sh runtime helper."
+    exit 0
+  fi
+
+  if ! wfhl_source_helper "$script_dir" "script_filter_search_driver.sh"; then
+    emit_error_item "Workflow helper missing" "Cannot locate script_filter_search_driver.sh runtime helper."
+    exit 0
+  fi
+
+  ensure_common_runtime_path
+
+  local query trimmed_query cli_query
+  query="$(sfqp_resolve_query_input "${1:-}")"
+  trimmed_query="$(sfqp_trim "$query")"
+  query="$trimmed_query"
+
+  if [[ -z "$query" ]]; then
+    emit_error_item "Enter a word" "Type a word after cd, then pick a candidate entry."
+    exit 0
+  fi
+
+  if sfqp_is_short_query "$query" 2; then
+    sfqp_emit_short_query_item_json \
+      2 \
+      "Keep typing (2+ chars)" \
+      "Type at least %s characters before searching Cambridge Dictionary."
+    exit 0
+  fi
+
+  cli_query="$(prepare_cli_query_input "$query")"
+
+  : "${CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS:=0}"
+
+  if query_has_explicit_mode_prefix "$cli_query"; then
+    emit_direct_query_result "$cli_query"
+    exit 0
+  fi
+
+  # Shared driver owns cache/coalesce orchestration only.
+  # Cambridge-specific backend fetch and error mapping remain local in this script.
+  sfsd_run_search_flow \
+    "$cli_query" \
+    "cambridge-dict" \
+    "nils-cambridge-dict-workflow" \
+    "CAMBRIDGE_QUERY_CACHE_TTL_SECONDS" \
+    "CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS" \
+    "CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS" \
+    "Searching Cambridge..." \
+    "Waiting for final query before calling Cambridge backend." \
+    "cambridge_query_fetch_json" \
+    "print_error_item"
+}
+
+# Run the Script Filter only when executed directly (Alfred entrypoint). When
+# this file is sourced (e.g. by unit tests that exercise the runtime-bootstrap
+# helpers), the main flow is skipped so the function definitions can be tested
+# in isolation.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  cambridge_script_filter_main "$@"
 fi
-
-if ! wfhl_source_helper "$script_dir" "script_filter_async_coalesce.sh"; then
-  emit_error_item "Workflow helper missing" "Cannot locate script_filter_async_coalesce.sh runtime helper."
-  exit 0
-fi
-
-if ! wfhl_source_helper "$script_dir" "script_filter_search_driver.sh"; then
-  emit_error_item "Workflow helper missing" "Cannot locate script_filter_search_driver.sh runtime helper."
-  exit 0
-fi
-
-ensure_common_runtime_path
-
-query="$(sfqp_resolve_query_input "${1:-}")"
-trimmed_query="$(sfqp_trim "$query")"
-query="$trimmed_query"
-
-if [[ -z "$query" ]]; then
-  emit_error_item "Enter a word" "Type a word after cd, then pick a candidate entry."
-  exit 0
-fi
-
-if sfqp_is_short_query "$query" 2; then
-  sfqp_emit_short_query_item_json \
-    2 \
-    "Keep typing (2+ chars)" \
-    "Type at least %s characters before searching Cambridge Dictionary."
-  exit 0
-fi
-
-cli_query="$(prepare_cli_query_input "$query")"
-
-: "${CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS:=0}"
-
-if query_has_explicit_mode_prefix "$cli_query"; then
-  emit_direct_query_result "$cli_query"
-  exit 0
-fi
-
-# Shared driver owns cache/coalesce orchestration only.
-# Cambridge-specific backend fetch and error mapping remain local in this script.
-sfsd_run_search_flow \
-  "$cli_query" \
-  "cambridge-dict" \
-  "nils-cambridge-dict-workflow" \
-  "CAMBRIDGE_QUERY_CACHE_TTL_SECONDS" \
-  "CAMBRIDGE_QUERY_COALESCE_SETTLE_SECONDS" \
-  "CAMBRIDGE_QUERY_COALESCE_RERUN_SECONDS" \
-  "Searching Cambridge..." \
-  "Waiting for final query before calling Cambridge backend." \
-  "cambridge_query_fetch_json" \
-  "print_error_item"

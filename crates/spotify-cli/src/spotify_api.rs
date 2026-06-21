@@ -1,9 +1,14 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
 pub const SEARCH_ENDPOINT: &str = "https://api.spotify.com/v1/search";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackSearchResult {
@@ -18,7 +23,8 @@ pub fn search_tracks(
     access_token: &str,
     query: &str,
 ) -> Result<Vec<TrackSearchResult>, SpotifyApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT))
+        .map_err(|source| SpotifyApiError::Transport { source })?;
     let params = build_query_params(config, query);
 
     let response = client

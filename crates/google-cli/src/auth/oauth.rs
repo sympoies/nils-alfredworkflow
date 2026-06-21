@@ -1,10 +1,12 @@
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::hash::{Hash, Hasher};
+use std::time::Duration;
 
 use reqwest::Url;
-use reqwest::blocking::{Client, Response};
+use reqwest::blocking::Response;
 use serde::Deserialize;
+use workflow_common::http::build_blocking_client;
 
 use super::browser;
 use super::callback::parse_callback_url;
@@ -18,6 +20,11 @@ pub const GOOGLE_CLI_AUTH_ALLOW_FAKE_EXCHANGE_ENV: &str = "GOOGLE_CLI_AUTH_ALLOW
 
 const GOOGLE_SCOPE: &str =
     "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive";
+
+// Bound OAuth token endpoint calls so a stalled server cannot hang the CLI
+// indefinitely. OAuth round-trips can be slower than a plain API read, so 15s
+// leaves headroom over a typical search timeout while still failing fast.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthFlowMode {
@@ -170,7 +177,9 @@ pub fn refresh_access_token(
         return Ok(fake_refresh(token));
     }
 
-    let client = Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
+        AppError::auth_store_failure(format!("failed to build OAuth HTTP client: {error}"))
+    })?;
     let response = client
         .post(&credentials.token_uri)
         .form(&[
@@ -205,7 +214,9 @@ fn exchange_code(
         return Ok(fake_exchange_code(account, code, mode));
     }
 
-    let client = Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
+        AppError::auth_store_failure(format!("failed to build OAuth HTTP client: {error}"))
+    })?;
     let response = client
         .post(&credentials.token_uri)
         .form(&[

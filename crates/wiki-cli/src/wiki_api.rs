@@ -1,9 +1,14 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
 const USER_AGENT: &str = "nils-alfredworkflow-wiki-search/0.1.5";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WikiSearchResult {
@@ -16,7 +21,8 @@ pub fn search_articles(
     config: &RuntimeConfig,
     query: &str,
 ) -> Result<Vec<WikiSearchResult>, WikiApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(Some(USER_AGENT), Some(REQUEST_TIMEOUT))
+        .map_err(|source| WikiApiError::Transport { source })?;
     let endpoint = build_endpoint(config);
     let params = build_query_params(config, query);
 

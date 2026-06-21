@@ -1,13 +1,19 @@
+use std::time::Duration;
+
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 pub const SUGGEST_ENDPOINT: &str = "https://suggestqueries.google.com/complete/search";
 pub const DEFAULT_SUGGEST_MAX_RESULTS: u8 = 8;
 const SUGGEST_OUTPUT: &str = "chrome";
 const SUGGEST_IE: &str = "utf8";
 const SUGGEST_OE: &str = "utf8";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 pub fn fetch_suggestions(query: &str, max_results: u8) -> Result<Vec<String>, GoogleSuggestError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT))
+        .map_err(|source| GoogleSuggestError::Transport { source })?;
     let params = vec![
         ("output".to_string(), SUGGEST_OUTPUT.to_string()),
         ("ie".to_string(), SUGGEST_IE.to_string()),
@@ -119,5 +125,54 @@ mod tests {
         let err = parse_suggestions_response("not-json", "rust", 8)
             .expect_err("invalid payload should fail");
         assert!(matches!(err, GoogleSuggestError::InvalidResponse(_)));
+    }
+
+    // The public `fetch_suggestions` hardcodes `SUGGEST_ENDPOINT`, so a true
+    // end-to-end hang test cannot be wired without adding an endpoint override
+    // (an invasive change beyond the timeout fix). Instead, lock in the actual
+    // production timeout policy: a client built the same way as the production
+    // path must fail (rather than hang) against a server that accepts the
+    // connection but never replies.
+    #[test]
+    fn request_timeout_aborts_a_stalled_server_within_bounds() {
+        use std::io::Read;
+        use std::net::TcpListener;
+        use std::time::Instant;
+
+        let listener =
+            TcpListener::bind("127.0.0.1:0").expect("should bind ephemeral loopback port");
+        let addr = listener
+            .local_addr()
+            .expect("listener should expose its address");
+
+        // Accept the connection but never write a response, so the client must
+        // rely on its own timeout to give up.
+        let accept_thread = std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut sink = [0u8; 1024];
+                let _ = stream.read(&mut sink);
+                std::thread::sleep(REQUEST_TIMEOUT + Duration::from_secs(2));
+            }
+        });
+
+        // Mirror the production client construction, but with a short timeout so
+        // the test stays fast while still exercising the timeout path.
+        let client = build_blocking_client(None, Some(Duration::from_millis(300)))
+            .expect("client should build with a valid configuration");
+
+        let started = Instant::now();
+        let result = client.get(format!("http://{addr}/complete/search")).send();
+        let elapsed = started.elapsed();
+
+        assert!(
+            result.is_err(),
+            "a stalled server should surface a transport error rather than hang"
+        );
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "timeout should fire promptly, took {elapsed:?}"
+        );
+
+        drop(accept_thread);
     }
 }

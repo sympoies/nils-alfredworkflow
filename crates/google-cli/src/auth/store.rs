@@ -5,7 +5,7 @@ use std::fs;
 use keyring_core::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 
-use super::config::AuthPaths;
+use super::config::{AuthPaths, restrict_file_permissions};
 use crate::error::AppError;
 
 pub const GOOGLE_CLI_KEYRING_MODE_ENV: &str = "GOOGLE_CLI_KEYRING_MODE";
@@ -214,7 +214,10 @@ fn save_file_store(paths: &AuthPaths, store: &FileTokenStore) -> Result<(), AppE
             "failed to write token fallback store `{}`: {error}",
             paths.token_fallback_path.display()
         ))
-    })
+    })?;
+
+    // OAuth tokens are sensitive at rest; keep them owner-only on Unix.
+    restrict_file_permissions(&paths.token_fallback_path)
 }
 
 #[cfg(test)]
@@ -259,5 +262,36 @@ mod tests {
 
         let removed = remove_token(&paths, "me@example.com").expect("remove");
         assert!(removed);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_store_is_written_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempdir().expect("tempdir");
+        let paths = AuthPaths {
+            root_dir: temp.path().to_path_buf(),
+            credentials_path: temp.path().join("credentials.v1.json"),
+            metadata_path: temp.path().join("accounts.v1.json"),
+            token_fallback_path: temp.path().join("tokens.v1.json"),
+            remote_state_path: temp.path().join("remote-state.v1.json"),
+        };
+        // Test-only env override to force deterministic file backend behavior.
+        unsafe {
+            std::env::set_var(GOOGLE_CLI_KEYRING_MODE_ENV, "file");
+        }
+
+        persist_token(&paths, "me@example.com", &token("manual")).expect("persist");
+
+        let mode = std::fs::metadata(&paths.token_fallback_path)
+            .expect("token file metadata")
+            .permissions()
+            .mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "token file should be owner read/write only"
+        );
     }
 }
