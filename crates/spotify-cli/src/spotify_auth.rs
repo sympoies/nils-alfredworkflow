@@ -1,9 +1,14 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
 pub const TOKEN_ENDPOINT: &str = "https://accounts.spotify.com/api/token";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpotifyAccessToken {
@@ -15,7 +20,8 @@ pub struct SpotifyAccessToken {
 pub fn request_access_token(
     config: &RuntimeConfig,
 ) -> Result<SpotifyAccessToken, SpotifyAuthError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT))
+        .map_err(|source| SpotifyAuthError::Transport { source })?;
 
     let response = client
         .post(TOKEN_ENDPOINT)

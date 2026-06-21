@@ -1,9 +1,14 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use thiserror::Error;
+use workflow_common::http::build_blocking_client;
 
 use crate::config::RuntimeConfig;
 
 pub const SEARCH_ENDPOINT: &str = "https://www.googleapis.com/youtube/v3/search";
+/// Bound every request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VideoSearchResult {
@@ -16,7 +21,8 @@ pub fn search_videos(
     config: &RuntimeConfig,
     query: &str,
 ) -> Result<Vec<VideoSearchResult>, YouTubeApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT))
+        .map_err(|source| YouTubeApiError::Transport { source })?;
     let params = build_query_params(config, query);
 
     let response = client

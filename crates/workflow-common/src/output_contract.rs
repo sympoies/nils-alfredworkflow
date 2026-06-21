@@ -171,13 +171,14 @@ fn redact_after_pattern(input: &str, pattern: &str) -> String {
         let start = cursor + found;
         let value_start = start + pattern.len();
         let value_content_start = skip_whitespace(input, value_start);
-        let (redaction_start, value_end) = if is_authorization_pattern
-            && input[value_content_start..]
-                .to_ascii_lowercase()
-                .starts_with("bearer ")
-        {
-            let bearer_start = value_content_start + "bearer ".len();
-            (bearer_start, find_value_end(input, bearer_start))
+        let (redaction_start, value_end) = if is_authorization_pattern {
+            // Authorization headers are `<scheme> <credential>` (e.g.
+            // `Bearer xyz`, `Basic dXNlcjpwYXNz`, `Negotiate YII...`). Redact the
+            // credential regardless of the scheme; when no scheme word is present
+            // the whole value is the credential. The previous code special-cased
+            // only `bearer `, so `Basic`/`Negotiate`/etc. leaked their credential.
+            let credential_start = authorization_credential_start(input, value_content_start);
+            (credential_start, find_value_end(input, credential_start))
         } else {
             (
                 value_content_start,
@@ -226,6 +227,30 @@ fn skip_whitespace(input: &str, mut index: usize) -> usize {
         index += 1;
     }
     index
+}
+
+/// Returns the byte index at which the credential begins inside an
+/// `Authorization` value. Authorization headers are `<scheme> <credential>`
+/// (e.g. `Bearer xyz`, `Basic dXNlcjpwYXNz`, `Negotiate YII...`). When a scheme
+/// word (a run of ASCII letters followed by whitespace and a credential token)
+/// is present, the credential is everything after it; otherwise the whole value
+/// is treated as the credential. Indices stay on ASCII boundaries so the result
+/// is always a valid UTF-8 slice point.
+fn authorization_credential_start(input: &str, value_start: usize) -> usize {
+    let bytes = input.as_bytes();
+    let mut index = value_start;
+    while index < bytes.len() && bytes[index].is_ascii_alphabetic() {
+        index += 1;
+    }
+
+    if index > value_start && index < bytes.len() && bytes[index].is_ascii_whitespace() {
+        let credential_start = skip_whitespace(input, index);
+        if credential_start < bytes.len() {
+            return credential_start;
+        }
+    }
+
+    value_start
 }
 
 fn find_value_end(input: &str, mut index: usize) -> usize {
@@ -355,5 +380,34 @@ mod tests {
         assert!(!redacted.contains("abc123"));
         assert!(!redacted.contains("zzz"));
         assert!(redacted.contains("Bearer [REDACTED]"));
+    }
+
+    #[test]
+    fn redaction_masks_non_bearer_authorization_schemes() {
+        // Regression: only `Bearer` was special-cased, so `Basic`/`Negotiate`
+        // (and any other scheme) leaked the credential after the scheme word.
+        let basic = redact_sensitive("authorization: Basic dXNlcjpwYXNzd29yZA==");
+        assert!(
+            !basic.contains("dXNlcjpwYXNzd29yZA=="),
+            "Basic credential leaked: {basic}"
+        );
+        assert!(basic.contains("Basic [REDACTED]"), "got: {basic}");
+
+        let negotiate = redact_sensitive("Authorization: Negotiate YIIZsecrettoken");
+        assert!(
+            !negotiate.contains("YIIZsecrettoken"),
+            "Negotiate credential leaked: {negotiate}"
+        );
+        assert!(
+            negotiate.contains("Negotiate [REDACTED]"),
+            "got: {negotiate}"
+        );
+
+        // A scheme-less authorization value must redact the whole credential.
+        let schemeless = redact_sensitive("authorization: rawsecretvalue");
+        assert!(
+            !schemeless.contains("rawsecretvalue"),
+            "scheme-less credential leaked: {schemeless}"
+        );
     }
 }

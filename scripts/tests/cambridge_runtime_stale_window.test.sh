@@ -59,4 +59,17 @@ check "invalid install timeout falls back to 300" "600" "" "not-a-number" ""
 # Buffer override widens the floor.
 check "buffer override widens the floor" "1200" "" "900" "300"
 
+# Buffer of exactly zero is valid (^[0-9]+$): the floor collapses to the bare
+# install timeout, and a configured window below it is floored up.
+check "buffer zero floors at install timeout" "300" "100" "300" "0"
+
+# Configured stale window equal to the floor is on the boundary: the function
+# only floors when configured < floor, so an exact match is respected as-is.
+check "configured equals floor is respected" "420" "420" "300" ""
+
+# Invalid buffer falls back to 120 (not 0). The configured 350 sits below the
+# correct 420 floor but above the broken-fallback 300 floor, so 420 proves the
+# 120 fallback (a broken 0 fallback would have returned 350).
+check "invalid buffer falls back to 120" "420" "350" "300" "bad"
+
 printf 'ok: cambridge runtime stale-window tests passed\n'

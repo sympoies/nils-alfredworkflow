@@ -30,6 +30,9 @@ impl AuthPaths {
                 root_dir.display()
             ))
         })?;
+        // The directory holds OAuth tokens and the client secret; keep it
+        // owner-only on Unix so siblings cannot read newly created auth state.
+        restrict_dir_permissions(&root_dir)?;
 
         Ok(Self {
             credentials_path: root_dir.join("credentials.v1.json"),
@@ -267,7 +270,50 @@ where
             "failed to write auth state `{}`: {error}",
             path.display()
         ))
+    })?;
+
+    // Auth state can include the OAuth client secret; keep it owner-only on Unix.
+    restrict_file_permissions(path)
+}
+
+/// Restricts a freshly written sensitive file to owner read/write (0600).
+///
+/// No-op on non-Unix platforms, which lack POSIX mode bits.
+#[cfg(unix)]
+pub(super) fn restrict_file_permissions(path: &std::path::Path) -> Result<(), AppError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|error| {
+        AppError::auth_store_failure(format!(
+            "failed to restrict permissions on `{}`: {error}",
+            path.display()
+        ))
     })
+}
+
+#[cfg(not(unix))]
+pub(super) fn restrict_file_permissions(_path: &std::path::Path) -> Result<(), AppError> {
+    Ok(())
+}
+
+/// Restricts the auth config directory to owner-only access (0700) on Unix.
+///
+/// No-op on non-Unix platforms, which lack POSIX mode bits.
+#[cfg(unix)]
+fn restrict_dir_permissions(path: &std::path::Path) -> Result<(), AppError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|error| {
+        AppError::auth_store_failure(format!(
+            "failed to restrict permissions on auth config directory `{}`: {error}",
+            path.display()
+        ))
+    })
+}
+
+#[cfg(not(unix))]
+fn restrict_dir_permissions(_path: &std::path::Path) -> Result<(), AppError> {
+    Ok(())
 }
 
 #[cfg(test)]

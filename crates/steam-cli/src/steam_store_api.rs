@@ -21,6 +21,8 @@ const STORE_SEARCH_ENDPOINT_ENV: &str = "STEAM_STORE_SEARCH_ENDPOINT";
 const FEATURED_CATEGORIES_ENDPOINT_ENV: &str = "STEAM_FEATURED_CATEGORIES_ENDPOINT";
 const SEARCH_ORIGIN: &str = "https://store.steampowered.com";
 const USER_AGENT: &str = "nils-alfredworkflow-steam-search/0.1.0";
+/// Bound every search request so a stalled server cannot hang the Alfred workflow.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 const COVER_CACHE_SUBDIR: &str = "steam-covers";
 const COVER_CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
@@ -136,7 +138,8 @@ pub fn search_apps(
     config: &RuntimeConfig,
     query: &str,
 ) -> Result<Vec<SteamSearchResult>, SteamStoreApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(Some(USER_AGENT), Some(REQUEST_TIMEOUT))
+        .map_err(|source| SteamStoreApiError::Transport { source })?;
 
     let mut results = match config.search_api {
         SteamSearchApi::SearchSuggestions => {
@@ -170,7 +173,8 @@ fn cache_covers_if_enabled(config: &RuntimeConfig, results: &mut [SteamSearchRes
 pub fn fetch_specials(
     config: &RuntimeConfig,
 ) -> Result<Vec<SteamSearchResult>, SteamStoreApiError> {
-    let client = reqwest::blocking::Client::new();
+    let client = build_blocking_client(Some(USER_AGENT), Some(REQUEST_TIMEOUT))
+        .map_err(|source| SteamStoreApiError::Transport { source })?;
     let endpoint = resolve_endpoint(
         FEATURED_CATEGORIES_ENDPOINT_ENV,
         FEATURED_CATEGORIES_ENDPOINT,

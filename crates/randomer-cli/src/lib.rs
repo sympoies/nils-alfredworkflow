@@ -17,6 +17,11 @@ const UNIT_LETTER_VALUES: [u32; 26] = [
     37, 38,
 ];
 
+/// Upper bound on a single `generate` request. Each value allocates an Alfred
+/// `Item`, and an Alfred Script Filter never renders thousands of rows, so cap
+/// the request to keep memory bounded and reject obviously hostile inputs.
+const MAX_COUNT: usize = 1000;
+
 const ALL_FORMATS: [Format; 11] = [
     Format::Email,
     Format::Imei,
@@ -100,6 +105,7 @@ impl Format {
 pub enum RandomerError {
     UnknownFormat(String),
     InvalidCount(usize),
+    CountTooLarge(usize),
 }
 
 impl fmt::Display for RandomerError {
@@ -107,6 +113,9 @@ impl fmt::Display for RandomerError {
         match self {
             Self::UnknownFormat(format) => write!(f, "unknown format: {format}"),
             Self::InvalidCount(count) => write!(f, "count must be at least 1 (got {count})"),
+            Self::CountTooLarge(count) => {
+                write!(f, "count must be at most {MAX_COUNT} (got {count})")
+            }
         }
     }
 }
@@ -187,6 +196,9 @@ fn generate_feedback_with_rng<R: Rng + ?Sized>(
 ) -> Result<Feedback, RandomerError> {
     if count == 0 {
         return Err(RandomerError::InvalidCount(count));
+    }
+    if count > MAX_COUNT {
+        return Err(RandomerError::CountTooLarge(count));
     }
 
     let format = Format::parse(format_name)
@@ -474,6 +486,22 @@ mod tests {
         let mut rng = seeded_rng();
         let err = generate_feedback_with_rng("email", 0, &mut rng).expect_err("should reject 0");
         assert_eq!(err, RandomerError::InvalidCount(0));
+    }
+
+    #[test]
+    fn generate_feedback_rejects_count_above_max() {
+        let mut rng = seeded_rng();
+        let err = generate_feedback_with_rng("email", MAX_COUNT + 1, &mut rng)
+            .expect_err("should reject count above MAX_COUNT");
+        assert_eq!(err, RandomerError::CountTooLarge(MAX_COUNT + 1));
+    }
+
+    #[test]
+    fn generate_feedback_accepts_count_at_max() {
+        let mut rng = seeded_rng();
+        let feedback = generate_feedback_with_rng("otp", MAX_COUNT, &mut rng)
+            .expect("MAX_COUNT itself should be accepted");
+        assert_eq!(feedback.items.len(), MAX_COUNT);
     }
 
     #[test]
