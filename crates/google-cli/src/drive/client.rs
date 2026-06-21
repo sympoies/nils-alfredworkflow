@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use reqwest::blocking::{Client, Response, multipart};
+use reqwest::blocking::{Client, RequestBuilder, Response, multipart};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use workflow_common::http::build_blocking_client;
@@ -21,10 +21,10 @@ use super::mime::resolve_mime_type;
 
 const DRIVE_API_BASE: &str = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_BASE: &str = "https://www.googleapis.com/upload/drive/v3";
-// Bound Drive HTTP calls so a stalled server cannot hang the CLI indefinitely.
-// Drive downloads/uploads can be slower than a plain API read, so 15s leaves
-// headroom while still failing fast on a dead connection.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+// Bound Drive metadata calls so a stalled server cannot hang the CLI indefinitely.
+const DRIVE_METADATA_TIMEOUT: Duration = Duration::from_secs(15);
+// Drive media transfers can legitimately exceed metadata latency on slow links.
+const DRIVE_MEDIA_TIMEOUT: Duration = Duration::from_secs(300);
 const GOOGLE_CLI_DRIVE_FIXTURE_PATH_ENV: &str = "GOOGLE_CLI_DRIVE_FIXTURE_PATH";
 const GOOGLE_CLI_DRIVE_FIXTURE_JSON_ENV: &str = "GOOGLE_CLI_DRIVE_FIXTURE_JSON";
 
@@ -162,9 +162,10 @@ impl DriveSession {
             refreshed
         };
 
-        let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
-            AppError::drive_failure(format!("failed to build Drive HTTP client: {error}"))
-        })?;
+        let client =
+            build_blocking_client(None, Some(DRIVE_METADATA_TIMEOUT)).map_err(|error| {
+                AppError::drive_failure(format!("failed to build Drive HTTP client: {error}"))
+            })?;
 
         Ok(Self {
             account: resolved.account,
@@ -308,18 +309,19 @@ impl DriveSession {
             let export_mime = resolve_export_mime_type(format).ok_or_else(|| {
                 AppError::invalid_drive_input(format!("unsupported export format `{format}`"))
             })?;
-            let response = self
-                .client
-                .get(format!("{DRIVE_API_BASE}/files/{file_id}/export"))
-                .bearer_auth(&self.access_token)
-                .query(&[
-                    ("mimeType", export_mime.as_str()),
-                    ("supportsAllDrives", "true"),
-                ])
-                .send()
-                .map_err(|error| {
-                    AppError::drive_failure(format!("GET files/{file_id}/export failed: {error}"))
-                })?;
+            let response = media_request(
+                self.client
+                    .get(format!("{DRIVE_API_BASE}/files/{file_id}/export"))
+                    .bearer_auth(&self.access_token)
+                    .query(&[
+                        ("mimeType", export_mime.as_str()),
+                        ("supportsAllDrives", "true"),
+                    ]),
+            )
+            .send()
+            .map_err(|error| {
+                AppError::drive_failure(format!("GET files/{file_id}/export failed: {error}"))
+            })?;
             let bytes = parse_drive_bytes_response(
                 response,
                 format!("GET files/{file_id}/export").as_str(),
@@ -426,11 +428,13 @@ impl DriveSession {
         } else {
             self.client.post(&endpoint)
         };
-        let response = request_builder
-            .bearer_auth(&self.access_token)
-            .multipart(form)
-            .send()
-            .map_err(|error| AppError::drive_failure(format!("upload request failed: {error}")))?;
+        let response = media_request(
+            request_builder
+                .bearer_auth(&self.access_token)
+                .multipart(form),
+        )
+        .send()
+        .map_err(|error| AppError::drive_failure(format!("upload request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "upload file", None)?;
         let file = view_from_live_json(&payload);
 
@@ -464,15 +468,14 @@ impl DriveSession {
             params.push(("pageToken", page_token.to_string()));
         }
 
-        let response = self
-            .client
-            .get(format!("{DRIVE_API_BASE}/files"))
-            .bearer_auth(&self.access_token)
-            .query(&params)
-            .send()
-            .map_err(|error| {
-                AppError::drive_failure(format!("list files request failed: {error}"))
-            })?;
+        let response = metadata_request(
+            self.client
+                .get(format!("{DRIVE_API_BASE}/files"))
+                .bearer_auth(&self.access_token)
+                .query(&params),
+        )
+        .send()
+        .map_err(|error| AppError::drive_failure(format!("list files request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "list files", None)?;
         let files = payload
             .get("files")
@@ -505,10 +508,7 @@ impl DriveSession {
         not_found: Option<(&str, &str)>,
     ) -> Result<Value, AppError> {
         let url = format!("{DRIVE_API_BASE}/{path_and_query}");
-        let response = self
-            .client
-            .get(&url)
-            .bearer_auth(&self.access_token)
+        let response = metadata_request(self.client.get(&url).bearer_auth(&self.access_token))
             .send()
             .map_err(|error| AppError::drive_failure(format!("GET {url} failed: {error}")))?;
         parse_drive_json_response(
@@ -524,10 +524,7 @@ impl DriveSession {
         not_found: Option<(&str, &str)>,
     ) -> Result<Vec<u8>, AppError> {
         let url = format!("{DRIVE_API_BASE}/{path_and_query}");
-        let response = self
-            .client
-            .get(&url)
-            .bearer_auth(&self.access_token)
+        let response = media_request(self.client.get(&url).bearer_auth(&self.access_token))
             .send()
             .map_err(|error| AppError::drive_failure(format!("GET {url} failed: {error}")))?;
         parse_drive_bytes_response(
@@ -536,6 +533,14 @@ impl DriveSession {
             not_found,
         )
     }
+}
+
+fn metadata_request(request: RequestBuilder) -> RequestBuilder {
+    request.timeout(DRIVE_METADATA_TIMEOUT)
+}
+
+fn media_request(request: RequestBuilder) -> RequestBuilder {
+    request.timeout(DRIVE_MEDIA_TIMEOUT)
 }
 
 fn parse_drive_json_response(
@@ -868,4 +873,26 @@ fn upload_to_fixture(
         convert_requested: request.convert,
         file,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, media_request, metadata_request};
+
+    use reqwest::blocking::Client;
+
+    #[test]
+    fn drive_media_requests_use_longer_timeout_than_metadata_requests() {
+        let client = Client::new();
+        let metadata = metadata_request(client.get("https://example.invalid/metadata"))
+            .build()
+            .expect("metadata request");
+        let media = media_request(client.get("https://example.invalid/media"))
+            .build()
+            .expect("media request");
+
+        assert_eq!(metadata.timeout().copied(), Some(DRIVE_METADATA_TIMEOUT));
+        assert_eq!(media.timeout().copied(), Some(DRIVE_MEDIA_TIMEOUT));
+        assert!(DRIVE_MEDIA_TIMEOUT > DRIVE_METADATA_TIMEOUT);
+    }
 }

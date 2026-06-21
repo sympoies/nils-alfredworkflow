@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
-use reqwest::blocking::{Client, Response};
+use reqwest::blocking::{Client, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use workflow_common::http::build_blocking_client;
@@ -19,10 +19,10 @@ use crate::cmd::common::GlobalOptions;
 use crate::error::{AppError, redact_sensitive};
 
 const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1/users/me";
-// Bound Gmail HTTP calls so a stalled server cannot hang the CLI indefinitely.
-// Gmail requests can be slower than a plain API read, so 15s leaves headroom
-// while still failing fast on a dead connection.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+// Bound Gmail metadata calls so a stalled server cannot hang the CLI indefinitely.
+const GMAIL_METADATA_TIMEOUT: Duration = Duration::from_secs(15);
+// Gmail sends with attachments can legitimately exceed metadata latency.
+const GMAIL_SEND_TIMEOUT: Duration = Duration::from_secs(300);
 const GOOGLE_CLI_GMAIL_FIXTURE_PATH_ENV: &str = "GOOGLE_CLI_GMAIL_FIXTURE_PATH";
 const GOOGLE_CLI_GMAIL_FIXTURE_JSON_ENV: &str = "GOOGLE_CLI_GMAIL_FIXTURE_JSON";
 
@@ -190,9 +190,10 @@ impl GmailSession {
             refreshed
         };
 
-        let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
-            AppError::gmail_failure(format!("failed to build Gmail HTTP client: {error}"))
-        })?;
+        let client =
+            build_blocking_client(None, Some(GMAIL_METADATA_TIMEOUT)).map_err(|error| {
+                AppError::gmail_failure(format!("failed to build Gmail HTTP client: {error}"))
+            })?;
 
         Ok(Self {
             account: resolved.account,
@@ -368,6 +369,7 @@ impl GmailSession {
             format!("threads/{}/modify", request.thread_id).as_str(),
             payload,
             Some(("thread", request.thread_id.as_str())),
+            metadata_request,
         )?;
 
         let mut labels_by_message = BTreeMap::new();
@@ -427,7 +429,7 @@ impl GmailSession {
             payload["threadId"] = Value::String(thread_id.to_string());
         }
 
-        let response = self.gmail_post_json("messages/send", payload, None)?;
+        let response = self.gmail_post_json("messages/send", payload, None, send_request)?;
         let id = response
             .get("id")
             .and_then(Value::as_str)
@@ -474,13 +476,14 @@ impl GmailSession {
         not_found: Option<(&str, &str)>,
     ) -> Result<Value, AppError> {
         let url = format!("{GMAIL_API_BASE}/{path}");
-        let response = self
-            .client
-            .get(&url)
-            .bearer_auth(&self.access_token)
-            .query(query)
-            .send()
-            .map_err(|error| AppError::gmail_failure(format!("GET {url} failed: {error}")))?;
+        let response = metadata_request(
+            self.client
+                .get(&url)
+                .bearer_auth(&self.access_token)
+                .query(query),
+        )
+        .send()
+        .map_err(|error| AppError::gmail_failure(format!("GET {url} failed: {error}")))?;
         parse_gmail_response(response, format!("GET {path}").as_str(), not_found)
     }
 
@@ -489,17 +492,27 @@ impl GmailSession {
         path: &str,
         payload: Value,
         not_found: Option<(&str, &str)>,
+        apply_timeout: fn(RequestBuilder) -> RequestBuilder,
     ) -> Result<Value, AppError> {
         let url = format!("{GMAIL_API_BASE}/{path}");
-        let response = self
-            .client
-            .post(&url)
-            .bearer_auth(&self.access_token)
-            .json(&payload)
-            .send()
-            .map_err(|error| AppError::gmail_failure(format!("POST {url} failed: {error}")))?;
+        let response = apply_timeout(
+            self.client
+                .post(&url)
+                .bearer_auth(&self.access_token)
+                .json(&payload),
+        )
+        .send()
+        .map_err(|error| AppError::gmail_failure(format!("POST {url} failed: {error}")))?;
         parse_gmail_response(response, format!("POST {path}").as_str(), not_found)
     }
+}
+
+fn metadata_request(request: RequestBuilder) -> RequestBuilder {
+    request.timeout(GMAIL_METADATA_TIMEOUT)
+}
+
+fn send_request(request: RequestBuilder) -> RequestBuilder {
+    request.timeout(GMAIL_SEND_TIMEOUT)
 }
 
 fn parse_gmail_response(
@@ -819,7 +832,12 @@ fn synthetic_message_id(account: &str, raw_rfc822: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{GmailMessage, MessageFormat, message_matches, view_for_fixture_message};
+    use super::{
+        GMAIL_METADATA_TIMEOUT, GMAIL_SEND_TIMEOUT, GmailMessage, MessageFormat, message_matches,
+        metadata_request, send_request, view_for_fixture_message,
+    };
+
+    use reqwest::blocking::Client;
 
     #[test]
     fn query_matches_common_predicates() {
@@ -871,5 +889,20 @@ mod tests {
             view.headers.get("Subject"),
             Some(&"Daily status".to_string())
         );
+    }
+
+    #[test]
+    fn gmail_send_requests_use_longer_timeout_than_metadata_requests() {
+        let client = Client::new();
+        let metadata = metadata_request(client.get("https://example.invalid/metadata"))
+            .build()
+            .expect("metadata request");
+        let send = send_request(client.post("https://example.invalid/send"))
+            .build()
+            .expect("send request");
+
+        assert_eq!(metadata.timeout().copied(), Some(GMAIL_METADATA_TIMEOUT));
+        assert_eq!(send.timeout().copied(), Some(GMAIL_SEND_TIMEOUT));
+        assert!(GMAIL_SEND_TIMEOUT > GMAIL_METADATA_TIMEOUT);
     }
 }
