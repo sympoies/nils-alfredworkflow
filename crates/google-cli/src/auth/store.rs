@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 
-use keyring_core::{Entry, Error as KeyringError};
+use keyring::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 
 use super::config::{AuthPaths, restrict_file_permissions};
@@ -151,7 +151,6 @@ fn delete_keyring_token(account: &str) -> Result<bool, String> {
 }
 
 fn keyring_entry(account: &str) -> Result<Entry, String> {
-    keyring::use_native_store(false).map_err(|error| error.to_string())?;
     Entry::new(KEYRING_SERVICE_NAME, account).map_err(|error| error.to_string())
 }
 
