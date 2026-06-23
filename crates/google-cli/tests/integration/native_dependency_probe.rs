@@ -3,7 +3,7 @@
 use directories::ProjectDirs;
 use google_drive3 as drive3;
 use google_gmail1 as gmail1;
-use keyring_core::Entry;
+use keyring::Entry;
 use mail_builder::MessageBuilder;
 use mime_guess::from_path;
 use reqwest::Client;
