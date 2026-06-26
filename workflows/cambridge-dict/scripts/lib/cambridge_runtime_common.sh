@@ -21,22 +21,34 @@ cambridge_runtime_bootstrap_stale_buffer_seconds() {
   printf '%s\n' "$raw"
 }
 
+# Number of browser artifacts the native install path downloads sequentially,
+# each under its own curl --max-time = install timeout (see
+# cambridge_runtime_install_browsers_native + the browser_specs wanted set:
+# chromium + chromium-headless-shell). The stale window must cover the whole
+# native budget, so it is multiplied by this count rather than a single timeout.
+cambridge_runtime_native_browser_count() {
+  printf '%s\n' '2'
+}
+
 # Effective age (seconds) after which a running bootstrap is treated as stale.
 # The bootstrap writes its state file once and does not refresh the mtime during
-# a progressing install, so the stale window must never fall below the install
-# timeout plus a buffer for the surrounding npm install -- otherwise raising
-# CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS above the stale window would kill
-# an install that is still legitimately running.
+# a progressing install. The native path downloads every CFT browser under its
+# own per-artifact install-timeout budget, so the stale window must never fall
+# below the WHOLE native budget (native_count * install timeout) plus a buffer
+# for the surrounding npm install -- otherwise a slow-but-progressing two-browser
+# native install (or a raised CAMBRIDGE_PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS) would
+# be killed mid-install and fall back into the failed/looping bootstrap path.
 cambridge_runtime_effective_stale_seconds() {
   local configured="${CAMBRIDGE_RUNTIME_BOOTSTRAP_STALE_SECONDS:-600}"
   if [[ ! "$configured" =~ ^[1-9][0-9]*$ ]]; then
     configured="600"
   fi
 
-  local install_timeout buffer floor
+  local install_timeout buffer native_count floor
   install_timeout="$(cambridge_runtime_install_timeout_seconds)"
   buffer="$(cambridge_runtime_bootstrap_stale_buffer_seconds)"
-  floor=$((install_timeout + buffer))
+  native_count="$(cambridge_runtime_native_browser_count)"
+  floor=$((install_timeout * native_count + buffer))
 
   if [[ "$configured" -lt "$floor" ]]; then
     printf '%s\n' "$floor"
@@ -228,10 +240,14 @@ cambridge_runtime_verify_headless_chromium_launch() {
   )
 }
 
-# Resolve the Playwright browser-download host. Honors the standard
-# PLAYWRIGHT_DOWNLOAD_HOST override so a mirror still works.
+# Resolve the Playwright browser-download host. The native path provisions only
+# chromium-class artifacts (chromium and chromium-headless-shell, both
+# name.startsWith("chromium")), which Playwright routes through
+# PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST in preference to the generic
+# PLAYWRIGHT_DOWNLOAD_HOST (registry _downloadURLs). Honor the same precedence so
+# an environment that configured only the chromium mirror still resolves.
 cambridge_runtime_download_host() {
-  printf '%s\n' "${PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.playwright.dev}"
+  printf '%s\n' "${PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST:-${PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.playwright.dev}}"
 }
 
 # macOS Chrome-for-Testing platform suffix (mac-arm64 / mac-x64). Returns
@@ -405,6 +421,39 @@ cambridge_runtime_install_browser_native() {
   return 0
 }
 
+# Register the natively-installed browsers with Playwright's browser-GC registry
+# so a later `npx playwright install`/upgrade from another project sharing the
+# default cache does not garbage-collect them (which would force an endless
+# re-bootstrap). Playwright treats a browser directory as "used" only when a
+# .links/<sha1(package path)> entry dereferences to a project whose browsers.json
+# lists it; the native path writes the build dirs + completion marker but never
+# that link. This replicates exactly what playwright-core's install() writes: a
+# file under <cache_root>/.links named sha1(realpath(node_modules/playwright-core))
+# whose content is that package path. Best-effort: callers ignore failures
+# because a missing link only risks a future re-bootstrap, never a broken install.
+# args: <workflow_dir> <cache_root>
+cambridge_runtime_register_browsers_with_gc() {
+  local workflow_dir="$1" cache_root="$2"
+  command -v node >/dev/null 2>&1 || return 1
+  # shellcheck disable=SC2016
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const crypto = require("crypto");
+    const [workflowDir, cacheRoot] = process.argv.slice(1);
+    let pkgPath;
+    try {
+      pkgPath = fs.realpathSync(path.join(workflowDir, "node_modules", "playwright-core"));
+    } catch {
+      process.exit(1);
+    }
+    const sha1 = crypto.createHash("sha1").update(pkgPath).digest("hex");
+    const linksDir = path.join(cacheRoot, ".links");
+    fs.mkdirSync(linksDir, { recursive: true });
+    fs.writeFileSync(path.join(linksDir, sha1), pkgPath);
+  ' "$workflow_dir" "$cache_root"
+}
+
 # Provision every required browser via the native path. Returns non-zero (so the
 # caller falls back to Playwright's installer) when the host is unsupported, the
 # tooling is missing, the registry cannot be read, or any browser fails.
@@ -426,6 +475,11 @@ cambridge_runtime_install_browsers_native() {
     cambridge_runtime_install_browser_native \
       "$name" "$revision" "$version" "$platform" "$cache_root" || return 1
   done <<<"$specs"
+
+  # Opt the natively-installed browsers out of Playwright's GC. Best-effort: a
+  # failure here only risks a future re-bootstrap, never a broken install, so it
+  # must not fail the native path.
+  cambridge_runtime_register_browsers_with_gc "$workflow_dir" "$cache_root" || true
 
   return 0
 }

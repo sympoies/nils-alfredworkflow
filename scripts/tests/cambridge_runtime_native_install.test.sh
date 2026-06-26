@@ -49,6 +49,19 @@ expect_eq "download host honors PLAYWRIGHT_DOWNLOAD_HOST" \
   "https://mirror.example" \
   "$(PLAYWRIGHT_DOWNLOAD_HOST="https://mirror.example" cambridge_runtime_download_host)"
 
+# The native path provisions only chromium-class artifacts (chromium and
+# chromium-headless-shell, both name.startsWith("chromium")), which Playwright
+# routes through PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST in preference to the generic
+# PLAYWRIGHT_DOWNLOAD_HOST. The helper must honor the per-browser override so a
+# chromium-only mirror still works.
+expect_eq "download host honors PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST" \
+  "https://chromium-mirror.example" \
+  "$(PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST="https://chromium-mirror.example" cambridge_runtime_download_host)"
+
+expect_eq "PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST takes precedence over PLAYWRIGHT_DOWNLOAD_HOST" \
+  "https://chromium-mirror.example" \
+  "$(PLAYWRIGHT_CHROMIUM_DOWNLOAD_HOST="https://chromium-mirror.example" PLAYWRIGHT_DOWNLOAD_HOST="https://generic-mirror.example" cambridge_runtime_download_host)"
+
 expect_eq "chromium cft url" \
   "https://cdn.playwright.dev/builds/cft/145.0.7632.6/mac-arm64/chrome-mac-arm64.zip" \
   "$(cambridge_runtime_browser_download_url "145.0.7632.6" "mac-arm64" "chrome-mac-arm64")"
@@ -233,6 +246,49 @@ if [[ "$(uname -s)" == "Darwin" ]] && command -v node >/dev/null 2>&1; then
     fail "native orchestrator did not provision chromium"
   [[ -f "$native_cache/chromium_headless_shell-1208/INSTALLATION_COMPLETE" ]] ||
     fail "native orchestrator did not provision the headless shell"
+fi
+
+# --- Playwright browser-GC registration -----------------------------------
+#
+# Playwright garbage-collects browser directories that no project's
+# .links/<sha1(package path)> entry dereferences. The native path writes the
+# build dirs + completion marker but never that link, so another project's
+# `npx playwright install` could delete the Cambridge browsers and force an
+# endless re-bootstrap. cambridge_runtime_register_browsers_with_gc replicates
+# exactly what playwright-core's install() writes: a .links file named
+# sha1(realpath(node_modules/playwright-core)) whose content is that path.
+if command -v node >/dev/null 2>&1; then
+  gc_wf="$tmp_root/gc-wf"
+  mkdir -p "$gc_wf/node_modules/playwright-core"
+  printf '%s\n' '{"name":"playwright-core"}' >"$gc_wf/node_modules/playwright-core/package.json"
+  gc_cache="$tmp_root/gc-cache"
+  mkdir -p "$gc_cache"
+
+  cambridge_runtime_register_browsers_with_gc "$gc_wf" "$gc_cache" ||
+    fail "register_browsers_with_gc failed"
+
+  gc_links="$gc_cache/.links"
+  [[ -d "$gc_links" ]] || fail "register_browsers_with_gc did not create the .links dir"
+  gc_link_count="$(find "$gc_links" -type f | wc -l | tr -d '[:space:]')"
+  expect_eq "exactly one .links registry entry is written" "1" "$gc_link_count"
+
+  gc_link_file="$(find "$gc_links" -type f | head -1)"
+  gc_link_name="$(basename "$gc_link_file")"
+  gc_link_content="$(cat "$gc_link_file")"
+
+  gc_expected_pkg="$(cd "$gc_wf/node_modules/playwright-core" && pwd -P)"
+  expect_eq "link content is the playwright-core package path" \
+    "$gc_expected_pkg" "$gc_link_content"
+
+  # Playwright keys the link filename by sha1 of the package path (calculateSha1
+  # = plain sha1 hex of the string); verify the filename matches sha1(content).
+  gc_expected_sha1="$(
+    printf '%s' "$gc_link_content" |
+      node -e 'const c=require("crypto");let d="";process.stdin.on("data",x=>d+=x).on("end",()=>process.stdout.write(c.createHash("sha1").update(d).digest("hex")))'
+  )"
+  expect_eq "link filename is sha1(package path)" "$gc_expected_sha1" "$gc_link_name"
+else
+  printf 'note: skipping GC registration check (node unavailable)\n'
 fi
 
 printf 'ok: cambridge runtime native-install tests passed\n'
