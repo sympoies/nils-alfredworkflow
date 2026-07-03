@@ -12,19 +12,19 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `3bfa6a18b444b96ff4487adab2d5cd5796d1515bb92ae92a5a772ec1d9732001`
+- Data source fingerprint (SHA256): `3efb6def39a647a97af280681f3a05377895c06f010aa29ab59095285335c3cc`
 - Runtime metadata fingerprint (SHA256): `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `9ee61a01423bb9ad249b07e48b0183d68d12a27bd637e841527a7fc1b9150062` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `172c2cd929caf28a29c71ddfbac97d64af7583f6c7d64cd712f8fd151ff190d3` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `e06b4cfa67831f83d99f535f7530ba33fb930fd5b31d5b4e12d8da71c70888f7` | `jq package-lock extraction` |
 | Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `65863452d659031214590bf2d8e8ee4b1a21d70c546647d30d373053ea7ad036` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
 | Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.7.3> | `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20` | `curl crates.io API plus jq normalized fields` |
 
-## Rust License Summary (314 crates)
+## Rust License Summary (313 crates)
 
 | Count | License Expression |
 | ---: | --- |
@@ -32,7 +32,7 @@ Do not edit manually.
 | 71 | MIT |
 | 29 | Apache-2.0 OR MIT |
 | 18 | Unicode-3.0 |
-| 9 | MIT/Apache-2.0 |
+| 8 | MIT/Apache-2.0 |
 | 5 | Apache-2.0 |
 | 3 | Apache-2.0 OR ISC OR MIT |
 | 2 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
@@ -62,7 +62,7 @@ Do not edit manually.
 | anstyle | 1.0.14 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
 | anstyle-parse | 1.0.0 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
 | anstyle-query | 1.1.5 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
-| anyhow | 1.0.102 | MIT OR Apache-2.0 | <https://github.com/dtolnay/anyhow> |
+| anyhow | 1.0.103 | MIT OR Apache-2.0 | <https://github.com/dtolnay/anyhow> |
 | apple-native-keyring-store | 1.0.0 | MIT OR Apache-2.0 | <https://github.com/open-source-cooperative/apple-native-keyring-store.git> |
 | arrayvec | 0.7.6 | MIT OR Apache-2.0 | <https://github.com/bluss/arrayvec> |
 | assert-json-diff | 2.0.2 | MIT | <https://github.com/davidpdrsn/assert-json-diff.git> |
@@ -222,12 +222,11 @@ Do not edit manually.
 | num_cpus | 1.17.0 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/num_cpus> |
 | num_threads | 0.1.7 | MIT OR Apache-2.0 | <https://github.com/jhpratt/num_threads> |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | <https://github.com/matklad/once_cell> |
-| open | 5.3.5 | MIT | <https://github.com/Byron/open-rs> |
+| open | 5.3.6 | MIT | <https://github.com/Byron/open-rs> |
 | openssl-probe | 0.2.1 | MIT OR Apache-2.0 | <https://github.com/rustls/openssl-probe> |
 | option-ext | 0.2.0 | MPL-2.0 | <https://github.com/soc/option-ext.git> |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/danieldg/ordered-stream> |
 | parking | 2.2.1 | Apache-2.0 OR MIT | <https://github.com/smol-rs/parking> |
-| pathdiff | 0.2.3 | MIT/Apache-2.0 | <https://github.com/Manishearth/pathdiff> |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url/> |
 | phf | 0.12.1 | MIT | <https://github.com/rust-phf/rust-phf> |
 | phf_shared | 0.12.1 | MIT | <https://github.com/rust-phf/rust-phf> |
@@ -341,7 +340,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.23.3 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.23.4 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | vcpkg | 0.2.15 | MIT/Apache-2.0 | <https://github.com/mcgoo/vcpkg-rs> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
