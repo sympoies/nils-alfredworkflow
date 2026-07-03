@@ -3,8 +3,8 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `9ee61a01423bb9ad249b07e48b0183d68d12a27bd637e841527a7fc1b9150062`
-- Third-party crates (`source != null`): 314
+- Cargo.lock SHA256: `172c2cd929caf28a29c71ddfbac97d64af7583f6c7d64cd712f8fd151ff190d3`
+- Third-party crates (`source != null`): 313
 
 ## Notice Extraction Policy
 
@@ -78,7 +78,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### anyhow 1.0.102
+### anyhow 1.0.103
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1473,7 +1473,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### open 5.3.5
+### open 5.3.6
 
 - License: `MIT`
 - Source: `crates.io`
@@ -1518,15 +1518,6 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
   - `LICENSE-THIRD-PARTY`
-
-### pathdiff 0.2.3
-
-- License: `MIT/Apache-2.0`
-- Source: `crates.io`
-- Notice files: No explicit NOTICE file discovered.
-- License file references:
-  - `LICENSE-APACHE`
-  - `LICENSE-MIT`
 
 ### percent-encoding 2.3.2
 
@@ -2516,7 +2507,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### uuid 1.23.3
+### uuid 1.23.4
 
 - License: `Apache-2.0 OR MIT`
 - Source: `crates.io`
