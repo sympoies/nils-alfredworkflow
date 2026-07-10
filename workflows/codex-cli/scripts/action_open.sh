@@ -27,8 +27,6 @@ fi
 source "$runtime_meta"
 # shellcheck disable=SC2153
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-# shellcheck disable=SC2153
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
 helper_loader=""
 for candidate in \
@@ -126,7 +124,7 @@ resolve_codex_cli() {
       "$packaged_cli" \
       "$release_cli" \
       "$debug_cli" \
-      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version})"
+      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version})"
     return $?
   fi
 
@@ -152,7 +150,7 @@ resolve_codex_cli() {
     return 0
   fi
 
-  echo "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version})" >&2
+  echo "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version})" >&2
   return 1
 }
 
@@ -373,6 +371,12 @@ validate_use_secret_name() {
   [[ "$secret" =~ ^[A-Za-z0-9._@-]+$ ]]
 }
 
+validate_remote_profile_name() {
+  local secret="$1"
+  [[ -n "$secret" ]] || return 1
+  [[ "$secret" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
 resolve_remote_authority() {
   local authority="${CODEX_AUTH_REMOTE_SSH:-}"
   authority="$(trim "$authority")"
@@ -382,6 +386,25 @@ resolve_remote_authority() {
     return 64
   fi
   printf '%s\n' "$authority"
+}
+
+resolve_auth_peer_pull_bin() {
+  local candidate="${CODEX_AUTH_PEER_PULL_BIN:-}"
+  candidate="$(trim "$candidate")"
+  if [[ -z "$candidate" ]]; then
+    candidate="${HOME%/}/.local/bin/codex-auth-peer-pull"
+  elif [[ "$candidate" == "~/"* ]]; then
+    candidate="${HOME%/}/${candidate#\~/}"
+  fi
+  if [[ "$candidate" != /* ]]; then
+    echo "CODEX_AUTH_PEER_PULL_BIN must be an absolute path" >&2
+    return 64
+  fi
+  if [[ ! -x "$candidate" ]]; then
+    echo "codex-auth-peer-pull is unavailable: $candidate" >&2
+    return 127
+  fi
+  printf '%s\n' "$candidate"
 }
 
 resolve_workflow_cache_dir() {
@@ -659,35 +682,27 @@ run_remote_auth_use() {
   local codex_cli="$1"
   local authority="$2"
   local secret="$3"
+  local peer_pull_bin=""
   local rc=0
 
-  set +e
-  CODEX_AUTO_REFRESH_ENABLED=false \
-    CODEX_AUTH_REMOTE_REFRESH=false \
-    "$codex_cli" auth remote pull \
-      --format json \
-      --ssh "$authority" \
-      --name "$secret" \
-      --access-only \
-      --write-active \
-      >/dev/null 2>&1
-  rc=$?
-  set -e
-  if [[ "$rc" -ne 0 ]]; then
-    notify "Failed(${rc}): remote access-only switch via ${authority}"
-    echo "Remote access-only pull failed for ${secret} via ${authority}; local auth was not used." >&2
+  if peer_pull_bin="$(resolve_auth_peer_pull_bin)"; then
+    :
+  else
+    rc=$?
+    notify "Failed(${rc}): replica auth helper unavailable"
     return "$rc"
   fi
 
   set +e
   CODEX_AUTO_REFRESH_ENABLED=false \
     CODEX_AUTH_REMOTE_REFRESH=false \
-    "$codex_cli" auth sync --format json >/dev/null 2>&1
+    PATH="$(dirname "$codex_cli"):$PATH" \
+    "$peer_pull_bin" --authority "$authority" --name "$secret" >/dev/null 2>&1
   rc=$?
   set -e
   if [[ "$rc" -ne 0 ]]; then
-    notify "Failed(${rc}): access-only cache sync"
-    echo "Remote auth activated, but local access-only cache sync failed for ${secret}." >&2
+    notify "Failed(${rc}): replica switch via ${authority}"
+    echo "Replica auth helper rejected ${secret} via ${authority}; local auth was not used." >&2
     return "$rc"
   fi
 
@@ -895,6 +910,11 @@ use::*)
   fi
   remote_authority=""
   if remote_authority="$(resolve_remote_authority)"; then
+    if ! validate_remote_profile_name "$secret"; then
+      notify "Failed(64): invalid remote profile"
+      echo "remote profile names allow only A-Z a-z 0-9 . _ -" >&2
+      exit 64
+    fi
     run_remote_auth_use "$codex_cli" "$remote_authority" "$secret"
   else
     remote_authority_rc=$?

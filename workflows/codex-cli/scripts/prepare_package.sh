@@ -69,38 +69,23 @@ done
 resolve_source_bin() {
   local source_bin=""
   if [[ -n "${CODEX_CLI_PACK_BIN:-}" ]]; then
+    if [[ "${CODEX_CLI_RELEASE_TEST_MODE:-0}" != 1 ]]; then
+      echo "error: CODEX_CLI_PACK_BIN is restricted to CODEX_CLI_RELEASE_TEST_MODE=1" >&2
+      exit 1
+    fi
     if [[ ! -x "${CODEX_CLI_PACK_BIN}" ]]; then
       echo "error: CODEX_CLI_PACK_BIN is not executable: ${CODEX_CLI_PACK_BIN}" >&2
       exit 1
     fi
     source_bin="${CODEX_CLI_PACK_BIN}"
-  else
-    local resolved
-    resolved="$(command -v codex-cli 2>/dev/null || true)"
-    if [[ -n "$resolved" && -x "$resolved" ]]; then
-      source_bin="$resolved"
-    fi
   fi
 
-  if [[ -n "$source_bin" && "$skip_version_check" == "1" ]]; then
-    printf '%s\n' "$source_bin"
-    return 0
-  fi
-
-  local source_version=""
   if [[ -n "$source_bin" ]]; then
-    source_version="$(detect_version "$source_bin" || true)"
-    if [[ "$source_version" == "$expected_version" ]]; then
+    if [[ "$skip_version_check" == "1" || "$(detect_version "$source_bin" || true)" == "$expected_version" ]]; then
       printf '%s\n' "$source_bin"
       return 0
     fi
-    if [[ -n "$source_version" ]]; then
-      echo "info: local codex-cli version $source_version does not match pinned $expected_version; resolving the pinned release asset." >&2
-    else
-      echo "info: unable to detect local codex-cli version from $source_bin; resolving the pinned release asset." >&2
-    fi
-  else
-    echo "info: local codex-cli not found; resolving the pinned release asset." >&2
+    echo "info: test codex-cli does not match pinned $expected_version; resolving the pinned release asset." >&2
   fi
 
   local install_root=""
@@ -116,81 +101,12 @@ resolve_source_bin() {
   mkdir -p "$install_root"
 
   local installed_bin="${install_root%/}/bin/codex-cli"
-  if [[ -x "$installed_bin" ]]; then
-    if [[ "$skip_version_check" == "1" ]]; then
-      printf '%s\n' "$installed_bin"
-      return 0
-    fi
-    local installed_version=""
-    installed_version="$(detect_version "$installed_bin" || true)"
-    if [[ "$installed_version" == "$expected_version" ]]; then
-      echo "info: reusing cached pinned codex-cli $expected_version from $installed_bin." >&2
-      printf '%s\n' "$installed_bin"
-      return 0
-    fi
-  fi
-
-  if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
-    cat >&2 <<EOF
-error: curl and tar are required to fetch pinned codex-cli for packaging
-hint: install the packaging tools, or set CODEX_CLI_PACK_BIN to a codex-cli ${expected_version} binary
-EOF
+  if ! declare -F codex_cli_release_install >/dev/null 2>&1; then
+    echo "error: codex-cli release installer is unavailable from runtime metadata" >&2
     exit 1
   fi
-
-  local archive_name="nils-cli-v${expected_version}-${release_target}.tar.gz"
-  local release_base="${CODEX_CLI_RELEASE_BASE_URL:-https://github.com/${release_repo}/releases/download/v${expected_version}}"
-  local archive_path="${install_root%/}/${archive_name}"
-  local checksum_path="${archive_path}.sha256"
-  local extract_dir="${install_root%/}/extract"
-
-  rm -f "${archive_path}.partial" "${checksum_path}.partial"
-  if ! curl --fail --location --retry 3 --silent --show-error \
-    "${release_base%/}/${archive_name}" -o "${archive_path}.partial" \
-    || ! curl --fail --location --retry 3 --silent --show-error \
-      "${release_base%/}/${archive_name}.sha256" -o "${checksum_path}.partial"; then
-    cat >&2 <<EOF
-error: failed to download ${archive_name} from ${release_base}
-hint: retry with network access, install ${release_repo} v${expected_version}, or set CODEX_CLI_PACK_BIN
-EOF
-    exit 1
-  fi
-  mv "${archive_path}.partial" "$archive_path"
-  mv "${checksum_path}.partial" "$checksum_path"
-
-  local expected_sha actual_sha
-  expected_sha="$(awk 'NF { print $1; exit }' "$checksum_path")"
-  if command -v shasum >/dev/null 2>&1; then
-    actual_sha="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
-  elif command -v sha256sum >/dev/null 2>&1; then
-    actual_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
-  elif command -v openssl >/dev/null 2>&1; then
-    actual_sha="$(openssl dgst -sha256 "$archive_path" | awk '{print $NF}')"
-  else
-    echo "error: no SHA-256 tool available for release verification" >&2
-    exit 1
-  fi
-  if [[ -z "$expected_sha" || "$actual_sha" != "$expected_sha" ]]; then
-    echo "error: checksum mismatch for ${archive_name}" >&2
-    exit 1
-  fi
-
-  rm -rf "$extract_dir"
-  mkdir -p "$extract_dir"
-  if ! tar -xzf "$archive_path" -C "$extract_dir"; then
-    echo "error: failed to extract ${archive_name}" >&2
-    exit 1
-  fi
-
-  local extracted_bin=""
-  extracted_bin="$(find "$extract_dir" -type f -path '*/bin/codex-cli' -print -quit 2>/dev/null || true)"
-  if [[ -z "$extracted_bin" ]]; then
-    echo "error: release asset does not contain bin/codex-cli: ${archive_name}" >&2
-    exit 1
-  fi
-  mkdir -p "$(dirname "$installed_bin")"
-  cp "$extracted_bin" "$installed_bin"
-  chmod +x "$installed_bin"
+  CODEX_CLI_VERSION="$expected_version" CODEX_CLI_RELEASE_REPO="$release_repo" \
+    codex_cli_release_install "$release_target" "$install_root" "$installed_bin"
 
   source_bin="$installed_bin"
   if [[ ! -x "$source_bin" ]]; then

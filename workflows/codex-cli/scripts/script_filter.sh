@@ -27,8 +27,6 @@ fi
 source "$runtime_meta"
 # shellcheck disable=SC2153
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-# shellcheck disable=SC2153
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
 helper_loader=""
 for candidate in \
@@ -986,7 +984,7 @@ resolve_codex_cli_path() {
       "$packaged_cli" \
       "$release_cli" \
       "$debug_cli" \
-      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version} manually.)"
+      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version}.)"
     return $?
   fi
 
@@ -1019,7 +1017,7 @@ emit_runtime_status() {
 
   emit_item \
     "codex-cli runtime missing" \
-    "Re-import workflow, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version} manually." \
+    "Re-import workflow, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version}." \
     "" \
     false \
     ""
@@ -1577,6 +1575,37 @@ build_use_route_hint() {
   fi
 }
 
+remote_use_profile_supported() {
+  local secret="$1"
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -z "$authority" ]] && return 0
+  [[ "$secret" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+emit_use_profile_item() {
+  local title="$1"
+  local email="$2"
+  local weekly="$3"
+  local secret="$4"
+  local autocomplete="$5"
+  if remote_use_profile_supported "$secret"; then
+    emit_item \
+      "$title" \
+      "$(build_use_subtitle "$email" "$weekly" "$(build_use_route_hint "$secret")")" \
+      "use::${secret}" \
+      true \
+      "$autocomplete"
+  else
+    emit_item \
+      "$title" \
+      "$(build_use_subtitle "$email" "$weekly" "Remote profile unsupported; allowed: A-Z a-z 0-9 . _ -")" \
+      "" \
+      false \
+      "$autocomplete"
+  fi
+}
+
 build_use_usage_suffix() {
   local label="$1"
   local non_weekly="$2"
@@ -1650,6 +1679,16 @@ handle_use_query() {
       return
     fi
 
+    if ! remote_use_profile_supported "$normalized_secret"; then
+      emit_item \
+        "Invalid remote profile name" \
+        "Remote profiles allow only A-Z a-z 0-9 . _ -" \
+        "" \
+        false \
+        "use "
+      return
+    fi
+
     emit_item \
       "Run auth use ${normalized_secret}" \
       "$(build_use_route_hint "$normalized_secret")" \
@@ -1698,11 +1737,11 @@ handle_use_query() {
           false \
           "use "
       else
-        emit_item \
+        emit_use_profile_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
-          "use::${current_secret}" \
-          true \
+          "${current_cached_email:-"-"}" \
+          "${current_cached_weekly:-"-"}" \
+          "$current_secret" \
           "use ${current_secret}"
       fi
     else
@@ -1735,11 +1774,11 @@ handle_use_query() {
           false \
           "use "
       else
-        emit_item \
+        emit_use_profile_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
-          "use::${current_secret}" \
-          true \
+          "${current_cached_email:-"-"}" \
+          "${current_cached_weekly:-"-"}" \
+          "$current_secret" \
           "use ${current_secret}"
       fi
     else
@@ -1792,11 +1831,11 @@ handle_use_query() {
         false \
         "use "
     else
-      emit_item \
+      emit_use_profile_item \
         "Current: ${current_json}" \
-        "$(build_use_subtitle "${current_email:-"-"}" "${current_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
-        "use::${current_secret}" \
-        true \
+        "${current_email:-"-"}" \
+        "${current_weekly:-"-"}" \
+        "$current_secret" \
         "use ${current_secret}"
     fi
   else
@@ -1854,11 +1893,11 @@ handle_use_query() {
     if [[ -z "${account_email:-}" ]]; then
       account_email="$(extract_secret_email_from_file "${secret_dir%/}/${file}" || true)"
     fi
-    emit_item \
+    emit_use_profile_item \
       "$(build_use_title "$file" "${account_label:-}" "${account_non_weekly:-}" "${account_weekly_remaining:-}" "${account_non_weekly_reset_epoch:-}" "${account_weekly_epoch:-}")" \
-      "$(build_use_subtitle "${account_email:-}" "${account_weekly:-}" "$(build_use_route_hint "$use_secret")")" \
-      "use::${use_secret}" \
-      true \
+      "${account_email:-}" \
+      "${account_weekly:-}" \
+      "$use_secret" \
       "use ${use_secret}"
   done
 

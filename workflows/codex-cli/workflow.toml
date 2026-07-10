@@ -20,6 +20,9 @@ CODEX_SECRET_DIR = ""
 # Optional SSH alias for a remote token authority. When set, cxau imports the
 # selected profile access-only and never falls back to local auth use.
 CODEX_AUTH_REMOTE_SSH = ""
+# Optional absolute path to the installed replica switching helper.
+# Empty resolves to ~/.local/bin/codex-auth-peer-pull.
+CODEX_AUTH_PEER_PULL_BIN = ""
 # Diag cache TTL (seconds) for cxau/cxd/cxda auto refresh.
 # Default 300 seconds (5 minutes). Set 0 to always refresh before render.
 CODEX_DIAG_CACHE_TTL_SECONDS = "300"

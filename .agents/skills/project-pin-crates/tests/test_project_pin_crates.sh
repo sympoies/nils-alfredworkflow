@@ -28,6 +28,21 @@ echo "$targets_out" | rg -n "nils-memo" >/dev/null
 
 "${entrypoint}" --version 1.0.0 --dry-run >/dev/null
 "${entrypoint}" --version 1.21.6 --targets codex-cli --dry-run >/dev/null
+
+release_fixture="$(mktemp)"
+trap 'rm -f "$release_fixture"' EXIT
+cat >"$release_fixture" <<'JSON'
+{"tag_name":"v1.21.6","assets":[{"name":"nils-cli-v1.21.6-aarch64-apple-darwin.tar.gz"}]}
+JSON
+if PROJECT_PIN_CRATES_NILS_CLI_RELEASE_JSON="$release_fixture" \
+  "${entrypoint}" --version 1.21.6 --targets codex-cli --dry-run >/dev/null 2>&1; then
+  echo "error: codex-cli pin preflight must reject a release missing its checksum asset" >&2
+  exit 1
+fi
+rg -n "sympoies/nils-cli v.*release" "${entrypoint}" >/dev/null || {
+  echo "error: codex-cli pin helper must update the README release-version reference" >&2
+  exit 1
+}
 "${entrypoint}" --version 1.0.0 --targets nils-codex-cli,nils-memo --dry-run >/dev/null
 "${entrypoint}" --version 1.0.0 --dry-run --auto-commit >/dev/null
 "${entrypoint}" --version 1.0.0 --dry-run --auto-push >/dev/null

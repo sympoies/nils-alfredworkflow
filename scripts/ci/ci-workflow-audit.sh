@@ -42,6 +42,7 @@ fi
 ci_workflow="$repo_root/.github/workflows/ci.yml"
 release_workflow="$repo_root/.github/workflows/release.yml"
 publish_workflow="$repo_root/.github/workflows/publish-crates.yml"
+bootstrap_script="$repo_root/scripts/ci/ci-bootstrap.sh"
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   [[ -f "$workflow_file" ]] || {
@@ -49,6 +50,11 @@ for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
     exit 1
   }
 done
+
+[[ -f "$bootstrap_script" ]] || {
+  echo "error: missing CI bootstrap: $bootstrap_script" >&2
+  exit 1
+}
 
 failures=0
 
@@ -220,6 +226,17 @@ for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
     "deprecated inline codex-cli cargo install" \
     "Inline codex-cli install is forbidden; use ci-bootstrap --install-codex-cli."
 done
+
+require_fixed \
+  "$bootstrap_script" \
+  'codex_cli_release_install "$target" "$install_root" "$destination"' \
+  "verified codex-cli release bootstrap" \
+  "Install codex-cli through the repository-pinned release helper."
+reject_regex \
+  "$bootstrap_script" \
+  'cargo[[:space:]]+install[[:space:]]+.*codex' \
+  "retired codex-cli cargo bootstrap" \
+  "codex-cli is release-only; do not restore crates.io installation."
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   reject_regex \

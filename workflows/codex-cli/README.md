@@ -48,9 +48,11 @@ Auth use behavior:
 - When no saved `*.json` exists, `cxau` still shows current `auth.json` info (for example email).
 - With `CODEX_AUTH_REMOTE_SSH` unset, Enter runs local
   `codex-cli auth use <secret>`.
-- With `CODEX_AUTH_REMOTE_SSH` set, Enter imports that selected authority
-  profile with `auth remote pull --access-only --write-active`, then runs
-  `auth sync`. It never passes `--refresh` or falls back to local `auth use`.
+- With `CODEX_AUTH_REMOTE_SSH` set, Enter delegates the selected profile to
+  the installed `codex-auth-peer-pull` replica helper. The helper owns the
+  shared client lock, access-only pull, purge, named save, postconditions,
+  sync, and final cache audit. Alfred never refreshes or falls back to local
+  `auth use` in this mode.
 
 No `CODEX_SECRET_DIR` saved secrets behavior:
 
@@ -84,6 +86,7 @@ brew install sympoies/tap/nils-cli
 | `CODEX_AUTH_FILE`                     | No       | empty   | Auth file path used by `codex-cli` auth/diag commands. Resolution order: configured value -> inherited env `CODEX_AUTH_FILE` -> `~/.codex/auth.json`. Supports `~` expansion. |
 | `CODEX_SECRET_DIR`                    | No       | empty   | Optional secret directory override. If empty, runtime fallback is `$XDG_CONFIG_HOME/codex_secrets` or `~/.config/codex_secrets`.                                              |
 | `CODEX_AUTH_REMOTE_SSH`               | No       | empty   | Optional SSH alias for the refresh-token authority. When set, `cxau` performs an access-only remote switch without `--refresh`; empty preserves local `auth use`.            |
+| `CODEX_AUTH_PEER_PULL_BIN`             | No       | empty   | Optional absolute path to `codex-auth-peer-pull`; empty resolves to `~/.local/bin/codex-auth-peer-pull`. Required when remote mode is enabled.                              |
 | `CODEX_DIAG_CACHE_TTL_SECONDS`        | No       | `300`   | Diag cache TTL for `cxau`/`cxd`/`cxda` (`0` means always refresh before render).                                                                                              |
 | `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS` | No       | `15`    | Max wait seconds while another process is refreshing the same diag cache mode.                                                                                                |
 | `CODEX_LOGIN_TIMEOUT_SECONDS`         | No       | `60`    | Login timeout in seconds (`1..3600`).                                                                                                                                         |
@@ -137,16 +140,15 @@ brew install sympoies/tap/nils-cli
 
 - Official package should bundle exactly `codex-cli@1.21.6`.
 - `scripts/workflow-pack.sh --id codex-cli` runs `workflows/codex-cli/scripts/prepare_package.sh`.
-- Packaging binary resolution order:
-  1. `CODEX_CLI_PACK_BIN` (if set)
-  2. local `PATH` `codex-cli`
-  3. cached or downloaded `sympoies/nils-cli` v1.21.6
-     `aarch64-apple-darwin` release asset, verified against its published SHA-256
+- Official packaging always downloads the `sympoies/nils-cli v1.21.6 release`
+  `aarch64-apple-darwin` asset and verifies both the published checksum file
+  and archive against the repository-pinned SHA-256 trust root.
 - Useful overrides:
-  - `CODEX_CLI_PACK_BIN=/absolute/path/to/codex-cli`
   - `CODEX_CLI_PACK_INSTALL_ROOT=/absolute/path/to/install-root` (default is cache under `$XDG_CACHE_HOME` or
     `~/.cache`)
-  - `CODEX_CLI_RELEASE_BASE_URL=file:///mirror/path` for a controlled release mirror or test fixture
+  - Test fixtures only: set `CODEX_CLI_RELEASE_TEST_MODE=1` together with
+    `CODEX_CLI_RELEASE_BASE_URL`, `CODEX_CLI_RELEASE_TEST_SHA256`, or
+    `CODEX_CLI_PACK_BIN`. Release packaging rejects those bypasses.
 
 ## Validation
 
