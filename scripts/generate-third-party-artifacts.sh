@@ -225,6 +225,7 @@ runtime_fetch_user_agent="${THIRD_PARTY_LICENSES_USER_AGENT:-nils-alfredworkflow
 runtime_fetch_error_file="$tmp_root/runtime-release-fetch.stderr"
 runtime_fetch_ok=0
 runtime_curl_args=(
+  -q
   -fsSL
   --retry 0
   --connect-timeout 10

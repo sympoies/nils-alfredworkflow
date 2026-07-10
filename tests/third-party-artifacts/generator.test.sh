@@ -143,6 +143,11 @@ if [[ "${GENERATOR_CURL_REQUIRE_AUTH:-0}" == "1" ]]; then
   fi
 fi
 
+if [[ "${GENERATOR_CURL_SIMULATE_DEFAULT_CONFIG:-0}" == "1" && "${1:-}" != "-q" && -f "${CURL_HOME:?}/.curlrc" ]]; then
+  printf '%s\n' "* Authorization: Bearer ${GITHUB_TOKEN:-}" >&2
+  printf '%s\n' "Authorization: Bearer ${GITHUB_TOKEN:-}" >"${GENERATOR_CURL_TRACE_FILE:?}"
+fi
+
 cat <<'JSON'
 {
   "tag_name": "v1.2.3",
@@ -292,6 +297,24 @@ test_runtime_github_token_and_error_code() {
   fi
   if rg -F 'fixture-github-token' "$last_stdout" "$last_stderr" >/dev/null 2>&1; then
     echo "GitHub token leaked into generator output" >&2
+    dump_last_run
+    return 1
+  fi
+
+  mkdir -p "$fixture/curl-home"
+  printf '%s\n' 'verbose' >"$fixture/curl-home/.curlrc"
+  GENERATOR_CURL_REQUIRE_AUTH=1 \
+    GENERATOR_CURL_SIMULATE_DEFAULT_CONFIG=1 \
+    GENERATOR_CURL_TRACE_FILE="$fixture/curl.trace" \
+    CURL_HOME="$fixture/curl-home" \
+    GITHUB_TOKEN=fixture-github-token \
+    run_generator "$fixture" --write
+  if ! assert_eq "0" "$last_rc" "hostile curl config write exit code"; then
+    dump_last_run
+    return 1
+  fi
+  if rg -F 'fixture-github-token' "$last_stdout" "$last_stderr" "$fixture/curl.trace" >/dev/null 2>&1; then
+    echo "GitHub token leaked through default curl configuration" >&2
     dump_last_run
     return 1
   fi
