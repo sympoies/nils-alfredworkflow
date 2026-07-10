@@ -167,8 +167,8 @@ install_codex_cli_runtime() {
   install_root="${CODEX_CLI_RELEASE_INSTALL_ROOT:-$HOME/.cache/nils-alfredworkflow/nils-cli-release/codex-cli/${CODEX_CLI_VERSION}/${target}}"
   destination="${cargo_home%/}/bin/codex-cli"
   codex_cli_release_install "$target" "$install_root" "$destination"
-  [[ "$("$destination" --version 2>/dev/null | head -n1)" == *"${CODEX_CLI_VERSION}"* ]] \
-    || die "installed codex-cli version does not match ${CODEX_CLI_VERSION}"
+  [[ "$("$destination" --version 2>/dev/null | head -n1)" == *"${CODEX_CLI_VERSION}"* ]] ||
+    die "installed codex-cli version does not match ${CODEX_CLI_VERSION}"
 }
 
 while [[ $# -gt 0 ]]; do

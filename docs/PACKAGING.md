@@ -44,12 +44,13 @@ Use this file for maintainer-side packaging, install, and macOS acceptance flows
 - The Codex workflow consumes the release-coupled `codex-cli` binary from the
   `sympoies/nils-cli` GitHub release because current nils-cli bundle versions can
   lead the independently published crates.io package.
-- Its packaging order is explicit local override, exact-version PATH binary,
-  cached verified GitHub release asset, then a fresh download of the pinned
-  `aarch64-apple-darwin` asset and checksum.
-- `CODEX_CLI_RELEASE_REPO`, `CODEX_CLI_RELEASE_TARGET`, and
-  `CODEX_CLI_RELEASE_BASE_URL` exist for controlled test/mirror overrides; the
-  workflow default remains the official matching nils-cli release.
+- Production packaging always downloads the official pinned target archive and
+  checksum, then verifies both against the repository-pinned SHA-256 before
+  extracting `codex-cli`. The install root is a download/extraction workspace,
+  not a trusted binary cache.
+- `CODEX_CLI_PACK_BIN`, `CODEX_CLI_RELEASE_BASE_URL`, and checksum overrides are
+  accepted only with `CODEX_CLI_RELEASE_TEST_MODE=1` for hermetic fixtures.
+  Production packaging rejects those overrides.
 
 ### External crate exact-pin policy
 

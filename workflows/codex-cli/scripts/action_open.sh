@@ -390,11 +390,13 @@ resolve_remote_authority() {
 
 resolve_auth_peer_pull_bin() {
   local candidate="${CODEX_AUTH_PEER_PULL_BIN:-}"
+  local home_prefix
+  home_prefix="$(printf '\x7e/')"
   candidate="$(trim "$candidate")"
   if [[ -z "$candidate" ]]; then
     candidate="${HOME%/}/.local/bin/codex-auth-peer-pull"
-  elif [[ "$candidate" == "~/"* ]]; then
-    candidate="${HOME%/}/${candidate#\~/}"
+  elif [[ "${candidate:0:2}" == "$home_prefix" ]]; then
+    candidate="${HOME%/}/${candidate:2}"
   fi
   if [[ "$candidate" != /* ]]; then
     echo "CODEX_AUTH_PEER_PULL_BIN must be an absolute path" >&2

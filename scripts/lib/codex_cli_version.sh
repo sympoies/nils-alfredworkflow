@@ -33,11 +33,11 @@ codex_cli_release_expected_sha256() {
     return 0
   fi
   case "$target" in
-    aarch64-apple-darwin) printf '%s\n' '7331a5a2116a321c308179d883af69fcfa0cca6f0ebcb4bfe59c6be708872395' ;;
-    x86_64-apple-darwin) printf '%s\n' 'f7c49910473469608074811985121c6fd4b9a301d9890668994df6c0a2ebb200' ;;
-    x86_64-unknown-linux-gnu) printf '%s\n' '2ae7433838714234b041ddd2fb1b0979444a286cd2d2ee70bec1171e3d182b73' ;;
-    aarch64-unknown-linux-gnu) printf '%s\n' '232753fa6f18ffbe0f8d765d453259df4695f1f6e11b3cf68a6954d1f0ac9f92' ;;
-    *) return 1 ;;
+  aarch64-apple-darwin) printf '%s\n' '7331a5a2116a321c308179d883af69fcfa0cca6f0ebcb4bfe59c6be708872395' ;;
+  x86_64-apple-darwin) printf '%s\n' 'f7c49910473469608074811985121c6fd4b9a301d9890668994df6c0a2ebb200' ;;
+  x86_64-unknown-linux-gnu) printf '%s\n' '2ae7433838714234b041ddd2fb1b0979444a286cd2d2ee70bec1171e3d182b73' ;;
+  aarch64-unknown-linux-gnu) printf '%s\n' '232753fa6f18ffbe0f8d765d453259df4695f1f6e11b3cf68a6954d1f0ac9f92' ;;
+  *) return 1 ;;
   esac
 }
 
@@ -46,11 +46,11 @@ codex_cli_release_detect_target() {
   os="$(uname -s)"
   arch="$(uname -m)"
   case "$os:$arch" in
-    Darwin:arm64 | Darwin:aarch64) printf '%s\n' aarch64-apple-darwin ;;
-    Darwin:x86_64) printf '%s\n' x86_64-apple-darwin ;;
-    Linux:x86_64 | Linux:amd64) printf '%s\n' x86_64-unknown-linux-gnu ;;
-    Linux:arm64 | Linux:aarch64) printf '%s\n' aarch64-unknown-linux-gnu ;;
-    *) return 1 ;;
+  Darwin:arm64 | Darwin:aarch64) printf '%s\n' aarch64-apple-darwin ;;
+  Darwin:x86_64) printf '%s\n' x86_64-apple-darwin ;;
+  Linux:x86_64 | Linux:amd64) printf '%s\n' x86_64-unknown-linux-gnu ;;
+  Linux:arm64 | Linux:aarch64) printf '%s\n' aarch64-unknown-linux-gnu ;;
+  *) return 1 ;;
   esac
 }
 
@@ -94,8 +94,8 @@ codex_cli_release_install() {
   extract_dir="${install_root%/}/extract"
   rm -f "${archive_path}.partial" "${checksum_path}.partial"
   if ! curl --fail --location --retry 3 --silent --show-error \
-    "${release_base%/}/${archive_name}" -o "${archive_path}.partial" \
-    || ! curl --fail --location --retry 3 --silent --show-error \
+    "${release_base%/}/${archive_name}" -o "${archive_path}.partial" ||
+    ! curl --fail --location --retry 3 --silent --show-error \
       "${release_base%/}/${archive_name}.sha256" -o "${checksum_path}.partial"; then
     echo "error: failed to download pinned codex-cli release asset: $archive_name" >&2
     return 1

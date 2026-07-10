@@ -1304,7 +1304,7 @@ set -e
 
 pinned_install_root="$tmp_dir/codex-pinned-install"
 PATH="/usr/bin:/bin" CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-version-mismatch" \
-CODEX_CLI_RELEASE_BASE_URL="file://$release_fixture" CODEX_CLI_RELEASE_TARGET="$release_target" \
+  CODEX_CLI_RELEASE_BASE_URL="file://$release_fixture" CODEX_CLI_RELEASE_TARGET="$release_target" \
   CODEX_CLI_RELEASE_TEST_MODE=1 CODEX_CLI_RELEASE_TEST_SHA256="$(awk 'NF {print $1; exit}' "$release_fixture/$release_archive.sha256")" \
   CODEX_CLI_PACK_INSTALL_ROOT="$pinned_install_root" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
   "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-auto-install" --workflow-root "$workflow_dir" >/dev/null

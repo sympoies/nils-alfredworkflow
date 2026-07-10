@@ -43,6 +43,7 @@ ci_workflow="$repo_root/.github/workflows/ci.yml"
 release_workflow="$repo_root/.github/workflows/release.yml"
 publish_workflow="$repo_root/.github/workflows/publish-crates.yml"
 bootstrap_script="$repo_root/scripts/ci/ci-bootstrap.sh"
+packaging_doc="$repo_root/docs/PACKAGING.md"
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   [[ -f "$workflow_file" ]] || {
@@ -53,6 +54,10 @@ done
 
 [[ -f "$bootstrap_script" ]] || {
   echo "error: missing CI bootstrap: $bootstrap_script" >&2
+  exit 1
+}
+[[ -f "$packaging_doc" ]] || {
+  echo "error: missing packaging policy: $packaging_doc" >&2
   exit 1
 }
 
@@ -229,7 +234,7 @@ done
 
 require_fixed \
   "$bootstrap_script" \
-  'codex_cli_release_install "$target" "$install_root" "$destination"' \
+  "codex_cli_release_install \"\$target\" \"\$install_root\" \"\$destination\"" \
   "verified codex-cli release bootstrap" \
   "Install codex-cli through the repository-pinned release helper."
 reject_regex \
@@ -237,6 +242,16 @@ reject_regex \
   'cargo[[:space:]]+install[[:space:]]+.*codex' \
   "retired codex-cli cargo bootstrap" \
   "codex-cli is release-only; do not restore crates.io installation."
+require_fixed \
+  "$packaging_doc" \
+  'Production packaging always downloads the official pinned target archive' \
+  "codex-cli official-download packaging policy" \
+  "Document production release downloads and repository-pinned verification."
+reject_fixed \
+  "$packaging_doc" \
+  'Its packaging order is explicit local override' \
+  "retired codex-cli local/PATH packaging policy" \
+  "Do not advertise test-only local or mirror inputs as production resolution steps."
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   reject_regex \
