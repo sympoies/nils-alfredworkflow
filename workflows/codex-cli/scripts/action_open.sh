@@ -27,8 +27,6 @@ fi
 source "$runtime_meta"
 # shellcheck disable=SC2153
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-# shellcheck disable=SC2153
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
 helper_loader=""
 for candidate in \
@@ -126,7 +124,7 @@ resolve_codex_cli() {
       "$packaged_cli" \
       "$release_cli" \
       "$debug_cli" \
-      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version})"
+      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version})"
     return $?
   fi
 
@@ -152,7 +150,7 @@ resolve_codex_cli() {
     return 0
   fi
 
-  echo "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version})" >&2
+  echo "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version})" >&2
   return 1
 }
 
@@ -371,6 +369,60 @@ validate_use_secret_name() {
   local secret="$1"
   [[ -n "$secret" ]] || return 1
   [[ "$secret" =~ ^[A-Za-z0-9._@-]+$ ]]
+}
+
+validate_remote_profile_name() {
+  local secret="$1"
+  [[ -n "$secret" ]] || return 1
+  [[ "$secret" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]
+}
+
+resolve_remote_authority() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]] || return 1
+  if [[ ! "$authority" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+    echo "invalid CODEX_AUTH_REMOTE_SSH value" >&2
+    return 64
+  fi
+  printf '%s\n' "$authority"
+}
+
+remote_auth_mode_enabled() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]]
+}
+
+block_local_auth_writer_in_remote_mode() {
+  local action="$1"
+  if ! remote_auth_mode_enabled; then
+    return 0
+  fi
+  notify "Blocked: ${action} is authority-only"
+  echo "${action} is disabled on an access-only replica; run it on the configured authority." >&2
+  return 77
+}
+
+resolve_auth_peer_pull_bin() {
+  local candidate="${CODEX_AUTH_PEER_PULL_BIN:-}"
+  local home_prefix
+  home_prefix="$(printf '\x7e/')"
+  candidate="$(trim "$candidate")"
+  if [[ -z "$candidate" ]]; then
+    candidate="${HOME%/}/.local/bin/codex-auth-peer-pull"
+  elif [[ "${candidate:0:2}" == "$home_prefix" ]]; then
+    candidate="${HOME%/}/${candidate:2}"
+  fi
+  if [[ "$candidate" != /* ]]; then
+    echo "CODEX_AUTH_PEER_PULL_BIN must be an absolute path" >&2
+    return 64
+  fi
+  if [[ ! -x "$candidate" ]]; then
+    echo "codex-auth-peer-pull is unavailable: $candidate" >&2
+    return 127
+  fi
+  printf '%s\n' "$candidate"
 }
 
 resolve_workflow_cache_dir() {
@@ -644,6 +696,38 @@ run_codex_command() {
   fi
 }
 
+run_remote_auth_use() {
+  local codex_cli="$1"
+  local authority="$2"
+  local secret="$3"
+  local peer_pull_bin=""
+  local rc=0
+
+  if peer_pull_bin="$(resolve_auth_peer_pull_bin)"; then
+    :
+  else
+    rc=$?
+    notify "Failed(${rc}): replica auth helper unavailable"
+    return "$rc"
+  fi
+
+  set +e
+  CODEX_AUTO_REFRESH_ENABLED=false \
+    CODEX_AUTH_REMOTE_REFRESH=false \
+    PATH="$(dirname "$codex_cli"):$PATH" \
+    "$peer_pull_bin" --authority "$authority" --name "$secret" >/dev/null 2>&1
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    notify "Failed(${rc}): replica switch via ${authority}"
+    echo "Replica auth helper rejected ${secret} via ${authority}; local auth was not used." >&2
+    return "$rc"
+  fi
+
+  notify "Success: remote access-only switch via ${authority}"
+  printf 'Active %s via %s (access-only)\n' "$secret" "$authority"
+}
+
 run_codex_diag_command() {
   local codex_cli="$1"
   local mode="$2"
@@ -816,6 +900,21 @@ run_codex_login_device_code() {
 }
 
 action_token="$1"
+if remote_auth_mode_enabled; then
+  export CODEX_AUTO_REFRESH_ENABLED=false
+  export CODEX_AUTH_REMOTE_REFRESH=false
+fi
+case "$action_token" in
+login::*)
+  if block_local_auth_writer_in_remote_mode "auth login"; then :; else exit $?; fi
+  ;;
+save::*)
+  if block_local_auth_writer_in_remote_mode "auth save"; then :; else exit $?; fi
+  ;;
+remove::*)
+  if block_local_auth_writer_in_remote_mode "auth remove"; then :; else exit $?; fi
+  ;;
+esac
 codex_cli=""
 if ! codex_cli="$(resolve_codex_cli)"; then
   exit 1
@@ -842,7 +941,23 @@ use::*)
     echo "invalid use action token: $action_token" >&2
     exit 2
   fi
-  run_codex_command "$codex_cli" "auth use $secret" auth use "$secret"
+  remote_authority=""
+  if remote_authority="$(resolve_remote_authority)"; then
+    if ! validate_remote_profile_name "$secret"; then
+      notify "Failed(64): invalid remote profile"
+      echo "remote profile names allow only A-Z a-z 0-9 . _ -" >&2
+      exit 64
+    fi
+    run_remote_auth_use "$codex_cli" "$remote_authority" "$secret"
+  else
+    remote_authority_rc=$?
+    if [[ "$remote_authority_rc" -eq 1 ]]; then
+      run_codex_command "$codex_cli" "auth use $secret" auth use "$secret"
+    else
+      notify "Failed(${remote_authority_rc}): invalid remote authority"
+      exit "$remote_authority_rc"
+    fi
+  fi
   exit $?
   ;;
 save::*)

@@ -158,7 +158,17 @@ ensure_runtime_binaries() {
 install_codex_cli_runtime() {
   # shellcheck source=/dev/null
   source "$repo_root/scripts/lib/codex_cli_version.sh"
-  cargo install "${CODEX_CLI_CRATE}" --version "${CODEX_CLI_VERSION}" --locked
+  local target cargo_home install_root destination
+  target="${CODEX_CLI_RELEASE_TARGET:-}"
+  if [[ -z "$target" || "${CODEX_CLI_RELEASE_TEST_MODE:-0}" != 1 ]]; then
+    target="$(codex_cli_release_detect_target)" || die "unsupported codex-cli release platform"
+  fi
+  cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  install_root="${CODEX_CLI_RELEASE_INSTALL_ROOT:-$HOME/.cache/nils-alfredworkflow/nils-cli-release/codex-cli/${CODEX_CLI_VERSION}/${target}}"
+  destination="${cargo_home%/}/bin/codex-cli"
+  codex_cli_release_install "$target" "$install_root" "$destination"
+  [[ "$("$destination" --version 2>/dev/null | head -n1)" == *"${CODEX_CLI_VERSION}"* ]] ||
+    die "installed codex-cli version does not match ${CODEX_CLI_VERSION}"
 }
 
 while [[ $# -gt 0 ]]; do

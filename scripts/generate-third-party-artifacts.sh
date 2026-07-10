@@ -208,40 +208,54 @@ jq -r '.[] | [.name, .version, .license, .resolved] | @tsv' "$node_packages_json
 
 # shellcheck source=/dev/null
 source "$codex_cli_version_script"
-[[ -n "${CODEX_CLI_CRATE:-}" ]] || fail "missing CODEX_CLI_CRATE after sourcing $codex_cli_version_script"
 [[ -n "${CODEX_CLI_VERSION:-}" ]] || fail "missing CODEX_CLI_VERSION after sourcing $codex_cli_version_script"
+[[ -n "${CODEX_CLI_RELEASE_REPO:-}" ]] || fail "missing CODEX_CLI_RELEASE_REPO after sourcing $codex_cli_version_script"
+[[ -n "${CODEX_CLI_RELEASE_TARGET:-}" ]] || fail "missing CODEX_CLI_RELEASE_TARGET after sourcing $codex_cli_version_script"
+[[ -n "${CODEX_CLI_LICENSE:-}" ]] || fail "missing CODEX_CLI_LICENSE after sourcing $codex_cli_version_script"
 
-runtime_source_url="https://crates.io/api/v1/crates/${CODEX_CLI_CRATE}/${CODEX_CLI_VERSION}"
-runtime_fetch_attempts="${THIRD_PARTY_LICENSES_CRATES_IO_MAX_ATTEMPTS:-4}"
-runtime_fetch_backoff_seconds="${THIRD_PARTY_LICENSES_CRATES_IO_RETRY_BASE_SECONDS:-1}"
+runtime_source_url="https://api.github.com/repos/${CODEX_CLI_RELEASE_REPO}/releases/tags/v${CODEX_CLI_VERSION}"
+runtime_asset_name="nils-cli-v${CODEX_CLI_VERSION}-${CODEX_CLI_RELEASE_TARGET}.tar.gz"
+runtime_fetch_attempts="${THIRD_PARTY_LICENSES_RUNTIME_MAX_ATTEMPTS:-4}"
+runtime_fetch_backoff_seconds="${THIRD_PARTY_LICENSES_RUNTIME_RETRY_BASE_SECONDS:-1}"
 runtime_fetch_user_agent="${THIRD_PARTY_LICENSES_USER_AGENT:-nils-alfredworkflow-third-party-artifacts/1.0 (+https://github.com/sympoies/nils-alfredworkflow)}"
 
-[[ "$runtime_fetch_attempts" =~ ^[1-9][0-9]*$ ]] || fail "THIRD_PARTY_LICENSES_CRATES_IO_MAX_ATTEMPTS must be a positive integer"
-[[ "$runtime_fetch_backoff_seconds" =~ ^[0-9]+$ ]] || fail "THIRD_PARTY_LICENSES_CRATES_IO_RETRY_BASE_SECONDS must be a non-negative integer"
+[[ "$runtime_fetch_attempts" =~ ^[1-9][0-9]*$ ]] || fail "THIRD_PARTY_LICENSES_RUNTIME_MAX_ATTEMPTS must be a positive integer"
+[[ "$runtime_fetch_backoff_seconds" =~ ^[0-9]+$ ]] || fail "THIRD_PARTY_LICENSES_RUNTIME_RETRY_BASE_SECONDS must be a non-negative integer"
 
-runtime_fetch_error_file="$tmp_root/runtime-crates-io-fetch.stderr"
+runtime_fetch_error_file="$tmp_root/runtime-release-fetch.stderr"
 runtime_fetch_ok=0
+runtime_curl_args=(
+  -q
+  -fsSL
+  --retry 0
+  --connect-timeout 10
+  --max-time 30
+  -A "$runtime_fetch_user_agent"
+  -H 'Accept: application/vnd.github+json'
+  -H 'X-GitHub-Api-Version: 2022-11-28'
+)
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  runtime_curl_args+=(
+    -H "Authorization: Bearer ${GITHUB_TOKEN}"
+  )
+fi
 
 for ((runtime_fetch_attempt = 1; runtime_fetch_attempt <= runtime_fetch_attempts; runtime_fetch_attempt++)); do
   : >"$runtime_fetch_error_file"
-  if curl -fsSL \
-    --retry 0 \
-    --connect-timeout 10 \
-    --max-time 30 \
-    -A "$runtime_fetch_user_agent" \
-    -H 'Accept: application/json' \
+  if curl "${runtime_curl_args[@]}" \
     "$runtime_source_url" >"$runtime_response_json" 2>"$runtime_fetch_error_file"; then
     runtime_fetch_ok=1
     if [[ "$runtime_fetch_attempt" -gt 1 ]]; then
-      echo "note: crates.io fetch succeeded after retry ${runtime_fetch_attempt}/${runtime_fetch_attempts}" >&2
+      echo "note: runtime release fetch succeeded after retry ${runtime_fetch_attempt}/${runtime_fetch_attempts}" >&2
     fi
     break
+  else
+    runtime_fetch_rc=$?
   fi
 
-  runtime_fetch_rc=$?
   runtime_fetch_error="$(tr '\n' ' ' <"$runtime_fetch_error_file" | sed -e 's/[[:space:]]\+/ /g' -e 's/^ //' -e 's/ $//')"
   [[ -n "$runtime_fetch_error" ]] || runtime_fetch_error="no stderr output"
-  echo "warn: crates.io fetch attempt ${runtime_fetch_attempt}/${runtime_fetch_attempts} failed (exit=${runtime_fetch_rc}): ${runtime_fetch_error}" >&2
+  echo "warn: runtime release fetch attempt ${runtime_fetch_attempt}/${runtime_fetch_attempts} failed (exit=${runtime_fetch_rc}): ${runtime_fetch_error}" >&2
 
   if [[ "$runtime_fetch_attempt" -lt "$runtime_fetch_attempts" ]]; then
     runtime_backoff_sleep="$((runtime_fetch_backoff_seconds * runtime_fetch_attempt))"
@@ -250,33 +264,29 @@ for ((runtime_fetch_attempt = 1; runtime_fetch_attempt <= runtime_fetch_attempts
 done
 
 if [[ "$runtime_fetch_ok" -ne 1 ]]; then
-  fail "failed to fetch runtime crate metadata from crates.io after ${runtime_fetch_attempts} attempts: $runtime_source_url"
+  fail "failed to fetch runtime release metadata after ${runtime_fetch_attempts} attempts: $runtime_source_url"
 fi
 
-runtime_crate="$(jq -r '.version.crate // ""' "$runtime_response_json")"
-runtime_version="$(jq -r '.version.num // ""' "$runtime_response_json")"
-runtime_license="$(jq -r '.version.license // "UNKNOWN"' "$runtime_response_json")"
-runtime_repository="$(jq -r '.version.repository // .version.homepage // "-"' "$runtime_response_json")"
+runtime_name="codex-cli"
+runtime_version="$(jq -r '.tag_name // ""' "$runtime_response_json")"
+runtime_version="${runtime_version#v}"
+runtime_license="$CODEX_CLI_LICENSE"
+runtime_repository="https://github.com/${CODEX_CLI_RELEASE_REPO}"
+runtime_asset_url="$(jq -r --arg name "$runtime_asset_name" '.assets[]? | select(.name == $name) | .browser_download_url' "$runtime_response_json" | head -n1)"
 
-[[ -n "$runtime_crate" ]] || fail "crates.io response missing .version.crate for $runtime_source_url"
-[[ -n "$runtime_version" ]] || fail "crates.io response missing .version.num for $runtime_source_url"
-
-if [[ "$runtime_crate" != "$CODEX_CLI_CRATE" || "$runtime_version" != "$CODEX_CLI_VERSION" ]]; then
-  fail "runtime crate mismatch: expected ${CODEX_CLI_CRATE}@${CODEX_CLI_VERSION}, got ${runtime_crate}@${runtime_version}"
-fi
-
-if [[ -z "$runtime_repository" ]]; then
-  runtime_repository="-"
-fi
+[[ -n "$runtime_version" ]] || fail "GitHub release response missing tag_name for $runtime_source_url"
+[[ "$runtime_version" == "$CODEX_CLI_VERSION" ]] || fail "runtime release mismatch: expected v${CODEX_CLI_VERSION}, got v${runtime_version}"
+[[ -n "$runtime_asset_url" ]] || fail "runtime release missing asset ${runtime_asset_name}"
 
 cargo_lock_sha="$(sha256_file "$cargo_lock")"
 package_lock_sha="$(sha256_file "$package_lock")"
 runtime_pin_script_sha="$(sha256_file "$codex_cli_version_script")"
 runtime_metadata_sha="$(printf '%s\n' \
-  "crate=$runtime_crate" \
+  "runtime=$runtime_name" \
   "version=$runtime_version" \
   "license=$runtime_license" \
   "repository=$runtime_repository" \
+  "asset=$runtime_asset_url" \
   "source=$runtime_source_url" |
   sha256_stdin)"
 data_source_fingerprint="$(printf '%s\n' \
@@ -300,7 +310,7 @@ Do not edit manually.
 
 - Rust third-party crates resolved from \`Cargo.lock\` via \`cargo metadata --locked\` across supported macOS/Linux targets (workspace crates excluded).
 - Node third-party packages resolved from \`package-lock.json\` (root package excluded).
-- External packaged runtime crate resolved from \`scripts/lib/codex_cli_version.sh\` with metadata from crates.io.
+- External packaged runtime release resolved from \`scripts/lib/codex_cli_version.sh\` with metadata from GitHub Releases.
 - Contract: \`docs/specs/third-party-artifacts-contract-v1.md\`.
 
 ## Deterministic Provenance
@@ -318,10 +328,10 @@ __LICENSE_MD__
     "cargo metadata --format-version 1 --locked --filter-platform per supported target"
   printf "| Node lockfile | \`%s\` | \`%s\` | \`%s\` |\n" "package-lock.json" "$package_lock_sha" \
     "jq package-lock extraction"
-  printf "| Runtime crate pin | \`%s\` | \`%s\` | \`%s\` |\n" "scripts/lib/codex_cli_version.sh" "$runtime_pin_script_sha" \
-    "source for \$CODEX_CLI_CRATE and \$CODEX_CLI_VERSION"
-  printf "| Runtime crate metadata | %s | \`%s\` | \`%s\` |\n" "$(md_url_or_dash "$runtime_source_url")" "$runtime_metadata_sha" \
-    "curl crates.io API plus jq normalized fields"
+  printf "| Runtime release pin | \`%s\` | \`%s\` | \`%s\` |\n" "scripts/lib/codex_cli_version.sh" "$runtime_pin_script_sha" \
+    "source for release repository, target, license, and version"
+  printf "| Runtime release metadata | %s | \`%s\` | \`%s\` |\n" "$(md_url_or_dash "$runtime_source_url")" "$runtime_metadata_sha" \
+    "curl GitHub Releases API plus jq normalized fields"
 
   printf '\n## Rust License Summary (%s crates)\n\n' "$rust_count"
   printf '| Count | License Expression |\n'
@@ -353,10 +363,10 @@ __LICENSE_MD__
   done <"$node_packages_tsv"
 
   printf '\n## External Packaged Runtime\n\n'
-  printf '| Crate | Version | License | Repository | Source |\n'
+  printf '| Runtime | Version | License | Repository | Source |\n'
   printf '| --- | --- | --- | --- | --- |\n'
   printf '| %s | %s | %s | %s | %s |\n' \
-    "$(md_escape "$runtime_crate")" \
+    "$(md_escape "$runtime_name")" \
     "$(md_escape "$runtime_version")" \
     "$(md_escape "$runtime_license")" \
     "$(md_url_or_dash "$runtime_repository")" \

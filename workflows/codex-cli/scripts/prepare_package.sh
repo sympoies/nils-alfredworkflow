@@ -16,8 +16,8 @@ default_expected_version="${CODEX_CLI_PINNED_VERSION}"
 expected_version="${CODEX_CLI_BUNDLE_VERSION:-$default_expected_version}"
 skip_version_check="${CODEX_CLI_PACK_SKIP_VERSION_CHECK:-0}"
 skip_arch_check="${CODEX_CLI_PACK_SKIP_ARCH_CHECK:-0}"
-default_crate_name="${CODEX_CLI_PINNED_CRATE}"
-crate_name="${CODEX_CLI_CRATE_NAME:-$default_crate_name}"
+release_repo="${CODEX_CLI_RELEASE_REPO:-sympoies/nils-cli}"
+release_target="${CODEX_CLI_RELEASE_TARGET:-aarch64-apple-darwin}"
 
 usage() {
   cat <<USAGE
@@ -69,82 +69,44 @@ done
 resolve_source_bin() {
   local source_bin=""
   if [[ -n "${CODEX_CLI_PACK_BIN:-}" ]]; then
+    if [[ "${CODEX_CLI_RELEASE_TEST_MODE:-0}" != 1 ]]; then
+      echo "error: CODEX_CLI_PACK_BIN is restricted to CODEX_CLI_RELEASE_TEST_MODE=1" >&2
+      exit 1
+    fi
     if [[ ! -x "${CODEX_CLI_PACK_BIN}" ]]; then
       echo "error: CODEX_CLI_PACK_BIN is not executable: ${CODEX_CLI_PACK_BIN}" >&2
       exit 1
     fi
     source_bin="${CODEX_CLI_PACK_BIN}"
-  else
-    local resolved
-    resolved="$(command -v codex-cli 2>/dev/null || true)"
-    if [[ -n "$resolved" && -x "$resolved" ]]; then
-      source_bin="$resolved"
-    fi
   fi
 
-  if [[ -n "$source_bin" && "$skip_version_check" == "1" ]]; then
-    printf '%s\n' "$source_bin"
-    return 0
-  fi
-
-  local source_version=""
   if [[ -n "$source_bin" ]]; then
-    source_version="$(detect_version "$source_bin" || true)"
-    if [[ "$source_version" == "$expected_version" ]]; then
+    if [[ "$skip_version_check" == "1" || "$(detect_version "$source_bin" || true)" == "$expected_version" ]]; then
       printf '%s\n' "$source_bin"
       return 0
     fi
-    if [[ -n "$source_version" ]]; then
-      echo "info: local codex-cli version $source_version does not match pinned $expected_version; resolving pinned binary from cache/crates.io." >&2
-    else
-      echo "info: unable to detect local codex-cli version from $source_bin; resolving pinned binary from cache/crates.io." >&2
-    fi
-  else
-    echo "info: local codex-cli not found; resolving pinned binary from cache/crates.io." >&2
+    echo "info: test codex-cli does not match pinned $expected_version; resolving the pinned release asset." >&2
   fi
 
   local install_root=""
   if [[ -n "${CODEX_CLI_PACK_INSTALL_ROOT:-}" ]]; then
     install_root="${CODEX_CLI_PACK_INSTALL_ROOT}"
   elif [[ -n "${XDG_CACHE_HOME:-}" ]]; then
-    install_root="${XDG_CACHE_HOME%/}/nils-alfredworkflow/cargo-install/codex-cli/${expected_version}"
+    install_root="${XDG_CACHE_HOME%/}/nils-alfredworkflow/nils-cli-release/codex-cli/${expected_version}/${release_target}"
   elif [[ -n "${HOME:-}" ]]; then
-    install_root="${HOME%/}/.cache/nils-alfredworkflow/cargo-install/codex-cli/${expected_version}"
+    install_root="${HOME%/}/.cache/nils-alfredworkflow/nils-cli-release/codex-cli/${expected_version}/${release_target}"
   else
-    install_root="${workflow_root%/}/.cache/cargo-install/codex-cli/${expected_version}"
+    install_root="${workflow_root%/}/.cache/nils-cli-release/codex-cli/${expected_version}/${release_target}"
   fi
   mkdir -p "$install_root"
 
   local installed_bin="${install_root%/}/bin/codex-cli"
-  if [[ -x "$installed_bin" ]]; then
-    if [[ "$skip_version_check" == "1" ]]; then
-      printf '%s\n' "$installed_bin"
-      return 0
-    fi
-    local installed_version=""
-    installed_version="$(detect_version "$installed_bin" || true)"
-    if [[ "$installed_version" == "$expected_version" ]]; then
-      echo "info: reusing cached pinned codex-cli $expected_version from $installed_bin." >&2
-      printf '%s\n' "$installed_bin"
-      return 0
-    fi
-  fi
-
-  if ! command -v cargo >/dev/null 2>&1; then
-    cat >&2 <<EOF
-error: cargo is required to auto-install pinned codex-cli for packaging
-hint: install rust/cargo, or set CODEX_CLI_PACK_BIN to a codex-cli ${expected_version} binary
-EOF
+  if ! declare -F codex_cli_release_install >/dev/null 2>&1; then
+    echo "error: codex-cli release installer is unavailable from runtime metadata" >&2
     exit 1
   fi
-
-  if ! cargo install "$crate_name" --version "$expected_version" --locked --root "$install_root" --force; then
-    cat >&2 <<EOF
-error: failed to install $crate_name@$expected_version from crates.io
-hint: retry with network access, or set CODEX_CLI_PACK_BIN to a local pinned binary
-EOF
-    exit 1
-  fi
+  CODEX_CLI_VERSION="$expected_version" CODEX_CLI_RELEASE_REPO="$release_repo" \
+    codex_cli_release_install "$release_target" "$install_root" "$installed_bin"
 
   source_bin="$installed_bin"
   if [[ ! -x "$source_bin" ]]; then
@@ -152,7 +114,7 @@ EOF
     exit 1
   fi
 
-  if [[ "$skip_version_check" != "1" ]]; then
+  if [[ "$skip_version_check" != "1" && "$skip_arch_check" != "1" ]]; then
     validate_version "$source_bin"
   fi
 
@@ -239,7 +201,7 @@ EOF
 
 source_bin="$(resolve_source_bin)"
 
-if [[ "$skip_version_check" != "1" ]]; then
+if [[ "$skip_version_check" != "1" && "$skip_arch_check" != "1" ]]; then
   validate_version "$source_bin"
 fi
 

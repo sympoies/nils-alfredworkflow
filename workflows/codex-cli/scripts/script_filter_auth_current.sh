@@ -11,8 +11,6 @@ fi
 source "$runtime_meta"
 # shellcheck disable=SC2153
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-# shellcheck disable=SC2153
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
 helper_loader=""
 for candidate in \
@@ -153,7 +151,7 @@ resolve_codex_cli_path() {
       "$packaged_cli" \
       "$release_cli" \
       "$debug_cli" \
-      "codex-cli binary not found (re-import workflow, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version})."
+      "codex-cli binary not found (re-import workflow, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version})."
     return $?
   fi
 
@@ -294,7 +292,7 @@ codex_cli=""
 if ! codex_cli="$(resolve_codex_cli_path)"; then
   emit_item \
     "codex-cli runtime missing" \
-    "Re-import workflow, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version}."
+    "Re-import workflow, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version}."
   end_items
   exit 0
 fi

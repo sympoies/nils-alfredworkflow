@@ -1,7 +1,7 @@
 id = "codex-cli"
 name = "Codex CLI"
 bundle_id = "com.sympoies.codex-cli"
-version = "1.3.4"
+version = "1.4.0"
 readme_source = "README.md"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
@@ -17,6 +17,12 @@ CODEX_AUTH_FILE = ""
 # Optional secret directory override for auth save/use/diag operations.
 # Leave empty to auto-fallback to $XDG_CONFIG_HOME/codex_secrets or ~/.config/codex_secrets.
 CODEX_SECRET_DIR = ""
+# Optional SSH alias for a remote token authority. When set, cxau imports the
+# selected profile access-only and never falls back to local auth use.
+CODEX_AUTH_REMOTE_SSH = ""
+# Optional absolute path to the installed replica switching helper.
+# Empty resolves to ~/.local/bin/codex-auth-peer-pull.
+CODEX_AUTH_PEER_PULL_BIN = ""
 # Diag cache TTL (seconds) for cxau/cxd/cxda auto refresh.
 # Default 300 seconds (5 minutes). Set 0 to always refresh before render.
 CODEX_DIAG_CACHE_TTL_SECONDS = "300"

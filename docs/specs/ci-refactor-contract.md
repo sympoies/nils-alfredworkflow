@@ -63,7 +63,7 @@ All bootstrap and gate routing in those workflows must use the shared scripts in
 
 | Legacy or duplicate path | Replacement canonical entrypoint | Status | Rationale |
 | --- | --- | --- | --- |
-| `ci.yml` inline `cargo install "$CODEX_CLI_CRATE" --version "$CODEX_CLI_VERSION" --locked` block | `ci-bootstrap.sh --context ci --install-codex-cli` | Deleted in Task 1.2 | One codex pin install flow shared by CI/release. |
+| `ci.yml` inline codex-cli install block | `ci-bootstrap.sh --context ci --install-codex-cli` | Deleted in Task 1.2 | CI/release install the host-compatible nils-cli release asset against repository-pinned SHA-256 metadata. |
 | `release.yml` inline codex-cli install block | `ci-bootstrap.sh --context release --install-codex-cli` | Deleted in Task 1.2 | Removes duplicate pin/version wiring. |
 | `publish-crates.yml` inline shell for mode/token/arg assembly | `ci-run-gates.sh publish-crates ...` | Deleted in Task 1.2 | Reuses one gate invoker instead of workflow-local branching logic. |
 | `release.yml` multi-step inline shell gate orchestration (artifact regenerate/check, pack, bundle, audit) | `ci-run-gates.sh release-package --tag ...` | Deleted in Task 1.2 | Keeps release gate order in one script entrypoint. |

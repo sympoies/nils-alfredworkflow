@@ -27,8 +27,6 @@ fi
 source "$runtime_meta"
 # shellcheck disable=SC2153
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-# shellcheck disable=SC2153
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 
 helper_loader=""
 for candidate in \
@@ -986,7 +984,7 @@ resolve_codex_cli_path() {
       "$packaged_cli" \
       "$release_cli" \
       "$debug_cli" \
-      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version} manually.)"
+      "codex-cli binary not found (re-import workflow bundle, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version}.)"
     return $?
   fi
 
@@ -1019,43 +1017,64 @@ emit_runtime_status() {
 
   emit_item \
     "codex-cli runtime missing" \
-    "Re-import workflow, set CODEX_CLI_BIN, or install ${codex_cli_pinned_crate} ${codex_cli_pinned_version} manually." \
+    "Re-import workflow, set CODEX_CLI_BIN, or install sympoies/nils-cli v${codex_cli_pinned_version}." \
     "" \
     false \
     ""
 }
 
 emit_auth_action_items() {
-  emit_item \
-    "auth login (browser)" \
-    "Run codex-cli auth login" \
-    "login::browser" \
-    true \
-    "login"
-  emit_item \
-    "auth login --api-key" \
-    "Run codex-cli auth login --api-key" \
-    "login::api-key" \
-    true \
-    "login --api-key"
-  emit_item \
-    "auth login --device-code" \
-    "Run codex-cli auth login --device-code" \
-    "login::device-code" \
-    true \
-    "login --device-code"
-  emit_item \
-    "auth save <secret.json>" \
-    "Type: save team-alpha.json (or save --yes team-alpha.json)" \
-    "" \
-    false \
-    "save "
-  emit_item \
-    "auth remove <secret.json>" \
-    "Type: remove team-alpha.json (or remove --yes team-alpha.json)" \
-    "" \
-    false \
-    "remove "
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "auth login is authority-only" \
+      "Remote mode is access-only; run login on the configured authority." \
+      "" \
+      false \
+      "login"
+    emit_item \
+      "auth save is authority-only" \
+      "Remote mode is access-only; manage saved profiles on the configured authority." \
+      "" \
+      false \
+      ""
+    emit_item \
+      "auth remove is authority-only" \
+      "Remote mode is access-only; manage saved profiles on the configured authority." \
+      "" \
+      false \
+      ""
+  else
+    emit_item \
+      "auth login (browser)" \
+      "Run codex-cli auth login" \
+      "login::browser" \
+      true \
+      "login"
+    emit_item \
+      "auth login --api-key" \
+      "Run codex-cli auth login --api-key" \
+      "login::api-key" \
+      true \
+      "login --api-key"
+    emit_item \
+      "auth login --device-code" \
+      "Run codex-cli auth login --device-code" \
+      "login::device-code" \
+      true \
+      "login --device-code"
+    emit_item \
+      "auth save <secret.json>" \
+      "Type: save team-alpha.json (or save --yes team-alpha.json)" \
+      "" \
+      false \
+      "save "
+    emit_item \
+      "auth remove <secret.json>" \
+      "Type: remove team-alpha.json (or remove --yes team-alpha.json)" \
+      "" \
+      false \
+      "remove "
+  fi
   emit_item \
     "auth use <secret>" \
     "Type: use alpha (or open cxau to pick from saved JSON secrets)." \
@@ -1562,6 +1581,58 @@ build_use_subtitle() {
   printf '%s | reset %s | %s\n' "$email" "$weekly_reset" "$command_hint"
 }
 
+build_use_route_hint() {
+  local secret="$1"
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  if [[ -n "$authority" ]]; then
+    if [[ "$authority" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+      printf 'Remote access-only switch via %s\n' "$authority"
+    else
+      printf 'Remote authority configuration invalid\n'
+    fi
+  else
+    printf 'Run codex-cli auth use %s\n' "$secret"
+  fi
+}
+
+remote_use_profile_supported() {
+  local secret="$1"
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -z "$authority" ]] && return 0
+  [[ "$secret" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]
+}
+
+remote_auth_mode_enabled() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]]
+}
+
+emit_use_profile_item() {
+  local title="$1"
+  local email="$2"
+  local weekly="$3"
+  local secret="$4"
+  local autocomplete="$5"
+  if remote_use_profile_supported "$secret"; then
+    emit_item \
+      "$title" \
+      "$(build_use_subtitle "$email" "$weekly" "$(build_use_route_hint "$secret")")" \
+      "use::${secret}" \
+      true \
+      "$autocomplete"
+  else
+    emit_item \
+      "$title" \
+      "$(build_use_subtitle "$email" "$weekly" "Remote profile unsupported; allowed: A-Z a-z 0-9 . _ -")" \
+      "" \
+      false \
+      "$autocomplete"
+  fi
+}
+
 build_use_usage_suffix() {
   local label="$1"
   local non_weekly="$2"
@@ -1635,9 +1706,19 @@ handle_use_query() {
       return
     fi
 
+    if ! remote_use_profile_supported "$normalized_secret"; then
+      emit_item \
+        "Invalid remote profile name" \
+        "Remote profiles allow only A-Z a-z 0-9 . _ -" \
+        "" \
+        false \
+        "use "
+      return
+    fi
+
     emit_item \
       "Run auth use ${normalized_secret}" \
-      "Switch active auth to ${normalized_secret}.json" \
+      "$(build_use_route_hint "$normalized_secret")" \
       "use::${normalized_secret}" \
       true \
       "use ${normalized_secret}"
@@ -1683,11 +1764,11 @@ handle_use_query() {
           false \
           "use "
       else
-        emit_item \
+        emit_use_profile_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
-          "use::${current_secret}" \
-          true \
+          "${current_cached_email:-"-"}" \
+          "${current_cached_weekly:-"-"}" \
+          "$current_secret" \
           "use ${current_secret}"
       fi
     else
@@ -1720,11 +1801,11 @@ handle_use_query() {
           false \
           "use "
       else
-        emit_item \
+        emit_use_profile_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
-          "use::${current_secret}" \
-          true \
+          "${current_cached_email:-"-"}" \
+          "${current_cached_weekly:-"-"}" \
+          "$current_secret" \
           "use ${current_secret}"
       fi
     else
@@ -1777,11 +1858,11 @@ handle_use_query() {
         false \
         "use "
     else
-      emit_item \
+      emit_use_profile_item \
         "Current: ${current_json}" \
-        "$(build_use_subtitle "${current_email:-"-"}" "${current_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
-        "use::${current_secret}" \
-        true \
+        "${current_email:-"-"}" \
+        "${current_weekly:-"-"}" \
+        "$current_secret" \
         "use ${current_secret}"
     fi
   else
@@ -1831,6 +1912,14 @@ handle_use_query() {
 
   for file in "${sorted_files[@]}"; do
     local use_secret account_meta account_email account_weekly account_label account_non_weekly account_weekly_remaining account_weekly_epoch account_non_weekly_reset_epoch
+    account_meta=""
+    account_email=""
+    account_weekly=""
+    account_label=""
+    account_non_weekly=""
+    account_weekly_remaining=""
+    account_weekly_epoch=""
+    account_non_weekly_reset_epoch=""
     use_secret="${file%.json}"
     account_meta="$(lookup_diag_account_meta "$account_lookup_file" "$file" || true)"
     if [[ -n "$account_meta" ]]; then
@@ -1839,11 +1928,11 @@ handle_use_query() {
     if [[ -z "${account_email:-}" ]]; then
       account_email="$(extract_secret_email_from_file "${secret_dir%/}/${file}" || true)"
     fi
-    emit_item \
+    emit_use_profile_item \
       "$(build_use_title "$file" "${account_label:-}" "${account_non_weekly:-}" "${account_weekly_remaining:-}" "${account_non_weekly_reset_epoch:-}" "${account_weekly_epoch:-}")" \
-      "$(build_use_subtitle "${account_email:-}" "${account_weekly:-}" "Run codex-cli auth use ${use_secret}")" \
-      "use::${use_secret}" \
-      true \
+      "${account_email:-}" \
+      "${account_weekly:-}" \
+      "$use_secret" \
       "use ${use_secret}"
   done
 
@@ -1854,6 +1943,15 @@ handle_use_query() {
 
 handle_login_query() {
   local lower_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth login is authority-only" \
+      "This workflow is in access-only remote mode; run login on the authority host." \
+      "" \
+      false \
+      "login"
+    return
+  fi
   local mode="browser"
 
   local has_api=0
@@ -1913,6 +2011,15 @@ handle_login_query() {
 
 handle_save_query() {
   local raw_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth save is disabled in remote mode" \
+      "The replica helper owns access-only named-cache updates." \
+      "" \
+      false \
+      "save "
+    return
+  fi
   local remainder
   local yes_flag=0
   local secret=""
@@ -1988,6 +2095,15 @@ handle_save_query() {
 
 handle_remove_query() {
   local raw_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth remove is disabled in remote mode" \
+      "Manage authority profiles on the authority host; replicas only sync." \
+      "" \
+      false \
+      "remove "
+    return
+  fi
   local remainder
   local yes_flag=0
   local secret=""
@@ -2329,6 +2445,11 @@ handle_diag_query() {
 query="$(sfqp_resolve_query_input "${1:-}")"
 trimmed_query="$(trim "$query")"
 lower_query="$(to_lower "$trimmed_query")"
+
+if remote_auth_mode_enabled; then
+  export CODEX_AUTO_REFRESH_ENABLED=false
+  export CODEX_AUTH_REMOTE_REFRESH=false
+fi
 
 begin_items
 ensure_codex_auth_file_env >/dev/null 2>&1 || true

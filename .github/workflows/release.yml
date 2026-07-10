@@ -104,6 +104,8 @@ jobs:
         run: bash scripts/ci/ci-bootstrap.sh --context release --install-codex-cli
 
       - name: Run release package gates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/ci/ci-run-gates.sh release-package --tag "${GITHUB_REF_NAME}"
 
       - name: Upload workflow release assets
@@ -154,6 +156,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Regenerate third-party artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail

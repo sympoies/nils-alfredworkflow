@@ -42,6 +42,8 @@ fi
 ci_workflow="$repo_root/.github/workflows/ci.yml"
 release_workflow="$repo_root/.github/workflows/release.yml"
 publish_workflow="$repo_root/.github/workflows/publish-crates.yml"
+bootstrap_script="$repo_root/scripts/ci/ci-bootstrap.sh"
+packaging_doc="$repo_root/docs/PACKAGING.md"
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   [[ -f "$workflow_file" ]] || {
@@ -49,6 +51,15 @@ for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
     exit 1
   }
 done
+
+[[ -f "$bootstrap_script" ]] || {
+  echo "error: missing CI bootstrap: $bootstrap_script" >&2
+  exit 1
+}
+[[ -f "$packaging_doc" ]] || {
+  echo "error: missing packaging policy: $packaging_doc" >&2
+  exit 1
+}
 
 failures=0
 
@@ -104,6 +115,37 @@ reject_regex() {
   fi
 }
 
+require_step_github_token() {
+  local file="$1"
+  local step_name="$2"
+  local label="$3"
+
+  if ! python3 - "$file" "$step_name" <<'PY'; then
+from pathlib import Path
+import sys
+
+lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+needle = f"      - name: {sys.argv[2]}"
+try:
+    start = lines.index(needle)
+except ValueError:
+    raise SystemExit(1)
+end = len(lines)
+for index in range(start + 1, len(lines)):
+    if lines[index].startswith("      - name: "):
+        end = index
+        break
+block = lines[start:end]
+for index, line in enumerate(block[:-1]):
+    if line == "        env:" and block[index + 1] == "          GITHUB_TOKEN: ${{ github.token }}":
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+    record_failure "$label not found in ${file#"$repo_root"/}"
+    echo "hint: Pass github.token only to every step that can invoke the runtime metadata generator." >&2
+  fi
+}
+
 # Canonical gate routing must remain shared-script driven.
 require_fixed \
   "$ci_workflow" \
@@ -120,6 +162,26 @@ require_fixed \
   "run: bash scripts/ci/ci-run-gates.sh third-party-artifacts-audit" \
   "ci third-party artifact audit gate entrypoint" \
   "Route third-party artifact checks through ci-run-gates."
+require_fixed \
+  "$ci_workflow" \
+  "GITHUB_TOKEN: \${{ github.token }}" \
+  "ci third-party artifact GitHub token" \
+  "Pass the workflow-scoped read token to the strict artifact audit."
+require_step_github_token "$ci_workflow" \
+  "Lint (includes cli-standards-audit, docs-placement-audit, markdownlint-audit)" \
+  "ci lint runtime metadata GitHub token"
+require_step_github_token "$ci_workflow" \
+  "Third-party artifacts audit (strict)" \
+  "ci strict artifact runtime metadata GitHub token"
+require_step_github_token "$ci_workflow" \
+  "Test" \
+  "ci test runtime metadata GitHub token"
+require_step_github_token "$release_workflow" \
+  "Run release package gates" \
+  "release package runtime metadata GitHub token"
+require_step_github_token "$release_workflow" \
+  "Regenerate third-party artifacts" \
+  "release matrix runtime metadata GitHub token"
 require_fixed \
   "$ci_workflow" \
   "run: bash scripts/ci/ci-run-gates.sh node-scraper-tests" \
@@ -220,6 +282,27 @@ for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
     "deprecated inline codex-cli cargo install" \
     "Inline codex-cli install is forbidden; use ci-bootstrap --install-codex-cli."
 done
+
+require_fixed \
+  "$bootstrap_script" \
+  "codex_cli_release_install \"\$target\" \"\$install_root\" \"\$destination\"" \
+  "verified codex-cli release bootstrap" \
+  "Install codex-cli through the repository-pinned release helper."
+reject_regex \
+  "$bootstrap_script" \
+  'cargo[[:space:]]+install[[:space:]]+.*codex' \
+  "retired codex-cli cargo bootstrap" \
+  "codex-cli is release-only; do not restore crates.io installation."
+require_fixed \
+  "$packaging_doc" \
+  'Production packaging always downloads the official pinned target archive' \
+  "codex-cli official-download packaging policy" \
+  "Document production release downloads and repository-pinned verification."
+reject_fixed \
+  "$packaging_doc" \
+  'Its packaging order is explicit local override' \
+  "retired codex-cli local/PATH packaging policy" \
+  "Do not advertise test-only local or mirror inputs as production resolution steps."
 
 for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
   reject_regex \

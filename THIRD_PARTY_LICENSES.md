@@ -7,13 +7,13 @@ Do not edit manually.
 
 - Rust third-party crates resolved from `Cargo.lock` via `cargo metadata --locked` across supported macOS/Linux targets (workspace crates excluded).
 - Node third-party packages resolved from `package-lock.json` (root package excluded).
-- External packaged runtime crate resolved from `scripts/lib/codex_cli_version.sh` with metadata from crates.io.
+- External packaged runtime release resolved from `scripts/lib/codex_cli_version.sh` with metadata from GitHub Releases.
 - Contract: `docs/specs/third-party-artifacts-contract-v1.md`.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `6a447e20d2c1cbcf74a1a5d443c5064ac971d662922c297332ee9217b88cb407`
-- Runtime metadata fingerprint (SHA256): `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20`
+- Data source fingerprint (SHA256): `adfd2270cd00170dc52a3a7dafb9e326baa1d88bc8b40cfc636915a3d8ce6867`
+- Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
@@ -21,8 +21,8 @@ Do not edit manually.
 | --- | --- | --- | --- |
 | Cargo lockfile | `Cargo.lock` | `a9fb812255896b68e231f190c2fd50b4df1441c10e8d0383174078a7a04d5e02` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `e06b4cfa67831f83d99f535f7530ba33fb930fd5b31d5b4e12d8da71c70888f7` | `jq package-lock extraction` |
-| Runtime crate pin | `scripts/lib/codex_cli_version.sh` | `65863452d659031214590bf2d8e8ee4b1a21d70c546647d30d373053ea7ad036` | `source for $CODEX_CLI_CRATE and $CODEX_CLI_VERSION` |
-| Runtime crate metadata | <https://crates.io/api/v1/crates/nils-codex-cli/0.7.3> | `a154f614b02ad4d117fbf4f14a69366ed065d9ebff5def78d019f90558ec3e20` | `curl crates.io API plus jq normalized fields` |
+| Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
+| Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
 ## Rust License Summary (313 crates)
 
@@ -387,9 +387,9 @@ Do not edit manually.
 
 ## External Packaged Runtime
 
-| Crate | Version | License | Repository | Source |
+| Runtime | Version | License | Repository | Source |
 | --- | --- | --- | --- | --- |
-| nils-codex-cli | 0.7.3 | MIT | <https://github.com/sympoies/nils-cli> | <https://crates.io/api/v1/crates/nils-codex-cli/0.7.3> |
+| codex-cli | 1.21.6 | MIT | <https://github.com/sympoies/nils-cli> | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> |
 
 ## Regeneration
 

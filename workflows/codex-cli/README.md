@@ -1,6 +1,6 @@
 # Codex CLI - Alfred Workflow
 
-Run core `nils-codex-cli@0.7.3` operations from Alfred.
+Run core `codex-cli@1.21.6` operations from Alfred.
 
 ## Screenshot
 
@@ -46,7 +46,16 @@ Auth use behavior:
 - `cxau` first row shows current secret JSON from `codex-cli auth current` (when parsable).
 - Following rows list all `*.json` files in `CODEX_SECRET_DIR` (or fallback config dir).
 - When no saved `*.json` exists, `cxau` still shows current `auth.json` info (for example email).
-- Press Enter on a row to run `codex-cli auth use <secret>`.
+- With `CODEX_AUTH_REMOTE_SSH` unset, Enter runs local
+  `codex-cli auth use <secret>`.
+- With `CODEX_AUTH_REMOTE_SSH` set, Enter delegates the selected profile to
+  the installed `codex-auth-peer-pull` replica helper. The helper owns the
+  shared client lock, access-only pull, purge, named save, postconditions,
+  sync, and final cache audit. Alfred never refreshes or falls back to local
+  `auth use` in this mode.
+- Remote mode also disables local `auth login`, `auth save`, and `auth remove`;
+  login and profile management stay on the authority. Diagnostic subprocesses
+  receive both auto-refresh flags as `false`.
 
 No `CODEX_SECRET_DIR` saved secrets behavior:
 
@@ -56,7 +65,8 @@ No `CODEX_SECRET_DIR` saved secrets behavior:
 ## Runtime Requirements
 
 - End users: no extra install when using release artifact.
-- `.alfredworkflow` bundles `codex-cli@0.7.3` (release-coupled runtime version).
+- `.alfredworkflow` bundles `codex-cli@1.21.6` from the matching nils-cli
+  GitHub release asset (release-coupled runtime version).
 - Pinned runtime metadata is centralized in `scripts/lib/codex_cli_version.sh`.
 - Bundled target: macOS `arm64`.
 
@@ -68,7 +78,7 @@ Fallback runtime sources (when bundled binary is unavailable):
 Manual fallback install:
 
 ```bash
-cargo install nils-codex-cli --version 0.7.3
+brew install sympoies/tap/nils-cli
 ```
 
 ## Configuration
@@ -78,6 +88,8 @@ cargo install nils-codex-cli --version 0.7.3
 | `CODEX_CLI_BIN`                       | No       | empty   | Optional absolute path override for `codex-cli`.                                                                                                                              |
 | `CODEX_AUTH_FILE`                     | No       | empty   | Auth file path used by `codex-cli` auth/diag commands. Resolution order: configured value -> inherited env `CODEX_AUTH_FILE` -> `~/.codex/auth.json`. Supports `~` expansion. |
 | `CODEX_SECRET_DIR`                    | No       | empty   | Optional secret directory override. If empty, runtime fallback is `$XDG_CONFIG_HOME/codex_secrets` or `~/.config/codex_secrets`.                                              |
+| `CODEX_AUTH_REMOTE_SSH`               | No       | empty   | Optional SSH alias for the refresh-token authority. When set, `cxau` performs an access-only remote switch without `--refresh`; empty preserves local `auth use`.            |
+| `CODEX_AUTH_PEER_PULL_BIN`             | No       | empty   | Optional absolute path to `codex-auth-peer-pull`; empty resolves to `~/.local/bin/codex-auth-peer-pull`. Required when remote mode is enabled.                              |
 | `CODEX_DIAG_CACHE_TTL_SECONDS`        | No       | `300`   | Diag cache TTL for `cxau`/`cxd`/`cxda` (`0` means always refresh before render).                                                                                              |
 | `CODEX_DIAG_CACHE_BLOCK_WAIT_SECONDS` | No       | `15`    | Max wait seconds while another process is refreshing the same diag cache mode.                                                                                                |
 | `CODEX_LOGIN_TIMEOUT_SECONDS`         | No       | `60`    | Login timeout in seconds (`1..3600`).                                                                                                                                         |
@@ -99,6 +111,10 @@ cargo install nils-codex-cli --version 0.7.3
 | `cxr`   | Alias of `cx remove ...`.                                 |
 
 ## Query Examples
+
+Login, save, and remove examples below require local auth mode
+(`CODEX_AUTH_REMOTE_SSH` unset). Remote replicas render those writers as
+authority-only and reject direct execution.
 
 | Query                             | Result                                                                           |
 | --------------------------------- | -------------------------------------------------------------------------------- |
@@ -129,16 +145,17 @@ cargo install nils-codex-cli --version 0.7.3
 
 ## Maintainer Packaging Notes
 
-- Official package should bundle exactly `codex-cli@0.7.3`.
+- Official package should bundle exactly `codex-cli@1.21.6`.
 - `scripts/workflow-pack.sh --id codex-cli` runs `workflows/codex-cli/scripts/prepare_package.sh`.
-- Packaging binary resolution order:
-  1. `CODEX_CLI_PACK_BIN` (if set)
-  2. local `PATH` `codex-cli`
-  3. auto-install pinned `nils-codex-cli@0.7.3` from crates.io via `cargo install --locked --root <cache-root>`
+- Official packaging always downloads the `sympoies/nils-cli v1.21.6 release`
+  `aarch64-apple-darwin` asset and verifies both the published checksum file
+  and archive against the repository-pinned SHA-256 trust root.
 - Useful overrides:
-  - `CODEX_CLI_PACK_BIN=/absolute/path/to/codex-cli`
   - `CODEX_CLI_PACK_INSTALL_ROOT=/absolute/path/to/install-root` (default is cache under `$XDG_CACHE_HOME` or
     `~/.cache`)
+  - Test fixtures only: set `CODEX_CLI_RELEASE_TEST_MODE=1` together with
+    `CODEX_CLI_RELEASE_BASE_URL`, `CODEX_CLI_RELEASE_TEST_SHA256`, or
+    `CODEX_CLI_PACK_BIN`. Release packaging rejects those bypasses.
 
 ## Validation
 

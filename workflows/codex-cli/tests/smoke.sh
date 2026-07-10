@@ -19,9 +19,7 @@ assert_file "$runtime_meta"
 # shellcheck disable=SC1090
 source "$runtime_meta"
 codex_cli_pinned_version="${CODEX_CLI_PINNED_VERSION}"
-codex_cli_pinned_crate="${CODEX_CLI_PINNED_CRATE}"
 export CODEX_CLI_PINNED_VERSION="$codex_cli_pinned_version"
-export CODEX_CLI_PINNED_CRATE="$codex_cli_pinned_crate"
 
 for required in \
   workflow.toml \
@@ -76,6 +74,9 @@ if ! rg -n '^CODEX_AUTH_FILE[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null;
 fi
 if ! rg -n '^CODEX_SECRET_DIR[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
   fail "CODEX_SECRET_DIR default must be empty"
+fi
+if ! rg -n '^CODEX_AUTH_PEER_PULL_BIN[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "CODEX_AUTH_PEER_PULL_BIN default must be empty"
 fi
 if ! rg -n '^CODEX_DIAG_CACHE_TTL_SECONDS[[:space:]]*=[[:space:]]*"300"' "$manifest" >/dev/null; then
   fail "CODEX_DIAG_CACHE_TTL_SECONDS default must be 300"
@@ -142,6 +143,20 @@ JSON
     }
     printf '{"ok":true,"cmd":"auth use","target":"%s","argv":"%s"}\n' "${3:-}" "$*"
     ;;
+  remote)
+    [[ "${3:-}" == "pull" ]] || {
+      echo "unexpected auth remote command: $*" >&2
+      exit 9
+    }
+    if [[ "${4:-}" == "--help" ]]; then
+      echo "Pull remote auth over SSH"
+    else
+      printf '{"ok":true,"cmd":"auth remote pull","argv":"%s"}\n' "$*"
+    fi
+    ;;
+  sync)
+    printf '{"ok":true,"cmd":"auth sync","argv":"%s"}\n' "$*"
+    ;;
   *)
     echo "unexpected auth command: $*" >&2
     exit 9
@@ -162,6 +177,17 @@ diag)
 esac
 EOS
 chmod +x "$tmp_dir/stubs/codex-cli-ok"
+
+cat >"$tmp_dir/stubs/codex-cli-remote-fail" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"${CODEX_STUB_LOG:?}"
+case "$*" in
+  auth\ remote\ pull*) exit 7 ;;
+  *) printf '{"ok":true}\n' ;;
+esac
+EOS
+chmod +x "$tmp_dir/stubs/codex-cli-remote-fail"
 
 cat >"$tmp_dir/stubs/codex-cli-fail" <<'EOS'
 #!/usr/bin/env bash
@@ -625,73 +651,18 @@ exit 9
 EOS
 chmod +x "$tmp_dir/stubs/codex-cli-version-mismatch"
 
-cat >"$tmp_dir/stubs/cargo" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ -n "${CARGO_STUB_LOG:-}" ]]; then
-  printf '%s\n' "$*" >>"$CARGO_STUB_LOG"
+release_target="test-apple-darwin"
+release_fixture="$tmp_dir/release-fixture"
+release_tree="$tmp_dir/release-tree"
+release_archive="nils-cli-v${codex_cli_pinned_version}-${release_target}.tar.gz"
+mkdir -p "$release_fixture" "$release_tree/bin"
+cp "$tmp_dir/stubs/codex-cli-ok" "$release_tree/bin/codex-cli"
+tar -czf "$release_fixture/$release_archive" -C "$release_tree" bin/codex-cli
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 "$release_fixture/$release_archive" >"$release_fixture/$release_archive.sha256"
+else
+  sha256sum "$release_fixture/$release_archive" >"$release_fixture/$release_archive.sha256"
 fi
-
-[[ "${1:-}" == "install" ]] || {
-  echo "unexpected cargo command: $*" >&2
-  exit 9
-}
-
-crate=""
-version=""
-root=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  install)
-    shift
-    ;;
-  --version)
-    version="${2:-}"
-    shift 2
-    ;;
-  --root)
-    root="${2:-}"
-    shift 2
-    ;;
-  --locked | --force)
-    shift
-    ;;
-  *)
-    if [[ -z "$crate" && "$1" != -* ]]; then
-      crate="$1"
-    fi
-    shift
-    ;;
-  esac
-done
-
-[[ "$crate" == "${CODEX_CLI_PINNED_CRATE:-nils-codex-cli}" ]] || {
-  echo "unexpected crate: $crate" >&2
-  exit 9
-}
-[[ -n "$version" ]] || {
-  echo "missing --version" >&2
-  exit 9
-}
-[[ -n "$root" ]] || {
-  echo "missing --root" >&2
-  exit 9
-}
-
-mkdir -p "$root/bin"
-cat >"$root/bin/codex-cli" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ "\${1:-}" == "--version" ]]; then
-  echo "codex-cli $version"
-  exit 0
-fi
-echo "unexpected command: \$*" >&2
-exit 9
-EOF
-chmod +x "$root/bin/codex-cli"
-EOS
-chmod +x "$tmp_dir/stubs/cargo"
 
 empty_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$empty_json" '.items | type == "array" and length >= 8' "empty query must return action items"
@@ -704,6 +675,17 @@ assert_jq_json "$missing_runtime_json" '.items[0].title == "codex-cli runtime mi
 auth_root_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth"; })"
 assert_jq_json "$auth_root_json" '.items | any(.arg == "login::browser")' "auth root should include login actions"
 assert_jq_json "$auth_root_json" '.items | any(.arg == "diag::default") | not' "auth root should hide diag actions"
+
+remote_auth_root_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth"; })"
+assert_jq_json "$remote_auth_root_json" '.items | any((.arg == "login::browser" or .arg == "login::api-key" or .arg == "login::device-code") and .valid == true) | not' "remote auth root must not expose valid local login actions"
+assert_jq_json "$remote_auth_root_json" '.items | any(.title == "auth save is authority-only" and .valid == false and ((.autocomplete // "") == ""))' "remote auth root must mark save authority-only without autocomplete"
+assert_jq_json "$remote_auth_root_json" '.items | any(.title == "auth remove is authority-only" and .valid == false and ((.autocomplete // "") == ""))' "remote auth root must mark remove authority-only without autocomplete"
+remote_login_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth login"; })"
+assert_jq_json "$remote_login_json" '.items[0].valid == false' "remote mode login query must be invalid"
+remote_save_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "save remote-test.json"; })"
+assert_jq_json "$remote_save_json" '.items[0].valid == false' "remote mode save query must be invalid"
+remote_remove_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "remove remote-test.json"; })"
+assert_jq_json "$remote_remove_json" '.items[0].valid == false' "remote mode remove query must be invalid"
 
 login_api_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "login --api-key"; })"
 assert_jq_json "$login_api_json" '.items[0].arg == "login::api-key"' "login api-key mapping mismatch"
@@ -745,6 +727,18 @@ use_secret_dir="$tmp_dir/secrets"
 mkdir -p "$use_secret_dir"
 printf '{"email":"alpha@example.com"}\n' >"$use_secret_dir/alpha.json"
 printf '{"email":"beta@example.com"}\n' >"$use_secret_dir/beta.json"
+printf '{"email":"work@example.com"}\n' >"$use_secret_dir/work@example.json"
+printf '{"email":"dash@example.com"}\n' >"$use_secret_dir/-alpha.json"
+
+remote_invalid_profile_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use work@example"; })"
+assert_jq_json "$remote_invalid_profile_json" '.items[0].valid == false' "remote use must reject profile names unsupported by the peer helper"
+assert_jq_json "$remote_invalid_profile_json" '.items[0].arg == null or .items[0].arg == ""' "invalid remote profile must not dispatch an action"
+remote_profile_list_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter_auth_use.sh" ""; })"
+assert_jq_json "$remote_profile_list_json" '.items | any((.title | startswith("work@example.json")) and .valid == false)' "remote picker must mark unsupported saved profiles invalid"
+assert_jq_json "$remote_profile_list_json" '.items | any((.title | startswith("-alpha.json")) and .valid == false)' "remote picker must reject leading-hyphen profiles"
+remote_leading_hyphen_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use -alpha"; })"
+assert_jq_json "$remote_leading_hyphen_json" '.items[0].valid == false' "remote direct use must reject a leading-hyphen profile"
+assert_jq_json "$remote_leading_hyphen_json" '.items[0].arg == null or .items[0].arg == ""' "leading-hyphen remote profile must not dispatch"
 
 auth_use_json="$({ CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use"; })"
 assert_jq_json "$auth_use_json" '.items[0].title == "Current: beta.json"' "auth use should show current secret on first row"
@@ -756,6 +750,9 @@ assert_jq_json "$auth_use_json" '.items | any(.title == "alpha.json" and (.subti
 auth_use_direct_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use alpha"; })"
 assert_jq_json "$auth_use_direct_json" '.items[0].arg == "use::alpha"' "auth use alpha should map to use::alpha"
 assert_jq_json "$auth_use_direct_json" '.items[0].valid == true' "auth use alpha item must be valid"
+
+auth_use_remote_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use alpha"; })"
+assert_jq_json "$auth_use_remote_json" '.items[0].subtitle | contains("Remote access-only switch via sympoies")' "remote auth use row should identify authority routing"
 
 auth_use_nonzero_current_json="$({ CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-current-nonzero" "$workflow_dir/scripts/script_filter.sh" "auth use"; })"
 assert_jq_json "$auth_use_nonzero_current_json" '.items[0].title == "Current: sym.json"' "auth use should parse matched_secret from auth current --json even when command exits non-zero"
@@ -963,9 +960,150 @@ CODEX_API_KEY="sk-test-smoke-key" CODEX_STUB_LOG="$action_log" CODEX_STDIN_OUT="
 [[ "$(tail -n1 "$action_log")" == "auth login --api-key" ]] || fail "api-key login should keep command mapping"
 [[ "$(cat "$api_key_stdin_out")" == "sk-test-smoke-key" ]] || fail "api-key login must pass CODEX_API_KEY via stdin"
 
-CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+env -u CODEX_AUTH_REMOTE_SSH CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
   "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null
 [[ "$(tail -n1 "$action_log")" == "auth use alpha" ]] || fail "use mapping mismatch"
+
+: >"$action_log"
+peer_helper="$tmp_dir/stubs/codex-auth-peer-pull"
+peer_log="$tmp_dir/peer-helper.log"
+peer_path_out="$tmp_dir/peer-helper-path.out"
+cat >"$peer_helper" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n "${PEER_LOCK_FILE:-}" ]]; then
+  python3 - "${PEER_LOCK_FILE}" <<'PY'
+import fcntl
+import os
+import sys
+
+fd = os.open(sys.argv[1], os.O_CREAT | os.O_RDWR, 0o600)
+try:
+    fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    raise SystemExit(75)
+PY
+fi
+printf '%s\n' "$*" >>"${PEER_STUB_LOG:?}"
+printf '%s\n' "${PATH%%:*}" >"${PEER_PATH_OUT:?}"
+exit "${PEER_STUB_RC:-0}"
+EOS
+chmod +x "$peer_helper"
+: >"$peer_log"
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null
+[[ "$(<"$peer_log")" == "--authority sympoies --name alpha" ]] || fail "remote use must delegate exactly once to the peer helper"
+[[ ! -s "$action_log" ]] || fail "remote helper mode must not invoke codex-cli directly"
+[[ "$(<"$peer_path_out")" == "$tmp_dir/stubs" ]] || fail "remote helper PATH must prefer the packaged codex-cli directory"
+
+: >"$peer_log"
+: >"$action_log"
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" PEER_STUB_RC=7 \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null 2>&1
+remote_use_fail_rc=$?
+set -e
+[[ "$remote_use_fail_rc" -eq 7 ]] || fail "remote helper failure should preserve exit 7"
+[[ "$(<"$peer_log")" == "--authority sympoies --name alpha" ]] || fail "remote failure must remain one helper call"
+[[ ! -s "$action_log" ]] || fail "remote helper failure must not invoke codex-cli or fall back"
+
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$tmp_dir/stubs/missing-peer-helper" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null 2>&1
+missing_peer_rc=$?
+set -e
+[[ "$missing_peer_rc" -eq 127 ]] || fail "missing remote peer helper should fail closed with 127"
+[[ ! -s "$action_log" ]] || fail "missing peer helper must not invoke codex-cli or fall back"
+
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::work@example" >/dev/null 2>&1
+invalid_remote_profile_rc=$?
+set -e
+[[ "$invalid_remote_profile_rc" -eq 64 ]] || fail "remote profile grammar mismatch must fail before helper dispatch"
+
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::-alpha" >/dev/null 2>&1
+leading_hyphen_action_rc=$?
+set -e
+[[ "$leading_hyphen_action_rc" -eq 64 ]] || fail "remote leading-hyphen action must fail before helper dispatch"
+
+client_lock="$tmp_dir/client-auth.lock"
+client_lock_ready="$tmp_dir/client-auth.ready"
+client_lock_release="$tmp_dir/client-auth.release"
+python3 - "$client_lock" "$client_lock_ready" "$client_lock_release" <<'PY' &
+import fcntl
+import os
+import sys
+import time
+
+lock, ready, release = sys.argv[1:]
+fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
+fcntl.lockf(fd, fcntl.LOCK_EX)
+open(ready, "w", encoding="utf-8").close()
+while not os.path.exists(release):
+    time.sleep(0.02)
+PY
+client_lock_holder=$!
+for _ in $(seq 1 100); do
+  [[ -e "$client_lock_ready" ]] && break
+  sleep 0.02
+done
+[[ -e "$client_lock_ready" ]] || fail "client lock holder did not start"
+: >"$peer_log"
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_LOCK_FILE="$client_lock" PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null 2>&1
+remote_lock_rc=$?
+set -e
+[[ "$remote_lock_rc" -eq 75 ]] || fail "held canonical lock must surface busy exit 75"
+[[ ! -s "$peer_log" && ! -s "$action_log" ]] || fail "lock contention must perform no auth writer action"
+: >"$client_lock_release"
+wait "$client_lock_holder"
+
+for blocked_remote_writer in \
+  login::browser \
+  login::api-key \
+  login::device-code \
+  save::remote-test.json::1 \
+  remove::remote-test.json::1; do
+  : >"$action_log"
+  set +e
+  CODEX_AUTH_REMOTE_SSH=sympoies CODEX_API_KEY=fixture-key \
+    CODEX_SECRET_DIR="$use_secret_dir" CODEX_STUB_LOG="$action_log" \
+    CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+    "$workflow_dir/scripts/action_open.sh" "$blocked_remote_writer" >/dev/null 2>&1
+  blocked_remote_writer_rc=$?
+  set -e
+  [[ "$blocked_remote_writer_rc" -eq 77 ]] || fail "remote mode must reject local auth writer: $blocked_remote_writer"
+  [[ ! -s "$action_log" ]] || fail "blocked remote writer invoked codex-cli: $blocked_remote_writer"
+done
+
+refresh_flags_out="$tmp_dir/refresh-flags.out"
+cat >"$tmp_dir/stubs/codex-cli-capture-refresh-flags" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\n' "${CODEX_AUTO_REFRESH_ENABLED:-unset}" "${CODEX_AUTH_REMOTE_REFRESH:-unset}" >"${CODEX_REFRESH_FLAGS_OUT:?}"
+exec "${CODEX_DELEGATE_BIN:?}" "$@"
+EOS
+chmod +x "$tmp_dir/stubs/codex-cli-capture-refresh-flags"
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTO_REFRESH_ENABLED=true CODEX_AUTH_REMOTE_REFRESH=true \
+  CODEX_REFRESH_FLAGS_OUT="$refresh_flags_out" CODEX_DELEGATE_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-capture-refresh-flags" \
+  "$workflow_dir/scripts/action_open.sh" "diag::default" >/dev/null
+[[ "$(<"$refresh_flags_out")" == "false false" ]] || fail "remote mode must disable implicit refresh for diagnostics"
 
 auth_file_out="$tmp_dir/auth-file.out"
 env -u CODEX_AUTH_FILE CODEX_AUTH_FILE_OUT="$auth_file_out" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-capture-auth-file" \
@@ -1213,31 +1351,42 @@ set -e
 
 set +e
 PATH="/usr/bin:/bin" \
-  CODEX_CLI_PACK_INSTALL_ROOT="$tmp_dir/pinned-install-missing-cargo" \
+  CODEX_CLI_RELEASE_BASE_URL="file://$tmp_dir/missing-release" \
+  CODEX_CLI_RELEASE_TARGET="$release_target" \
+  CODEX_CLI_PACK_INSTALL_ROOT="$tmp_dir/pinned-install-missing-release" \
   "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-missing-bin" --workflow-root "$workflow_dir" >/dev/null 2>&1
 prepare_missing_rc=$?
 set -e
-[[ "$prepare_missing_rc" -eq 1 ]] || fail "prepare_package should fail when codex-cli is unavailable and cargo is missing"
+[[ "$prepare_missing_rc" -eq 1 ]] || fail "prepare_package should fail when the pinned release asset is unavailable"
 
-cargo_stub_log="$tmp_dir/cargo-stub.log"
 pinned_install_root="$tmp_dir/codex-pinned-install"
-PATH="$tmp_dir/stubs:/usr/bin:/bin" CARGO_STUB_LOG="$cargo_stub_log" CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-version-mismatch" \
+PATH="/usr/bin:/bin" CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-version-mismatch" \
+  CODEX_CLI_RELEASE_BASE_URL="file://$release_fixture" CODEX_CLI_RELEASE_TARGET="$release_target" \
+  CODEX_CLI_RELEASE_TEST_MODE=1 CODEX_CLI_RELEASE_TEST_SHA256="$(awk 'NF {print $1; exit}' "$release_fixture/$release_archive.sha256")" \
   CODEX_CLI_PACK_INSTALL_ROOT="$pinned_install_root" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
   "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-auto-install" --workflow-root "$workflow_dir" >/dev/null
 
 assert_file "$tmp_dir/stage-auto-install/bin/codex-cli"
-[[ "$("$tmp_dir/stage-auto-install/bin/codex-cli" --version)" == "codex-cli ${codex_cli_pinned_version}" ]] || fail "prepare_package should auto-install pinned codex-cli version"
-if ! rg -n "^install ${codex_cli_pinned_crate} " "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should invoke cargo install for pinned codex-cli"
-fi
-if ! rg -n --fixed-strings -- "--version ${codex_cli_pinned_version}" "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should request pinned codex-cli version in cargo install"
-fi
-if ! rg -n --fixed-strings -- "--root $pinned_install_root" "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should pass CODEX_CLI_PACK_INSTALL_ROOT to cargo install"
-fi
+[[ "$("$tmp_dir/stage-auto-install/bin/codex-cli" --version)" == "codex-cli ${codex_cli_pinned_version}" ]] || fail "prepare_package should bundle pinned release codex-cli version"
 
-CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-ok" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
+bad_checksum_fixture="$tmp_dir/release-fixture-bad-checksum"
+mkdir -p "$bad_checksum_fixture"
+cp "$release_fixture/$release_archive" "$bad_checksum_fixture/$release_archive"
+printf '%064d  %s\n' 0 "$release_archive" >"$bad_checksum_fixture/$release_archive.sha256"
+set +e
+CODEX_CLI_RELEASE_BASE_URL="file://$bad_checksum_fixture" CODEX_CLI_RELEASE_TARGET="$release_target" \
+  CODEX_CLI_RELEASE_TEST_MODE=1 CODEX_CLI_RELEASE_TEST_SHA256="$(awk 'NF {print $1; exit}' "$release_fixture/$release_archive.sha256")" \
+  CODEX_CLI_PACK_INSTALL_ROOT="$tmp_dir/pinned-install-bad-checksum" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
+  "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-bad-checksum" --workflow-root "$workflow_dir" >"$tmp_dir/bad-checksum.out" 2>&1
+bad_checksum_rc=$?
+set -e
+[[ "$bad_checksum_rc" -ne 0 ]] || fail "prepare_package must reject a mismatched release checksum"
+rg -n 'checksum mismatch|pinned checksum' "$tmp_dir/bad-checksum.out" >/dev/null || fail "checksum rejection should be explicit"
+[[ ! -e "$tmp_dir/stage-bad-checksum/bin/codex-cli" ]] || fail "checksum failure must not stage codex-cli"
+assert_file "$pinned_install_root/$release_archive"
+assert_file "$pinned_install_root/$release_archive.sha256"
+
+CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-ok" CODEX_CLI_RELEASE_TEST_MODE=1 CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
   "$repo_root/scripts/workflow-pack.sh" --id codex-cli >/dev/null
 
 packaged_dir="$repo_root/build/workflows/codex-cli/pkg"
@@ -1287,10 +1436,11 @@ assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workfl
 assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workflow.input.scriptfilter") | .config.queuedelayimmediatelyinitially] | all(. == false)' "all codex script filters must disable immediate initial run"
 assert_jq_file "$packaged_json_file" '.connections | length == 16' "plist must include eight scriptfilter-to-action connections and eight hotkey routes"
 assert_jq_file "$packaged_json_file" '.connections["771DC53D-E670-447A-9983-1E513A55CA1E"][0].destinationuid == "B7D3A21F-6B44-4CF9-9CC3-3CE9D9F4E9D7"' "cxau hotkey must target cxau script filter"
-assert_jq_file "$packaged_json_file" '.userconfigurationconfig | length >= 4' "plist must expose codex workflow config variables"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig | length >= 5' "plist must expose codex workflow config variables"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_CLI_BIN") | .config.default == ""' "CODEX_CLI_BIN config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_AUTH_FILE") | .config.default == ""' "CODEX_AUTH_FILE config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_SECRET_DIR") | .config.default == ""' "CODEX_SECRET_DIR config row missing"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_AUTH_REMOTE_SSH") | .config.default == ""' "CODEX_AUTH_REMOTE_SSH config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_DIAG_CACHE_TTL_SECONDS") | .config.default == "300"' "CODEX_DIAG_CACHE_TTL_SECONDS config row missing"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.keyword == "cx||codex"' "keyword trigger must be cx"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptfile == "./scripts/script_filter.sh"' "script filter wiring mismatch"
@@ -1313,5 +1463,7 @@ assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="EC219E70-FAD4-4
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.scriptfile == "./scripts/action_open.sh"' "action wiring mismatch"
 assert_jq_file "$packaged_json_file" '.readme | contains("# Codex CLI - Alfred Workflow")' "readme heading should be synced from README.md"
 assert_jq_file "$packaged_json_file" '.readme | test("\\|\\s*-{3,}\\s*\\|") | not' "readme table separators must be downgraded"
+
+"$packaged_dir/bin/codex-cli" auth remote pull --help >/dev/null || fail "packaged codex-cli must expose auth remote pull"
 
 echo "ok: codex-cli smoke test"

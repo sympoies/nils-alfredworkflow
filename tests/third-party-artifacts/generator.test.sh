@@ -4,6 +4,12 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 
+rg -n --fixed-strings '  - `Runtime | Version | License | Repository | Source`' \
+  "$repo_root/docs/specs/third-party-artifacts-contract-v1.md" >/dev/null || {
+  echo "error: external runtime contract header is not aligned with the generated artifact" >&2
+  exit 1
+}
+
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/third-party-artifacts-generator.test.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
 
@@ -72,6 +78,9 @@ setup_fixture() {
 #!/usr/bin/env bash
 CODEX_CLI_CRATE="fixture-runtime-crate"
 CODEX_CLI_VERSION="1.2.3"
+CODEX_CLI_RELEASE_REPO="fixture-owner/fixture-runtime"
+CODEX_CLI_RELEASE_TARGET="aarch64-apple-darwin"
+CODEX_CLI_LICENSE="MIT"
 CODEX_CLI_PINNED_CRATE="$CODEX_CLI_CRATE"
 CODEX_CLI_PINNED_VERSION="$CODEX_CLI_VERSION"
 __PIN__
@@ -113,20 +122,42 @@ __LOCK__
 set -euo pipefail
 
 url="${@: -1}"
-expected="https://crates.io/api/v1/crates/fixture-runtime-crate/1.2.3"
+expected="https://api.github.com/repos/fixture-owner/fixture-runtime/releases/tags/v1.2.3"
 if [[ "$url" != "$expected" ]]; then
   echo "unexpected URL: $url" >&2
   exit 1
 fi
 
+if [[ "${GENERATOR_CURL_REQUIRE_AUTH:-0}" == "1" ]]; then
+  expected_authorization="Authorization: Bearer ${GENERATOR_EXPECTED_GITHUB_TOKEN:-fixture-github-token}"
+  authorization_seen=0
+  for arg in "$@"; do
+    if [[ "$arg" == "$expected_authorization" ]]; then
+      authorization_seen=1
+      break
+    fi
+  done
+  if [[ "$authorization_seen" -ne 1 ]]; then
+    echo "curl: (22) The requested URL returned error: 403" >&2
+    exit 22
+  fi
+fi
+
+if [[ "${GENERATOR_CURL_SIMULATE_DEFAULT_CONFIG:-0}" == "1" && "${1:-}" != "-q" && -f "${CURL_HOME:?}/.curlrc" ]]; then
+  printf '%s\n' "* Authorization: Bearer ${GITHUB_TOKEN:-}" >&2
+  printf '%s\n' "Authorization: Bearer ${GITHUB_TOKEN:-}" >"${GENERATOR_CURL_TRACE_FILE:?}"
+fi
+
 cat <<'JSON'
 {
-  "version": {
-    "crate": "fixture-runtime-crate",
-    "num": "1.2.3",
-    "license": "MIT",
-    "repository": "https://example.com/fixture-runtime"
-  }
+  "tag_name": "v1.2.3",
+  "html_url": "https://github.com/fixture-owner/fixture-runtime/releases/tag/v1.2.3",
+  "assets": [
+    {
+      "name": "nils-cli-v1.2.3-aarch64-apple-darwin.tar.gz",
+      "browser_download_url": "https://github.com/fixture-owner/fixture-runtime/releases/download/v1.2.3/nils-cli-v1.2.3-aarch64-apple-darwin.tar.gz"
+    }
+  ]
 }
 JSON
 __CURL__
@@ -254,6 +285,56 @@ test_missing_input_error() {
   return 0
 }
 
+test_runtime_github_token_and_error_code() {
+  local fixture
+  fixture="$(setup_fixture)"
+
+  GENERATOR_CURL_REQUIRE_AUTH=1 GITHUB_TOKEN=fixture-github-token \
+    run_generator "$fixture" --write
+  if ! assert_eq "0" "$last_rc" "authenticated runtime metadata write exit code"; then
+    dump_last_run
+    return 1
+  fi
+  if rg -F 'fixture-github-token' "$last_stdout" "$last_stderr" >/dev/null 2>&1; then
+    echo "GitHub token leaked into generator output" >&2
+    dump_last_run
+    return 1
+  fi
+
+  mkdir -p "$fixture/curl-home"
+  printf '%s\n' 'verbose' >"$fixture/curl-home/.curlrc"
+  GENERATOR_CURL_REQUIRE_AUTH=1 \
+    GENERATOR_CURL_SIMULATE_DEFAULT_CONFIG=1 \
+    GENERATOR_CURL_TRACE_FILE="$fixture/curl.trace" \
+    CURL_HOME="$fixture/curl-home" \
+    GITHUB_TOKEN=fixture-github-token \
+    run_generator "$fixture" --write
+  if ! assert_eq "0" "$last_rc" "hostile curl config write exit code"; then
+    dump_last_run
+    return 1
+  fi
+  if rg -F 'fixture-github-token' "$last_stdout" "$last_stderr" "$fixture/curl.trace" >/dev/null 2>&1; then
+    echo "GitHub token leaked through default curl configuration" >&2
+    dump_last_run
+    return 1
+  fi
+
+  GENERATOR_CURL_REQUIRE_AUTH=1 GITHUB_TOKEN='' \
+    THIRD_PARTY_LICENSES_RUNTIME_MAX_ATTEMPTS=1 \
+    THIRD_PARTY_LICENSES_RUNTIME_RETRY_BASE_SECONDS=0 \
+    run_generator "$fixture" --write
+  if ! assert_eq "1" "$last_rc" "unauthenticated runtime metadata write exit code"; then
+    dump_last_run
+    return 1
+  fi
+  if ! assert_contains "$(cat "$last_stderr")" "failed (exit=22)" "curl exit code propagation"; then
+    dump_last_run
+    return 1
+  fi
+
+  return 0
+}
+
 test_mpl_source_and_license_url_lines() {
   local fixture
   fixture="$(setup_fixture)"
@@ -340,6 +421,7 @@ run_test() {
 run_test test_clean_write_and_check
 run_test test_drift_detection
 run_test test_missing_input_error
+run_test test_runtime_github_token_and_error_code
 run_test test_mpl_source_and_license_url_lines
 
 if [[ "$tests_failed" -ne 0 ]]; then
