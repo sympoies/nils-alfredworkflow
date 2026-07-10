@@ -717,12 +717,17 @@ mkdir -p "$use_secret_dir"
 printf '{"email":"alpha@example.com"}\n' >"$use_secret_dir/alpha.json"
 printf '{"email":"beta@example.com"}\n' >"$use_secret_dir/beta.json"
 printf '{"email":"work@example.com"}\n' >"$use_secret_dir/work@example.json"
+printf '{"email":"dash@example.com"}\n' >"$use_secret_dir/-alpha.json"
 
 remote_invalid_profile_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use work@example"; })"
 assert_jq_json "$remote_invalid_profile_json" '.items[0].valid == false' "remote use must reject profile names unsupported by the peer helper"
 assert_jq_json "$remote_invalid_profile_json" '.items[0].arg == null or .items[0].arg == ""' "invalid remote profile must not dispatch an action"
 remote_profile_list_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter_auth_use.sh" ""; })"
 assert_jq_json "$remote_profile_list_json" '.items | any((.title | startswith("work@example.json")) and .valid == false)' "remote picker must mark unsupported saved profiles invalid"
+assert_jq_json "$remote_profile_list_json" '.items | any((.title | startswith("-alpha.json")) and .valid == false)' "remote picker must reject leading-hyphen profiles"
+remote_leading_hyphen_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use -alpha"; })"
+assert_jq_json "$remote_leading_hyphen_json" '.items[0].valid == false' "remote direct use must reject a leading-hyphen profile"
+assert_jq_json "$remote_leading_hyphen_json" '.items[0].arg == null or .items[0].arg == ""' "leading-hyphen remote profile must not dispatch"
 
 auth_use_json="$({ CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use"; })"
 assert_jq_json "$auth_use_json" '.items[0].title == "Current: beta.json"' "auth use should show current secret on first row"
@@ -1012,6 +1017,15 @@ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
 invalid_remote_profile_rc=$?
 set -e
 [[ "$invalid_remote_profile_rc" -eq 64 ]] || fail "remote profile grammar mismatch must fail before helper dispatch"
+
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::-alpha" >/dev/null 2>&1
+leading_hyphen_action_rc=$?
+set -e
+[[ "$leading_hyphen_action_rc" -eq 64 ]] || fail "remote leading-hyphen action must fail before helper dispatch"
 
 client_lock="$tmp_dir/client-auth.lock"
 client_lock_ready="$tmp_dir/client-auth.ready"

@@ -374,7 +374,7 @@ validate_use_secret_name() {
 validate_remote_profile_name() {
   local secret="$1"
   [[ -n "$secret" ]] || return 1
-  [[ "$secret" =~ ^[A-Za-z0-9._-]+$ ]]
+  [[ "$secret" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]
 }
 
 resolve_remote_authority() {

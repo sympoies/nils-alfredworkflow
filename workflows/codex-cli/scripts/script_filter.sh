@@ -1580,7 +1580,7 @@ remote_use_profile_supported() {
   local authority="${CODEX_AUTH_REMOTE_SSH:-}"
   authority="$(trim "$authority")"
   [[ -z "$authority" ]] && return 0
-  [[ "$secret" =~ ^[A-Za-z0-9._-]+$ ]]
+  [[ "$secret" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]
 }
 
 emit_use_profile_item() {
@@ -1885,6 +1885,14 @@ handle_use_query() {
 
   for file in "${sorted_files[@]}"; do
     local use_secret account_meta account_email account_weekly account_label account_non_weekly account_weekly_remaining account_weekly_epoch account_non_weekly_reset_epoch
+    account_meta=""
+    account_email=""
+    account_weekly=""
+    account_label=""
+    account_non_weekly=""
+    account_weekly_remaining=""
+    account_weekly_epoch=""
+    account_non_weekly_reset_epoch=""
     use_secret="${file%.json}"
     account_meta="$(lookup_diag_account_meta "$account_lookup_file" "$file" || true)"
     if [[ -n "$account_meta" ]]; then

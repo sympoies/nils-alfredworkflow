@@ -39,7 +39,7 @@ Options:
   --auto-commit           Stage touched files and create a semantic commit after pinning
   --auto-push             Push current branch after auto-commit (implies --auto-commit)
   --push-remote <name>    Remote to use with --auto-push (default: origin)
-  (always validates selected crate versions on crates.io before file edits)
+  (validates codex-cli on GitHub Releases and cargo-managed targets on crates.io before edits)
   --list-targets          Print supported targets and aliases
   -h, --help              Show this help
 USAGE
@@ -353,10 +353,22 @@ else:
     except Exception:
         sys.exit(4)
 
-expected = f"nils-cli-v{version}-aarch64-apple-darwin.tar.gz"
-expected_checksum = f"{expected}.sha256"
+targets = (
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+)
+expected_assets = {
+    asset
+    for target in targets
+    for asset in (
+        f"nils-cli-v{version}-{target}.tar.gz",
+        f"nils-cli-v{version}-{target}.tar.gz.sha256",
+    )
+}
 assets = {asset.get("name") for asset in data.get("assets", [])}
-if data.get("tag_name") != f"v{version}" or not {expected, expected_checksum}.issubset(assets):
+if data.get("tag_name") != f"v{version}" or not expected_assets.issubset(assets):
     sys.exit(5)
 PY
   if [[ "$status" -eq 0 ]]; then
@@ -376,14 +388,14 @@ PY
         NILS_CLI_RELEASE_CHECKSUMS+="${release_target}"$'\t'"${release_sha}"$'\n'
       done
     fi
-    echo "verified: GitHub release has sympoies/nils-cli@v${version} macOS arm64 archive and checksum assets"
+    echo "verified: GitHub release has sympoies/nils-cli@v${version} archive and checksum assets for every supported runtime target"
     return 0
   fi
 
   case "$status" in
     3) die "nils-cli release not found on GitHub: v${version}" ;;
     4) die "failed to query GitHub release: sympoies/nils-cli@v${version}" ;;
-    5) die "nils-cli release is missing the macOS arm64 archive or checksum: v${version}" ;;
+    5) die "nils-cli release is missing a supported runtime archive or checksum: v${version}" ;;
     *) die "release verification failed for sympoies/nils-cli@v${version}" ;;
   esac
 }

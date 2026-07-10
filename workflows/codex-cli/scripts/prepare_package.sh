@@ -114,7 +114,7 @@ resolve_source_bin() {
     exit 1
   fi
 
-  if [[ "$skip_version_check" != "1" ]]; then
+  if [[ "$skip_version_check" != "1" && "$skip_arch_check" != "1" ]]; then
     validate_version "$source_bin"
   fi
 
@@ -201,7 +201,7 @@ EOF
 
 source_bin="$(resolve_source_bin)"
 
-if [[ "$skip_version_check" != "1" ]]; then
+if [[ "$skip_version_check" != "1" && "$skip_arch_check" != "1" ]]; then
   validate_version "$source_bin"
 fi
 
