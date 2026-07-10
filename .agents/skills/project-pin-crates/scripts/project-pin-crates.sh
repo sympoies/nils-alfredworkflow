@@ -76,8 +76,8 @@ print_targets() {
   cat <<'TARGETS'
 codex-cli
   aliases: codex-cli, codex, nils-codex-cli
-  published_crate: nils-codex-cli
-  kind: workflow runtime pin + docs
+  release_source: sympoies/nils-cli GitHub release
+  kind: workflow release-bundle runtime pin + docs
 memo
   aliases: memo, nils-memo
   published_crate: nils-memo
@@ -175,27 +175,15 @@ pin_codex_cli() {
 
   replace_in_file \
     "$readme_file" \
-    'nils-codex-cli[@.][0-9A-Za-z.+-]+' \
-    "nils-codex-cli@${version}" \
-    "codex readme crate pin"
-
-  replace_in_file \
-    "$readme_file" \
     'codex-cli[@.][0-9A-Za-z.+-]+' \
     "codex-cli@${version}" \
     "codex readme runtime pin"
 
   replace_in_file \
-    "$readme_file" \
-    'cargo install nils-codex-cli --version [0-9A-Za-z.+-]+' \
-    "cargo install nils-codex-cli --version ${version}" \
-    "codex readme install hint pin"
-
-  replace_in_file \
     "$plist_file" \
-    'cargo install nils-codex-cli --version [0-9A-Za-z.+-]+' \
-    "cargo install nils-codex-cli --version ${version}" \
-    "codex plist install hint pin"
+    'nils-cli v[0-9A-Za-z.+-]+ release binary' \
+    "nils-cli v${version} release binary" \
+    "codex plist release pin"
 }
 
 pin_memo() {
@@ -308,15 +296,72 @@ PY
   esac
 }
 
+check_nils_cli_release_exists() {
+  local status=0
+  python3 - "$version" <<'PY' || status="$?"
+import json
+import sys
+import urllib.error
+import urllib.request
+
+version = sys.argv[1]
+url = f"https://api.github.com/repos/sympoies/nils-cli/releases/tags/v{version}"
+request = urllib.request.Request(
+    url,
+    headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "project-pin-crates/1.0",
+    },
+)
+try:
+    with urllib.request.urlopen(request, timeout=20) as response:
+        if response.status != 200:
+            sys.exit(4)
+        data = json.load(response)
+except urllib.error.HTTPError as exc:
+    if exc.code == 404:
+        sys.exit(3)
+    sys.exit(4)
+except Exception:
+    sys.exit(4)
+
+expected = f"nils-cli-v{version}-aarch64-apple-darwin.tar.gz"
+assets = {asset.get("name") for asset in data.get("assets", [])}
+if data.get("tag_name") != f"v{version}" or expected not in assets:
+    sys.exit(5)
+PY
+  if [[ "$status" -eq 0 ]]; then
+    echo "verified: GitHub release has sympoies/nils-cli@v${version} macOS arm64 asset"
+    return 0
+  fi
+
+  case "$status" in
+    3) die "nils-cli release not found on GitHub: v${version}" ;;
+    4) die "failed to query GitHub release: sympoies/nils-cli@v${version}" ;;
+    5) die "nils-cli release is missing the macOS arm64 bundle: v${version}" ;;
+    *) die "release verification failed for sympoies/nils-cli@v${version}" ;;
+  esac
+}
+
 verify_target_versions_available() {
   declare -A dedup=()
   local target crate
   for target in "${selected_targets[@]}"; do
-    crate="$(target_crate "$target")" || die "failed to resolve crate for target: $target"
-    if [[ -z "${dedup[$crate]:-}" ]]; then
-      dedup["$crate"]=1
-      check_crate_version_exists "$crate"
-    fi
+    case "$target" in
+      codex-cli)
+        if [[ -z "${dedup[nils-cli-release]:-}" ]]; then
+          dedup[nils-cli-release]=1
+          check_nils_cli_release_exists
+        fi
+        ;;
+      *)
+        crate="$(target_crate "$target")" || die "failed to resolve crate for target: $target"
+        if [[ -z "${dedup[$crate]:-}" ]]; then
+          dedup["$crate"]=1
+          check_crate_version_exists "$crate"
+        fi
+        ;;
+    esac
   done
   version_check_status="verified"
 }
@@ -429,7 +474,11 @@ print_summary() {
   echo "  push_status: ${push_status}"
   echo "  targets:"
   for target in "${selected_targets[@]}"; do
-    echo "    - ${target} (crate: $(target_crate "$target"))"
+    if [[ "$target" == codex-cli ]]; then
+      echo "    - ${target} (release: sympoies/nils-cli)"
+    else
+      echo "    - ${target} (crate: $(target_crate "$target"))"
+    fi
   done
   echo "  files:"
   for target in "${changed_files[@]:-}"; do

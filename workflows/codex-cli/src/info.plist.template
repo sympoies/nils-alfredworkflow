@@ -1014,7 +1014,7 @@
         <true/>
       </dict>
       <key>description</key>
-      <string>Optional absolute path override for codex-cli. Leave empty to use PATH (cargo install nils-codex-cli --version 0.7.3).</string>
+      <string>Optional absolute path override for codex-cli. Leave empty to use the bundled nils-cli v1.21.6 release binary.</string>
       <key>label</key>
       <string>CODEX_CLI_BIN</string>
       <key>type</key>
@@ -1063,6 +1063,27 @@
       <string>textfield</string>
       <key>variable</key>
       <string>CODEX_SECRET_DIR</string>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
+        <string></string>
+        <key>placeholder</key>
+        <string>sympoies</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional SSH alias for the Codex token authority. When set, cxau imports access-only auth without remote refresh or local auth-use fallback.</string>
+      <key>label</key>
+      <string>CODEX_AUTH_REMOTE_SSH</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>CODEX_AUTH_REMOTE_SSH</string>
     </dict>
     <dict>
       <key>config</key>

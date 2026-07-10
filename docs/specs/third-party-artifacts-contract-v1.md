@@ -74,8 +74,11 @@ Each per-crate section renders bullets in this order:
   `cargo metadata --format-version 1 --locked --filter-platform <target>` for supported platform targets
   (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `x86_64-unknown-linux-gnu`)
 - Node dependencies: `package-lock.json`
-- Runtime crate pin: `scripts/lib/codex_cli_version.sh` (`CODEX_CLI_CRATE`, `CODEX_CLI_VERSION`)
-- Runtime crate metadata: `https://crates.io/api/v1/crates/<runtime crate>/<version>`
+- Runtime release pin: `scripts/lib/codex_cli_version.sh`
+  (`CODEX_CLI_VERSION`, `CODEX_CLI_RELEASE_REPO`,
+  `CODEX_CLI_RELEASE_TARGET`, `CODEX_CLI_LICENSE`)
+- Runtime release metadata:
+  `https://api.github.com/repos/<owner>/<repo>/releases/tags/v<version>`
 
 ## Deterministic Rendering Rules
 
@@ -118,8 +121,8 @@ For each third-party Rust crate (`source != null`):
 The generator must fail closed (non-zero) when:
 
 - Required inputs are missing (`Cargo.lock`, `package-lock.json`, `scripts/lib/codex_cli_version.sh`).
-- Runtime crate pin variables are missing after sourcing `scripts/lib/codex_cli_version.sh`.
-- crates.io lookup fails (network/HTTP failure, invalid payload, or crate/version mismatch).
+- Runtime release pin variables are missing after sourcing `scripts/lib/codex_cli_version.sh`.
+- GitHub release lookup fails, the tag mismatches, or the pinned target asset is absent.
 - Required command dependencies are unavailable (`cargo`, `jq`, `curl`, `python3`).
 
 Diagnostics must include the failing input or command and expected corrective action.

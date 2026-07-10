@@ -142,6 +142,20 @@ JSON
     }
     printf '{"ok":true,"cmd":"auth use","target":"%s","argv":"%s"}\n' "${3:-}" "$*"
     ;;
+  remote)
+    [[ "${3:-}" == "pull" ]] || {
+      echo "unexpected auth remote command: $*" >&2
+      exit 9
+    }
+    if [[ "${4:-}" == "--help" ]]; then
+      echo "Pull remote auth over SSH"
+    else
+      printf '{"ok":true,"cmd":"auth remote pull","argv":"%s"}\n' "$*"
+    fi
+    ;;
+  sync)
+    printf '{"ok":true,"cmd":"auth sync","argv":"%s"}\n' "$*"
+    ;;
   *)
     echo "unexpected auth command: $*" >&2
     exit 9
@@ -162,6 +176,17 @@ diag)
 esac
 EOS
 chmod +x "$tmp_dir/stubs/codex-cli-ok"
+
+cat >"$tmp_dir/stubs/codex-cli-remote-fail" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"${CODEX_STUB_LOG:?}"
+case "$*" in
+  auth\ remote\ pull*) exit 7 ;;
+  *) printf '{"ok":true}\n' ;;
+esac
+EOS
+chmod +x "$tmp_dir/stubs/codex-cli-remote-fail"
 
 cat >"$tmp_dir/stubs/codex-cli-fail" <<'EOS'
 #!/usr/bin/env bash
@@ -625,73 +650,18 @@ exit 9
 EOS
 chmod +x "$tmp_dir/stubs/codex-cli-version-mismatch"
 
-cat >"$tmp_dir/stubs/cargo" <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ -n "${CARGO_STUB_LOG:-}" ]]; then
-  printf '%s\n' "$*" >>"$CARGO_STUB_LOG"
+release_target="test-apple-darwin"
+release_fixture="$tmp_dir/release-fixture"
+release_tree="$tmp_dir/release-tree"
+release_archive="nils-cli-v${codex_cli_pinned_version}-${release_target}.tar.gz"
+mkdir -p "$release_fixture" "$release_tree/bin"
+cp "$tmp_dir/stubs/codex-cli-ok" "$release_tree/bin/codex-cli"
+tar -czf "$release_fixture/$release_archive" -C "$release_tree" bin/codex-cli
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 "$release_fixture/$release_archive" >"$release_fixture/$release_archive.sha256"
+else
+  sha256sum "$release_fixture/$release_archive" >"$release_fixture/$release_archive.sha256"
 fi
-
-[[ "${1:-}" == "install" ]] || {
-  echo "unexpected cargo command: $*" >&2
-  exit 9
-}
-
-crate=""
-version=""
-root=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  install)
-    shift
-    ;;
-  --version)
-    version="${2:-}"
-    shift 2
-    ;;
-  --root)
-    root="${2:-}"
-    shift 2
-    ;;
-  --locked | --force)
-    shift
-    ;;
-  *)
-    if [[ -z "$crate" && "$1" != -* ]]; then
-      crate="$1"
-    fi
-    shift
-    ;;
-  esac
-done
-
-[[ "$crate" == "${CODEX_CLI_PINNED_CRATE:-nils-codex-cli}" ]] || {
-  echo "unexpected crate: $crate" >&2
-  exit 9
-}
-[[ -n "$version" ]] || {
-  echo "missing --version" >&2
-  exit 9
-}
-[[ -n "$root" ]] || {
-  echo "missing --root" >&2
-  exit 9
-}
-
-mkdir -p "$root/bin"
-cat >"$root/bin/codex-cli" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ "\${1:-}" == "--version" ]]; then
-  echo "codex-cli $version"
-  exit 0
-fi
-echo "unexpected command: \$*" >&2
-exit 9
-EOF
-chmod +x "$root/bin/codex-cli"
-EOS
-chmod +x "$tmp_dir/stubs/cargo"
 
 empty_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$empty_json" '.items | type == "array" and length >= 8' "empty query must return action items"
@@ -756,6 +726,9 @@ assert_jq_json "$auth_use_json" '.items | any(.title == "alpha.json" and (.subti
 auth_use_direct_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use alpha"; })"
 assert_jq_json "$auth_use_direct_json" '.items[0].arg == "use::alpha"' "auth use alpha should map to use::alpha"
 assert_jq_json "$auth_use_direct_json" '.items[0].valid == true' "auth use alpha item must be valid"
+
+auth_use_remote_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth use alpha"; })"
+assert_jq_json "$auth_use_remote_json" '.items[0].subtitle | contains("Remote access-only switch via sympoies")' "remote auth use row should identify authority routing"
 
 auth_use_nonzero_current_json="$({ CODEX_SECRET_DIR="$use_secret_dir" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-current-nonzero" "$workflow_dir/scripts/script_filter.sh" "auth use"; })"
 assert_jq_json "$auth_use_nonzero_current_json" '.items[0].title == "Current: sym.json"' "auth use should parse matched_secret from auth current --json even when command exits non-zero"
@@ -963,9 +936,27 @@ CODEX_API_KEY="sk-test-smoke-key" CODEX_STUB_LOG="$action_log" CODEX_STDIN_OUT="
 [[ "$(tail -n1 "$action_log")" == "auth login --api-key" ]] || fail "api-key login should keep command mapping"
 [[ "$(cat "$api_key_stdin_out")" == "sk-test-smoke-key" ]] || fail "api-key login must pass CODEX_API_KEY via stdin"
 
-CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+env -u CODEX_AUTH_REMOTE_SSH CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
   "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null
 [[ "$(tail -n1 "$action_log")" == "auth use alpha" ]] || fail "use mapping mismatch"
+
+: >"$action_log"
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null
+expected_remote_use=$'auth remote pull --format json --ssh sympoies --name alpha --access-only --write-active\nauth sync --format json'
+[[ "$(<"$action_log")" == "$expected_remote_use" ]] || fail "remote use mapping/order mismatch"
+if rg -n -- '--refresh|auth use' "$action_log" >/dev/null 2>&1; then
+  fail "remote use must not refresh or fall back to local auth use"
+fi
+
+: >"$action_log"
+set +e
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-remote-fail" \
+  "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null 2>&1
+remote_use_fail_rc=$?
+set -e
+[[ "$remote_use_fail_rc" -eq 7 ]] || fail "remote pull failure should preserve exit 7"
+[[ "$(<"$action_log")" == "auth remote pull --format json --ssh sympoies --name alpha --access-only --write-active" ]] || fail "remote failure must not sync or fall back"
 
 auth_file_out="$tmp_dir/auth-file.out"
 env -u CODEX_AUTH_FILE CODEX_AUTH_FILE_OUT="$auth_file_out" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-capture-auth-file" \
@@ -1213,29 +1204,24 @@ set -e
 
 set +e
 PATH="/usr/bin:/bin" \
-  CODEX_CLI_PACK_INSTALL_ROOT="$tmp_dir/pinned-install-missing-cargo" \
+  CODEX_CLI_RELEASE_BASE_URL="file://$tmp_dir/missing-release" \
+  CODEX_CLI_RELEASE_TARGET="$release_target" \
+  CODEX_CLI_PACK_INSTALL_ROOT="$tmp_dir/pinned-install-missing-release" \
   "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-missing-bin" --workflow-root "$workflow_dir" >/dev/null 2>&1
 prepare_missing_rc=$?
 set -e
-[[ "$prepare_missing_rc" -eq 1 ]] || fail "prepare_package should fail when codex-cli is unavailable and cargo is missing"
+[[ "$prepare_missing_rc" -eq 1 ]] || fail "prepare_package should fail when the pinned release asset is unavailable"
 
-cargo_stub_log="$tmp_dir/cargo-stub.log"
 pinned_install_root="$tmp_dir/codex-pinned-install"
-PATH="$tmp_dir/stubs:/usr/bin:/bin" CARGO_STUB_LOG="$cargo_stub_log" CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-version-mismatch" \
+PATH="/usr/bin:/bin" CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-version-mismatch" \
+  CODEX_CLI_RELEASE_BASE_URL="file://$release_fixture" CODEX_CLI_RELEASE_TARGET="$release_target" \
   CODEX_CLI_PACK_INSTALL_ROOT="$pinned_install_root" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
   "$workflow_dir/scripts/prepare_package.sh" --stage-dir "$tmp_dir/stage-auto-install" --workflow-root "$workflow_dir" >/dev/null
 
 assert_file "$tmp_dir/stage-auto-install/bin/codex-cli"
-[[ "$("$tmp_dir/stage-auto-install/bin/codex-cli" --version)" == "codex-cli ${codex_cli_pinned_version}" ]] || fail "prepare_package should auto-install pinned codex-cli version"
-if ! rg -n "^install ${codex_cli_pinned_crate} " "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should invoke cargo install for pinned codex-cli"
-fi
-if ! rg -n --fixed-strings -- "--version ${codex_cli_pinned_version}" "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should request pinned codex-cli version in cargo install"
-fi
-if ! rg -n --fixed-strings -- "--root $pinned_install_root" "$cargo_stub_log" >/dev/null 2>&1; then
-  fail "prepare_package should pass CODEX_CLI_PACK_INSTALL_ROOT to cargo install"
-fi
+[[ "$("$tmp_dir/stage-auto-install/bin/codex-cli" --version)" == "codex-cli ${codex_cli_pinned_version}" ]] || fail "prepare_package should bundle pinned release codex-cli version"
+assert_file "$pinned_install_root/$release_archive"
+assert_file "$pinned_install_root/$release_archive.sha256"
 
 CODEX_CLI_PACK_BIN="$tmp_dir/stubs/codex-cli-ok" CODEX_CLI_PACK_SKIP_ARCH_CHECK=1 \
   "$repo_root/scripts/workflow-pack.sh" --id codex-cli >/dev/null
@@ -1287,10 +1273,11 @@ assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workfl
 assert_jq_file "$packaged_json_file" '[.objects[] | select(.type=="alfred.workflow.input.scriptfilter") | .config.queuedelayimmediatelyinitially] | all(. == false)' "all codex script filters must disable immediate initial run"
 assert_jq_file "$packaged_json_file" '.connections | length == 16' "plist must include eight scriptfilter-to-action connections and eight hotkey routes"
 assert_jq_file "$packaged_json_file" '.connections["771DC53D-E670-447A-9983-1E513A55CA1E"][0].destinationuid == "B7D3A21F-6B44-4CF9-9CC3-3CE9D9F4E9D7"' "cxau hotkey must target cxau script filter"
-assert_jq_file "$packaged_json_file" '.userconfigurationconfig | length >= 4' "plist must expose codex workflow config variables"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig | length >= 5' "plist must expose codex workflow config variables"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_CLI_BIN") | .config.default == ""' "CODEX_CLI_BIN config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_AUTH_FILE") | .config.default == ""' "CODEX_AUTH_FILE config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_SECRET_DIR") | .config.default == ""' "CODEX_SECRET_DIR config row missing"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_AUTH_REMOTE_SSH") | .config.default == ""' "CODEX_AUTH_REMOTE_SSH config row missing"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="CODEX_DIAG_CACHE_TTL_SECONDS") | .config.default == "300"' "CODEX_DIAG_CACHE_TTL_SECONDS config row missing"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.keyword == "cx||codex"' "keyword trigger must be cx"
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10") | .config.scriptfile == "./scripts/script_filter.sh"' "script filter wiring mismatch"
@@ -1313,5 +1300,7 @@ assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="EC219E70-FAD4-4
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.scriptfile == "./scripts/action_open.sh"' "action wiring mismatch"
 assert_jq_file "$packaged_json_file" '.readme | contains("# Codex CLI - Alfred Workflow")' "readme heading should be synced from README.md"
 assert_jq_file "$packaged_json_file" '.readme | test("\\|\\s*-{3,}\\s*\\|") | not' "readme table separators must be downgraded"
+
+"$packaged_dir/bin/codex-cli" auth remote pull --help >/dev/null || fail "packaged codex-cli must expose auth remote pull"
 
 echo "ok: codex-cli smoke test"

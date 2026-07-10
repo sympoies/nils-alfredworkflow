@@ -39,6 +39,18 @@ Use this file for maintainer-side packaging, install, and macOS acceptance flows
      `cargo install --locked --root <cache-root>` and bundle that installed binary.
 - This policy avoids accidental version drift while keeping packaging reproducible across machines.
 
+### nils-cli release-bundle exception
+
+- The Codex workflow consumes the release-coupled `codex-cli` binary from the
+  `sympoies/nils-cli` GitHub release because current nils-cli bundle versions can
+  lead the independently published crates.io package.
+- Its packaging order is explicit local override, exact-version PATH binary,
+  cached verified GitHub release asset, then a fresh download of the pinned
+  `aarch64-apple-darwin` asset and checksum.
+- `CODEX_CLI_RELEASE_REPO`, `CODEX_CLI_RELEASE_TARGET`, and
+  `CODEX_CLI_RELEASE_BASE_URL` exist for controlled test/mirror overrides; the
+  workflow default remains the official matching nils-cli release.
+
 ### External crate exact-pin policy
 
 - Third-party crates used by workspace crates must be exact-pinned (for example `foo = "=1.2.3"`), not loose semver

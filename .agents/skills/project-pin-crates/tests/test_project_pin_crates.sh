@@ -27,6 +27,7 @@ echo "$targets_out" | rg -n "^memo$" >/dev/null
 echo "$targets_out" | rg -n "nils-memo" >/dev/null
 
 "${entrypoint}" --version 1.0.0 --dry-run >/dev/null
+"${entrypoint}" --version 1.21.6 --targets codex-cli --dry-run >/dev/null
 "${entrypoint}" --version 1.0.0 --targets nils-codex-cli,nils-memo --dry-run >/dev/null
 "${entrypoint}" --version 1.0.0 --dry-run --auto-commit >/dev/null
 "${entrypoint}" --version 1.0.0 --dry-run --auto-push >/dev/null

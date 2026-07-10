@@ -373,6 +373,17 @@ validate_use_secret_name() {
   [[ "$secret" =~ ^[A-Za-z0-9._@-]+$ ]]
 }
 
+resolve_remote_authority() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]] || return 1
+  if [[ ! "$authority" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+    echo "invalid CODEX_AUTH_REMOTE_SSH value" >&2
+    return 64
+  fi
+  printf '%s\n' "$authority"
+}
+
 resolve_workflow_cache_dir() {
   local candidate
   for candidate in \
@@ -644,6 +655,46 @@ run_codex_command() {
   fi
 }
 
+run_remote_auth_use() {
+  local codex_cli="$1"
+  local authority="$2"
+  local secret="$3"
+  local rc=0
+
+  set +e
+  CODEX_AUTO_REFRESH_ENABLED=false \
+    CODEX_AUTH_REMOTE_REFRESH=false \
+    "$codex_cli" auth remote pull \
+      --format json \
+      --ssh "$authority" \
+      --name "$secret" \
+      --access-only \
+      --write-active \
+      >/dev/null 2>&1
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    notify "Failed(${rc}): remote access-only switch via ${authority}"
+    echo "Remote access-only pull failed for ${secret} via ${authority}; local auth was not used." >&2
+    return "$rc"
+  fi
+
+  set +e
+  CODEX_AUTO_REFRESH_ENABLED=false \
+    CODEX_AUTH_REMOTE_REFRESH=false \
+    "$codex_cli" auth sync --format json >/dev/null 2>&1
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    notify "Failed(${rc}): access-only cache sync"
+    echo "Remote auth activated, but local access-only cache sync failed for ${secret}." >&2
+    return "$rc"
+  fi
+
+  notify "Success: remote access-only switch via ${authority}"
+  printf 'Active %s via %s (access-only)\n' "$secret" "$authority"
+}
+
 run_codex_diag_command() {
   local codex_cli="$1"
   local mode="$2"
@@ -842,7 +893,18 @@ use::*)
     echo "invalid use action token: $action_token" >&2
     exit 2
   fi
-  run_codex_command "$codex_cli" "auth use $secret" auth use "$secret"
+  remote_authority=""
+  if remote_authority="$(resolve_remote_authority)"; then
+    run_remote_auth_use "$codex_cli" "$remote_authority" "$secret"
+  else
+    remote_authority_rc=$?
+    if [[ "$remote_authority_rc" -eq 1 ]]; then
+      run_codex_command "$codex_cli" "auth use $secret" auth use "$secret"
+    else
+      notify "Failed(${remote_authority_rc}): invalid remote authority"
+      exit "$remote_authority_rc"
+    fi
+  fi
   exit $?
   ;;
 save::*)

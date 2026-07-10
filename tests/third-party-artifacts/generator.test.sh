@@ -72,6 +72,9 @@ setup_fixture() {
 #!/usr/bin/env bash
 CODEX_CLI_CRATE="fixture-runtime-crate"
 CODEX_CLI_VERSION="1.2.3"
+CODEX_CLI_RELEASE_REPO="fixture-owner/fixture-runtime"
+CODEX_CLI_RELEASE_TARGET="aarch64-apple-darwin"
+CODEX_CLI_LICENSE="MIT"
 CODEX_CLI_PINNED_CRATE="$CODEX_CLI_CRATE"
 CODEX_CLI_PINNED_VERSION="$CODEX_CLI_VERSION"
 __PIN__
@@ -113,7 +116,7 @@ __LOCK__
 set -euo pipefail
 
 url="${@: -1}"
-expected="https://crates.io/api/v1/crates/fixture-runtime-crate/1.2.3"
+expected="https://api.github.com/repos/fixture-owner/fixture-runtime/releases/tags/v1.2.3"
 if [[ "$url" != "$expected" ]]; then
   echo "unexpected URL: $url" >&2
   exit 1
@@ -121,12 +124,14 @@ fi
 
 cat <<'JSON'
 {
-  "version": {
-    "crate": "fixture-runtime-crate",
-    "num": "1.2.3",
-    "license": "MIT",
-    "repository": "https://example.com/fixture-runtime"
-  }
+  "tag_name": "v1.2.3",
+  "html_url": "https://github.com/fixture-owner/fixture-runtime/releases/tag/v1.2.3",
+  "assets": [
+    {
+      "name": "nils-cli-v1.2.3-aarch64-apple-darwin.tar.gz",
+      "browser_download_url": "https://github.com/fixture-owner/fixture-runtime/releases/download/v1.2.3/nils-cli-v1.2.3-aarch64-apple-darwin.tar.gz"
+    }
+  ]
 }
 JSON
 __CURL__

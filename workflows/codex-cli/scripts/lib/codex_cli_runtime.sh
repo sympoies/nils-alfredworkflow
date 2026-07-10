@@ -24,11 +24,23 @@ codex_cli_runtime_source_version_contract() {
 
 if ! codex_cli_runtime_source_version_contract; then
   if [[ -z "${CODEX_CLI_VERSION:-}" ]]; then
-    CODEX_CLI_VERSION="0.7.3"
+    CODEX_CLI_VERSION="1.21.6"
   fi
 
   if [[ -z "${CODEX_CLI_CRATE:-}" ]]; then
     CODEX_CLI_CRATE="nils-codex-cli"
+  fi
+
+  if [[ -z "${CODEX_CLI_RELEASE_REPO:-}" ]]; then
+    CODEX_CLI_RELEASE_REPO="sympoies/nils-cli"
+  fi
+
+  if [[ -z "${CODEX_CLI_RELEASE_TARGET:-}" ]]; then
+    CODEX_CLI_RELEASE_TARGET="aarch64-apple-darwin"
+  fi
+
+  if [[ -z "${CODEX_CLI_LICENSE:-}" ]]; then
+    CODEX_CLI_LICENSE="MIT"
   fi
 fi
 

@@ -1562,6 +1562,21 @@ build_use_subtitle() {
   printf '%s | reset %s | %s\n' "$email" "$weekly_reset" "$command_hint"
 }
 
+build_use_route_hint() {
+  local secret="$1"
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  if [[ -n "$authority" ]]; then
+    if [[ "$authority" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+      printf 'Remote access-only switch via %s\n' "$authority"
+    else
+      printf 'Remote authority configuration invalid\n'
+    fi
+  else
+    printf 'Run codex-cli auth use %s\n' "$secret"
+  fi
+}
+
 build_use_usage_suffix() {
   local label="$1"
   local non_weekly="$2"
@@ -1637,7 +1652,7 @@ handle_use_query() {
 
     emit_item \
       "Run auth use ${normalized_secret}" \
-      "Switch active auth to ${normalized_secret}.json" \
+      "$(build_use_route_hint "$normalized_secret")" \
       "use::${normalized_secret}" \
       true \
       "use ${normalized_secret}"
@@ -1685,7 +1700,7 @@ handle_use_query() {
       else
         emit_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
+          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
           "use::${current_secret}" \
           true \
           "use ${current_secret}"
@@ -1722,7 +1737,7 @@ handle_use_query() {
       else
         emit_item \
           "Current: ${current_json}" \
-          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
+          "$(build_use_subtitle "${current_cached_email:-"-"}" "${current_cached_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
           "use::${current_secret}" \
           true \
           "use ${current_secret}"
@@ -1779,7 +1794,7 @@ handle_use_query() {
     else
       emit_item \
         "Current: ${current_json}" \
-        "$(build_use_subtitle "${current_email:-"-"}" "${current_weekly:-"-"}" "Press Enter to run codex-cli auth use ${current_secret}")" \
+        "$(build_use_subtitle "${current_email:-"-"}" "${current_weekly:-"-"}" "$(build_use_route_hint "$current_secret")")" \
         "use::${current_secret}" \
         true \
         "use ${current_secret}"
@@ -1841,7 +1856,7 @@ handle_use_query() {
     fi
     emit_item \
       "$(build_use_title "$file" "${account_label:-}" "${account_non_weekly:-}" "${account_weekly_remaining:-}" "${account_non_weekly_reset_epoch:-}" "${account_weekly_epoch:-}")" \
-      "$(build_use_subtitle "${account_email:-}" "${account_weekly:-}" "Run codex-cli auth use ${use_secret}")" \
+      "$(build_use_subtitle "${account_email:-}" "${account_weekly:-}" "$(build_use_route_hint "$use_secret")")" \
       "use::${use_secret}" \
       true \
       "use ${use_secret}"
