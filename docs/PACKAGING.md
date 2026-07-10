@@ -30,27 +30,28 @@ Use this file for maintainer-side packaging, install, and macOS acceptance flows
 
 ## Packaging policy
 
-### Crates.io runtime packaging policy
+### Bundled runtime packaging policy
 
-- When a workflow bundles a runtime binary published on crates.io, packaging scripts must follow this order:
-  1. Prefer explicit local override (for example `*_PACK_BIN`).
-  2. Then use local PATH binary.
-  3. If the binary is missing or not the pinned version, auto-install the pinned crate version from crates.io via
-     `cargo install --locked --root <cache-root>` and bundle that installed binary.
-- This policy avoids accidental version drift while keeping packaging reproducible across machines.
-
-### nils-cli release-bundle exception
-
-- The Codex workflow consumes the release-coupled `codex-cli` binary from the
-  `sympoies/nils-cli` GitHub release because current nils-cli bundle versions can
-  lead the independently published crates.io package.
+- When a workflow bundles a runtime binary, packaging resolves it from the
+  official pinned release, not from a local build or crates.io.
 - Production packaging always downloads the official pinned target archive and
-  checksum, then verifies both against the repository-pinned SHA-256 before
-  extracting `codex-cli`. The install root is a download/extraction workspace,
+  its checksum, then verifies both against the repository-pinned SHA-256 before
+  extracting the binary. The install root is a download/extraction workspace,
   not a trusted binary cache.
-- `CODEX_CLI_PACK_BIN`, `CODEX_CLI_RELEASE_BASE_URL`, and checksum overrides are
-  accepted only with `CODEX_CLI_RELEASE_TEST_MODE=1` for hermetic fixtures.
-  Production packaging rejects those overrides.
+- Repository-pinned per-target digests are the source of truth: every downloaded
+  candidate is verified against them, so a mutable co-published checksum is never
+  trusted on its own. This keeps packaging reproducible across machines without
+  relying on a local binary's self-reported version.
+- Local binary overrides, alternate release base URLs, and checksum overrides are
+  explicit test-mode-only inputs for hermetic fixtures. Production packaging
+  rejects them. For the Codex workflow these are `CODEX_CLI_PACK_BIN`,
+  `CODEX_CLI_RELEASE_BASE_URL`, and the checksum override, all gated behind
+  `CODEX_CLI_RELEASE_TEST_MODE=1`.
+- The Codex workflow is the reference implementation of this policy: it consumes
+  the release-coupled `codex-cli` binary from the `sympoies/nils-cli` GitHub
+  release because current nils-cli bundle versions can lead the independently
+  published crates.io package. Restoring a crates.io `cargo install` packaging
+  path is disallowed and enforced by `scripts/ci/ci-workflow-audit.sh`.
 
 ### External crate exact-pin policy
 

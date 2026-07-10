@@ -968,6 +968,7 @@ env -u CODEX_AUTH_REMOTE_SSH CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_di
 peer_helper="$tmp_dir/stubs/codex-auth-peer-pull"
 peer_log="$tmp_dir/peer-helper.log"
 peer_path_out="$tmp_dir/peer-helper-path.out"
+peer_env_out="$tmp_dir/peer-helper-env.out"
 cat >"$peer_helper" <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -986,17 +987,21 @@ PY
 fi
 printf '%s\n' "$*" >>"${PEER_STUB_LOG:?}"
 printf '%s\n' "${PATH%%:*}" >"${PEER_PATH_OUT:?}"
+if [[ -n "${PEER_ENV_OUT:-}" ]]; then
+  printf '%s\n%s\n' "${CODEX_AUTO_REFRESH_ENABLED-<unset>}" "${CODEX_AUTH_REMOTE_REFRESH-<unset>}" >"${PEER_ENV_OUT}"
+fi
 exit "${PEER_STUB_RC:-0}"
 EOS
 chmod +x "$peer_helper"
 : >"$peer_log"
 CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTH_PEER_PULL_BIN="$peer_helper" \
-  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" \
+  PEER_STUB_LOG="$peer_log" PEER_PATH_OUT="$peer_path_out" PEER_ENV_OUT="$peer_env_out" \
   CODEX_STUB_LOG="$action_log" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
   "$workflow_dir/scripts/action_open.sh" "use::alpha" >/dev/null
 [[ "$(<"$peer_log")" == "--authority sympoies --name alpha" ]] || fail "remote use must delegate exactly once to the peer helper"
 [[ ! -s "$action_log" ]] || fail "remote helper mode must not invoke codex-cli directly"
 [[ "$(<"$peer_path_out")" == "$tmp_dir/stubs" ]] || fail "remote helper PATH must prefer the packaged codex-cli directory"
+[[ "$(<"$peer_env_out")" == $'false\nfalse' ]] || fail "remote use must suppress auth refresh (CODEX_AUTO_REFRESH_ENABLED/CODEX_AUTH_REMOTE_REFRESH=false) toward the peer helper"
 
 : >"$peer_log"
 : >"$action_log"
