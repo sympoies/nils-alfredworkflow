@@ -388,6 +388,22 @@ resolve_remote_authority() {
   printf '%s\n' "$authority"
 }
 
+remote_auth_mode_enabled() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]]
+}
+
+block_local_auth_writer_in_remote_mode() {
+  local action="$1"
+  if ! remote_auth_mode_enabled; then
+    return 0
+  fi
+  notify "Blocked: ${action} is authority-only"
+  echo "${action} is disabled on an access-only replica; run it on the configured authority." >&2
+  return 77
+}
+
 resolve_auth_peer_pull_bin() {
   local candidate="${CODEX_AUTH_PEER_PULL_BIN:-}"
   local home_prefix
@@ -884,6 +900,21 @@ run_codex_login_device_code() {
 }
 
 action_token="$1"
+if remote_auth_mode_enabled; then
+  export CODEX_AUTO_REFRESH_ENABLED=false
+  export CODEX_AUTH_REMOTE_REFRESH=false
+fi
+case "$action_token" in
+login::*)
+  if block_local_auth_writer_in_remote_mode "auth login"; then :; else exit $?; fi
+  ;;
+save::*)
+  if block_local_auth_writer_in_remote_mode "auth save"; then :; else exit $?; fi
+  ;;
+remove::*)
+  if block_local_auth_writer_in_remote_mode "auth remove"; then :; else exit $?; fi
+  ;;
+esac
 codex_cli=""
 if ! codex_cli="$(resolve_codex_cli)"; then
   exit 1

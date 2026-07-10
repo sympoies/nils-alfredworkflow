@@ -1024,24 +1024,33 @@ emit_runtime_status() {
 }
 
 emit_auth_action_items() {
-  emit_item \
-    "auth login (browser)" \
-    "Run codex-cli auth login" \
-    "login::browser" \
-    true \
-    "login"
-  emit_item \
-    "auth login --api-key" \
-    "Run codex-cli auth login --api-key" \
-    "login::api-key" \
-    true \
-    "login --api-key"
-  emit_item \
-    "auth login --device-code" \
-    "Run codex-cli auth login --device-code" \
-    "login::device-code" \
-    true \
-    "login --device-code"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "auth login is authority-only" \
+      "Remote mode is access-only; run login on the configured authority." \
+      "" \
+      false \
+      "login"
+  else
+    emit_item \
+      "auth login (browser)" \
+      "Run codex-cli auth login" \
+      "login::browser" \
+      true \
+      "login"
+    emit_item \
+      "auth login --api-key" \
+      "Run codex-cli auth login --api-key" \
+      "login::api-key" \
+      true \
+      "login --api-key"
+    emit_item \
+      "auth login --device-code" \
+      "Run codex-cli auth login --device-code" \
+      "login::device-code" \
+      true \
+      "login --device-code"
+  fi
   emit_item \
     "auth save <secret.json>" \
     "Type: save team-alpha.json (or save --yes team-alpha.json)" \
@@ -1583,6 +1592,12 @@ remote_use_profile_supported() {
   [[ "$secret" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]
 }
 
+remote_auth_mode_enabled() {
+  local authority="${CODEX_AUTH_REMOTE_SSH:-}"
+  authority="$(trim "$authority")"
+  [[ -n "$authority" ]]
+}
+
 emit_use_profile_item() {
   local title="$1"
   local email="$2"
@@ -1916,6 +1931,15 @@ handle_use_query() {
 
 handle_login_query() {
   local lower_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth login is authority-only" \
+      "This workflow is in access-only remote mode; run login on the authority host." \
+      "" \
+      false \
+      "login"
+    return
+  fi
   local mode="browser"
 
   local has_api=0
@@ -1975,6 +1999,15 @@ handle_login_query() {
 
 handle_save_query() {
   local raw_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth save is disabled in remote mode" \
+      "The replica helper owns access-only named-cache updates." \
+      "" \
+      false \
+      "save "
+    return
+  fi
   local remainder
   local yes_flag=0
   local secret=""
@@ -2050,6 +2083,15 @@ handle_save_query() {
 
 handle_remove_query() {
   local raw_query="$1"
+  if remote_auth_mode_enabled; then
+    emit_item \
+      "Auth remove is disabled in remote mode" \
+      "Manage authority profiles on the authority host; replicas only sync." \
+      "" \
+      false \
+      "remove "
+    return
+  fi
   local remainder
   local yes_flag=0
   local secret=""
@@ -2391,6 +2433,11 @@ handle_diag_query() {
 query="$(sfqp_resolve_query_input "${1:-}")"
 trimmed_query="$(trim "$query")"
 lower_query="$(to_lower "$trimmed_query")"
+
+if remote_auth_mode_enabled; then
+  export CODEX_AUTO_REFRESH_ENABLED=false
+  export CODEX_AUTH_REMOTE_REFRESH=false
+fi
 
 begin_items
 ensure_codex_auth_file_env >/dev/null 2>&1 || true

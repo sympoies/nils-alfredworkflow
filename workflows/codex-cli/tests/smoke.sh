@@ -676,6 +676,15 @@ auth_root_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/s
 assert_jq_json "$auth_root_json" '.items | any(.arg == "login::browser")' "auth root should include login actions"
 assert_jq_json "$auth_root_json" '.items | any(.arg == "diag::default") | not' "auth root should hide diag actions"
 
+remote_auth_root_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth"; })"
+assert_jq_json "$remote_auth_root_json" '.items | any((.arg == "login::browser" or .arg == "login::api-key" or .arg == "login::device-code") and .valid == true) | not' "remote auth root must not expose valid local login actions"
+remote_login_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth login"; })"
+assert_jq_json "$remote_login_json" '.items[0].valid == false' "remote mode login query must be invalid"
+remote_save_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "save remote-test.json"; })"
+assert_jq_json "$remote_save_json" '.items[0].valid == false' "remote mode save query must be invalid"
+remote_remove_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "remove remote-test.json"; })"
+assert_jq_json "$remote_remove_json" '.items[0].valid == false' "remote mode remove query must be invalid"
+
 login_api_json="$({ CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "login --api-key"; })"
 assert_jq_json "$login_api_json" '.items[0].arg == "login::api-key"' "login api-key mapping mismatch"
 assert_jq_json "$login_api_json" '.items[0].valid == true' "login api-key item must be valid"
@@ -1061,6 +1070,38 @@ set -e
 [[ ! -s "$peer_log" && ! -s "$action_log" ]] || fail "lock contention must perform no auth writer action"
 : >"$client_lock_release"
 wait "$client_lock_holder"
+
+for blocked_remote_writer in \
+  login::browser \
+  login::api-key \
+  login::device-code \
+  save::remote-test.json::1 \
+  remove::remote-test.json::1; do
+  : >"$action_log"
+  set +e
+  CODEX_AUTH_REMOTE_SSH=sympoies CODEX_API_KEY=fixture-key \
+    CODEX_SECRET_DIR="$use_secret_dir" CODEX_STUB_LOG="$action_log" \
+    CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" \
+    "$workflow_dir/scripts/action_open.sh" "$blocked_remote_writer" >/dev/null 2>&1
+  blocked_remote_writer_rc=$?
+  set -e
+  [[ "$blocked_remote_writer_rc" -eq 77 ]] || fail "remote mode must reject local auth writer: $blocked_remote_writer"
+  [[ ! -s "$action_log" ]] || fail "blocked remote writer invoked codex-cli: $blocked_remote_writer"
+done
+
+refresh_flags_out="$tmp_dir/refresh-flags.out"
+cat >"$tmp_dir/stubs/codex-cli-capture-refresh-flags" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\n' "${CODEX_AUTO_REFRESH_ENABLED:-unset}" "${CODEX_AUTH_REMOTE_REFRESH:-unset}" >"${CODEX_REFRESH_FLAGS_OUT:?}"
+exec "${CODEX_DELEGATE_BIN:?}" "$@"
+EOS
+chmod +x "$tmp_dir/stubs/codex-cli-capture-refresh-flags"
+CODEX_AUTH_REMOTE_SSH=sympoies CODEX_AUTO_REFRESH_ENABLED=true CODEX_AUTH_REMOTE_REFRESH=true \
+  CODEX_REFRESH_FLAGS_OUT="$refresh_flags_out" CODEX_DELEGATE_BIN="$tmp_dir/stubs/codex-cli-ok" \
+  CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-capture-refresh-flags" \
+  "$workflow_dir/scripts/action_open.sh" "diag::default" >/dev/null
+[[ "$(<"$refresh_flags_out")" == "false false" ]] || fail "remote mode must disable implicit refresh for diagnostics"
 
 auth_file_out="$tmp_dir/auth-file.out"
 env -u CODEX_AUTH_FILE CODEX_AUTH_FILE_OUT="$auth_file_out" CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-capture-auth-file" \

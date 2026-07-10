@@ -56,7 +56,7 @@ Must render sections in this exact order:
 - `## Node Packages`
   - `Package | Version | License | Resolved`
 - `## External Packaged Runtime`
-  - `Crate | Version | License | Repository | Source`
+  - `Runtime | Version | License | Repository | Source`
 
 `THIRD_PARTY_NOTICES.md` uses deterministic per-crate bullet sections under `## Dependency Notices`.
 Each per-crate section renders bullets in this order:

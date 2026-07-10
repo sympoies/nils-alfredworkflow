@@ -4,6 +4,12 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 
+rg -n --fixed-strings '  - `Runtime | Version | License | Repository | Source`' \
+  "$repo_root/docs/specs/third-party-artifacts-contract-v1.md" >/dev/null || {
+  echo "error: external runtime contract header is not aligned with the generated artifact" >&2
+  exit 1
+}
+
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/third-party-artifacts-generator.test.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
 

@@ -53,6 +53,9 @@ Auth use behavior:
   shared client lock, access-only pull, purge, named save, postconditions,
   sync, and final cache audit. Alfred never refreshes or falls back to local
   `auth use` in this mode.
+- Remote mode also disables local `auth login`, `auth save`, and `auth remove`;
+  login and profile management stay on the authority. Diagnostic subprocesses
+  receive both auto-refresh flags as `false`.
 
 No `CODEX_SECRET_DIR` saved secrets behavior:
 
