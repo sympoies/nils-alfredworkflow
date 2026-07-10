@@ -68,6 +68,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Third-party artifacts audit (strict)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/ci/ci-run-gates.sh third-party-artifacts-audit
 
       - name: Node scraper tests

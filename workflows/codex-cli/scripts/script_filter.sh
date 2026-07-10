@@ -1031,6 +1031,18 @@ emit_auth_action_items() {
       "" \
       false \
       "login"
+    emit_item \
+      "auth save is authority-only" \
+      "Remote mode is access-only; manage saved profiles on the configured authority." \
+      "" \
+      false \
+      ""
+    emit_item \
+      "auth remove is authority-only" \
+      "Remote mode is access-only; manage saved profiles on the configured authority." \
+      "" \
+      false \
+      ""
   else
     emit_item \
       "auth login (browser)" \
@@ -1050,19 +1062,19 @@ emit_auth_action_items() {
       "login::device-code" \
       true \
       "login --device-code"
+    emit_item \
+      "auth save <secret.json>" \
+      "Type: save team-alpha.json (or save --yes team-alpha.json)" \
+      "" \
+      false \
+      "save "
+    emit_item \
+      "auth remove <secret.json>" \
+      "Type: remove team-alpha.json (or remove --yes team-alpha.json)" \
+      "" \
+      false \
+      "remove "
   fi
-  emit_item \
-    "auth save <secret.json>" \
-    "Type: save team-alpha.json (or save --yes team-alpha.json)" \
-    "" \
-    false \
-    "save "
-  emit_item \
-    "auth remove <secret.json>" \
-    "Type: remove team-alpha.json (or remove --yes team-alpha.json)" \
-    "" \
-    false \
-    "remove "
   emit_item \
     "auth use <secret>" \
     "Type: use alpha (or open cxau to pick from saved JSON secrets)." \

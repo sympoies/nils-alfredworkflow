@@ -224,24 +224,34 @@ runtime_fetch_user_agent="${THIRD_PARTY_LICENSES_USER_AGENT:-nils-alfredworkflow
 
 runtime_fetch_error_file="$tmp_root/runtime-release-fetch.stderr"
 runtime_fetch_ok=0
+runtime_curl_args=(
+  -fsSL
+  --retry 0
+  --connect-timeout 10
+  --max-time 30
+  -A "$runtime_fetch_user_agent"
+  -H 'Accept: application/vnd.github+json'
+  -H 'X-GitHub-Api-Version: 2022-11-28'
+)
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  runtime_curl_args+=(
+    -H "Authorization: Bearer ${GITHUB_TOKEN}"
+  )
+fi
 
 for ((runtime_fetch_attempt = 1; runtime_fetch_attempt <= runtime_fetch_attempts; runtime_fetch_attempt++)); do
   : >"$runtime_fetch_error_file"
-  if curl -fsSL \
-    --retry 0 \
-    --connect-timeout 10 \
-    --max-time 30 \
-    -A "$runtime_fetch_user_agent" \
-    -H 'Accept: application/json' \
+  if curl "${runtime_curl_args[@]}" \
     "$runtime_source_url" >"$runtime_response_json" 2>"$runtime_fetch_error_file"; then
     runtime_fetch_ok=1
     if [[ "$runtime_fetch_attempt" -gt 1 ]]; then
       echo "note: runtime release fetch succeeded after retry ${runtime_fetch_attempt}/${runtime_fetch_attempts}" >&2
     fi
     break
+  else
+    runtime_fetch_rc=$?
   fi
 
-  runtime_fetch_rc=$?
   runtime_fetch_error="$(tr '\n' ' ' <"$runtime_fetch_error_file" | sed -e 's/[[:space:]]\+/ /g' -e 's/^ //' -e 's/ $//')"
   [[ -n "$runtime_fetch_error" ]] || runtime_fetch_error="no stderr output"
   echo "warn: runtime release fetch attempt ${runtime_fetch_attempt}/${runtime_fetch_attempts} failed (exit=${runtime_fetch_rc}): ${runtime_fetch_error}" >&2

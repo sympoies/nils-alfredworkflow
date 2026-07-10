@@ -112,6 +112,10 @@ brew install sympoies/tap/nils-cli
 
 ## Query Examples
 
+Login, save, and remove examples below require local auth mode
+(`CODEX_AUTH_REMOTE_SSH` unset). Remote replicas render those writers as
+authority-only and reject direct execution.
+
 | Query                             | Result                                                                           |
 | --------------------------------- | -------------------------------------------------------------------------------- |
 | `cx login`                        | Run `codex-cli auth login`                                                       |

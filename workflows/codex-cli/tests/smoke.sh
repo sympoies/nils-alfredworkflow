@@ -678,6 +678,8 @@ assert_jq_json "$auth_root_json" '.items | any(.arg == "diag::default") | not' "
 
 remote_auth_root_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth"; })"
 assert_jq_json "$remote_auth_root_json" '.items | any((.arg == "login::browser" or .arg == "login::api-key" or .arg == "login::device-code") and .valid == true) | not' "remote auth root must not expose valid local login actions"
+assert_jq_json "$remote_auth_root_json" '.items | any(.title == "auth save is authority-only" and .valid == false and ((.autocomplete // "") == ""))' "remote auth root must mark save authority-only without autocomplete"
+assert_jq_json "$remote_auth_root_json" '.items | any(.title == "auth remove is authority-only" and .valid == false and ((.autocomplete // "") == ""))' "remote auth root must mark remove authority-only without autocomplete"
 remote_login_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "auth login"; })"
 assert_jq_json "$remote_login_json" '.items[0].valid == false' "remote mode login query must be invalid"
 remote_save_json="$({ CODEX_AUTH_REMOTE_SSH=sympoies CODEX_CLI_BIN="$tmp_dir/stubs/codex-cli-ok" "$workflow_dir/scripts/script_filter.sh" "save remote-test.json"; })"

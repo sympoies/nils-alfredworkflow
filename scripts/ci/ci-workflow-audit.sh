@@ -133,6 +133,11 @@ require_fixed \
   "Route third-party artifact checks through ci-run-gates."
 require_fixed \
   "$ci_workflow" \
+  "GITHUB_TOKEN: \${{ github.token }}" \
+  "ci third-party artifact GitHub token" \
+  "Pass the workflow-scoped read token to the strict artifact audit."
+require_fixed \
+  "$ci_workflow" \
   "run: bash scripts/ci/ci-run-gates.sh node-scraper-tests" \
   "ci node scraper test gate entrypoint" \
   "Route node scraper tests through ci-run-gates."
