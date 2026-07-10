@@ -115,6 +115,37 @@ reject_regex() {
   fi
 }
 
+require_step_github_token() {
+  local file="$1"
+  local step_name="$2"
+  local label="$3"
+
+  if ! python3 - "$file" "$step_name" <<'PY'; then
+from pathlib import Path
+import sys
+
+lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+needle = f"      - name: {sys.argv[2]}"
+try:
+    start = lines.index(needle)
+except ValueError:
+    raise SystemExit(1)
+end = len(lines)
+for index in range(start + 1, len(lines)):
+    if lines[index].startswith("      - name: "):
+        end = index
+        break
+block = lines[start:end]
+for index, line in enumerate(block[:-1]):
+    if line == "        env:" and block[index + 1] == "          GITHUB_TOKEN: ${{ github.token }}":
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+    record_failure "$label not found in ${file#"$repo_root"/}"
+    echo "hint: Pass github.token only to every step that can invoke the runtime metadata generator." >&2
+  fi
+}
+
 # Canonical gate routing must remain shared-script driven.
 require_fixed \
   "$ci_workflow" \
@@ -136,6 +167,21 @@ require_fixed \
   "GITHUB_TOKEN: \${{ github.token }}" \
   "ci third-party artifact GitHub token" \
   "Pass the workflow-scoped read token to the strict artifact audit."
+require_step_github_token "$ci_workflow" \
+  "Lint (includes cli-standards-audit, docs-placement-audit, markdownlint-audit)" \
+  "ci lint runtime metadata GitHub token"
+require_step_github_token "$ci_workflow" \
+  "Third-party artifacts audit (strict)" \
+  "ci strict artifact runtime metadata GitHub token"
+require_step_github_token "$ci_workflow" \
+  "Test" \
+  "ci test runtime metadata GitHub token"
+require_step_github_token "$release_workflow" \
+  "Run release package gates" \
+  "release package runtime metadata GitHub token"
+require_step_github_token "$release_workflow" \
+  "Regenerate third-party artifacts" \
+  "release matrix runtime metadata GitHub token"
 require_fixed \
   "$ci_workflow" \
   "run: bash scripts/ci/ci-run-gates.sh node-scraper-tests" \

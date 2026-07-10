@@ -41,6 +41,8 @@ jobs:
         run: bash scripts/ci/ci-bootstrap.sh --context ci --install-codex-cli
 
       - name: Lint (includes cli-standards-audit, docs-placement-audit, markdownlint-audit)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/ci/ci-run-gates.sh lint
 
       - name: Clippy unwrap/expect surface (warn-only — visibility for unwrap-cleanup wave)
@@ -79,6 +81,8 @@ jobs:
         run: bash scripts/ci/ci-run-gates.sh script-tests
 
       - name: Test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/ci/ci-run-gates.sh test
 
       - name: Package smoke
