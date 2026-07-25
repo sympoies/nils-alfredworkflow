@@ -77,10 +77,16 @@ else
   repo_fail "scripts/workflow-lint.sh must run scripts/cli-standards-audit.sh"
 fi
 
-if rg -n 'cli-standards-audit' "$repo_root/.github/workflows/ci.yml" >/dev/null; then
-  repo_pass "CI references cli-standards-audit"
+if rg -n 'cli-standards-audit' "$repo_root/.github/workflows/ci.yml" >/dev/null ||
+  {
+    rg -n 'scripts/local-pre-commit\.sh --mode ci' \
+      "$repo_root/.github/workflows/ci.yml" >/dev/null &&
+      rg -n 'scripts/ci/ci-run-gates\.sh lint' \
+        "$repo_root/scripts/local-pre-commit.sh" >/dev/null
+  }; then
+  repo_pass "CI routes to the cli-standards-audit owner"
 else
-  repo_fail ".github/workflows/ci.yml must reference cli-standards-audit gate"
+  repo_fail ".github/workflows/ci.yml must route to the cli-standards-audit gate"
 fi
 
 echo

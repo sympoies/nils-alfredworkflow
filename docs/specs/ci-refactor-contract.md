@@ -1,7 +1,8 @@
 # CI Refactor Contract (Sprint 1 Tasks 1.1-1.2)
 
-> Status: frozen — post-Sprint-1 contract; canonical entrypoints are not bypassed without an explicit
-> successor spec.
+> Status: active successor — the project validation aggregate supersedes the
+> original direct ordinary-gate mapping; canonical entrypoints are not bypassed
+> without an explicit successor update.
 
 This document freezes the post-refactor CI routing contract for:
 
@@ -16,7 +17,8 @@ All bootstrap and gate routing in those workflows must use the shared scripts in
 | Layer | canonical entrypoint | Purpose |
 | --- | --- | --- |
 | Bootstrap | `scripts/ci/ci-bootstrap.sh` | Shared bootstrap wrapper for CI/release/publish runtime setup. |
-| Gates | `scripts/ci/ci-run-gates.sh` | Shared gate invoker for lint/test/package/release/publish command routing. |
+| Project validation | `scripts/local-pre-commit.sh --mode ci` | Owns locked Node dependency installation and the ordered ordinary CI gate sequence. |
+| Gates | `scripts/ci/ci-run-gates.sh` | Internal phase dispatcher for project validation plus package/release/publish command routing. |
 
 ## workflow step mapping
 
@@ -26,16 +28,11 @@ All bootstrap and gate routing in those workflows must use the shared scripts in
 | --- | --- | --- | --- |
 | Checkout | GitHub Action | `actions/checkout@v6` | Keep |
 | Set up Node.js | GitHub Action | `actions/setup-node@v6` | Keep |
-| Install Node dependencies | Inline shell | `npm ci` | Keep |
 | Set up Rust | GitHub Action | `dtolnay/rust-toolchain@stable` | Keep |
 | Cache cargo | GitHub Action | `Swatinem/rust-cache@v2` | Keep |
 | Install cargo-nextest | GitHub Action | `taiki-e/install-action@v2` | Keep |
 | Bootstrap CI runtime | Script | `bash scripts/ci/ci-bootstrap.sh --context ci --install-codex-cli` | Canonical |
-| Lint | Script | `bash scripts/ci/ci-run-gates.sh lint` | Canonical |
-| Third-party artifacts audit (strict) | Script | `bash scripts/ci/ci-run-gates.sh third-party-artifacts-audit` | Canonical |
-| Node scraper tests | Script | `bash scripts/ci/ci-run-gates.sh node-scraper-tests` | Canonical |
-| Shell script tests | Script | `bash scripts/ci/ci-run-gates.sh script-tests` | Canonical |
-| Test | Script | `bash scripts/ci/ci-run-gates.sh test` | Canonical |
+| Validate project | Script | `bash scripts/local-pre-commit.sh --mode ci` | Canonical aggregate; runs `npm ci`, then lint, strict third-party audit, Node scraper tests, script tests, and workflow tests through `ci-run-gates.sh`. |
 | Package smoke | Script | `bash scripts/ci/ci-run-gates.sh package-smoke --skip-arch-check` | Canonical |
 
 ### `.github/workflows/release.yml` (`package` job)
@@ -63,6 +60,7 @@ All bootstrap and gate routing in those workflows must use the shared scripts in
 
 | Legacy or duplicate path | Replacement canonical entrypoint | Status | Rationale |
 | --- | --- | --- | --- |
+| `ci.yml` standalone `npm ci` plus five direct ordinary `ci-run-gates.sh` steps | `local-pre-commit.sh --mode ci` | Superseded | Keeps clean-worktree setup, gate order, and failure propagation in one local/CI owner. |
 | `ci.yml` inline codex-cli install block | `ci-bootstrap.sh --context ci --install-codex-cli` | Deleted in Task 1.2 | CI/release install the host-compatible nils-cli release asset against repository-pinned SHA-256 metadata. |
 | `release.yml` inline codex-cli install block | `ci-bootstrap.sh --context release --install-codex-cli` | Deleted in Task 1.2 | Removes duplicate pin/version wiring. |
 | `publish-crates.yml` inline shell for mode/token/arg assembly | `ci-run-gates.sh publish-crates ...` | Deleted in Task 1.2 | Reuses one gate invoker instead of workflow-local branching logic. |
@@ -72,5 +70,7 @@ All bootstrap and gate routing in those workflows must use the shared scripts in
 ## no legacy compatibility policy
 
 - CI routing is strict: no legacy compatibility fallback is allowed for gate execution once a gate has a canonical entrypoint.
-- New or modified workflow gate steps must call `ci-bootstrap.sh` and/or `ci-run-gates.sh` instead of adding new inline shell branches.
+- New or modified ordinary validation steps must call
+  `local-pre-commit.sh --mode ci`; specialized package, release, and publish
+  steps continue to use `ci-run-gates.sh`.
 - If a prior inline branch is still required temporarily, it must be called out in this contract with explicit removal ownership.

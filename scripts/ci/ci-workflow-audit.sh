@@ -146,57 +146,114 @@ PY
   fi
 }
 
+workflow_run_commands() {
+  local file="$1"
+
+  awk '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+
+    {
+      line = $0
+      if (in_block) {
+        if (line ~ /^[[:space:]]*$/) {
+          next
+        }
+        match(line, /^[[:space:]]*/)
+        current_indent = RLENGTH
+        if (current_indent > block_indent) {
+          command = trim(substr(line, current_indent + 1))
+          if (command !~ /^#/) {
+            print command
+          }
+          next
+        }
+        in_block = 0
+      }
+
+      if (line ~ /^[[:space:]]*#/) {
+        next
+      }
+      match(line, /^[[:space:]]*/)
+      run_indent = RLENGTH
+      rest = substr(line, run_indent + 1)
+      sub(/^-[[:space:]]+/, "", rest)
+      if (rest !~ /^run:[[:space:]]*/) {
+        next
+      }
+      sub(/^run:[[:space:]]*/, "", rest)
+      rest = trim(rest)
+      if (rest ~ /^[|>][-+0-9]*$/) {
+        in_block = 1
+        block_indent = run_indent
+      } else if (rest != "") {
+        print rest
+      }
+    }
+  ' "$file"
+}
+
+require_run_exact() {
+  local commands="$1"
+  local needle="$2"
+  local label="$3"
+  local hint="$4"
+  local count=0
+
+  while IFS= read -r command; do
+    if [[ "$command" == "$needle" ]]; then
+      count=$((count + 1))
+    fi
+  done <<<"$commands"
+
+  if [[ "$count" -ne 1 ]]; then
+    record_failure "$label must appear exactly once as an executable run command (found $count)"
+    echo "hint: $hint" >&2
+  fi
+}
+
+reject_run_regex() {
+  local commands="$1"
+  local pattern="$2"
+  local label="$3"
+  local hint="$4"
+  local matches=""
+
+  matches="$(printf '%s\n' "$commands" | rg -n "$pattern" || true)"
+  if [[ -n "$matches" ]]; then
+    record_failure "$label found in executable workflow commands"
+    while IFS= read -r line; do
+      echo "  match: $line" >&2
+    done <<<"$matches"
+    echo "hint: $hint" >&2
+  fi
+}
+
+ci_run_commands="$(workflow_run_commands "$ci_workflow")"
+
 # Canonical gate routing must remain shared-script driven.
 require_fixed \
   "$ci_workflow" \
   "run: bash scripts/ci/ci-bootstrap.sh --context ci --install-codex-cli" \
   "ci bootstrap entrypoint" \
   "Route CI bootstrap through scripts/ci/ci-bootstrap.sh."
-require_fixed \
-  "$ci_workflow" \
-  "run: bash scripts/ci/ci-run-gates.sh lint" \
-  "ci lint gate entrypoint" \
-  "Route lint checks through scripts/ci/ci-run-gates.sh lint."
-require_fixed \
-  "$ci_workflow" \
-  "run: bash scripts/ci/ci-run-gates.sh third-party-artifacts-audit" \
-  "ci third-party artifact audit gate entrypoint" \
-  "Route third-party artifact checks through ci-run-gates."
-require_fixed \
-  "$ci_workflow" \
-  "GITHUB_TOKEN: \${{ github.token }}" \
-  "ci third-party artifact GitHub token" \
-  "Pass the workflow-scoped read token to the strict artifact audit."
 require_step_github_token "$ci_workflow" \
-  "Lint (includes cli-standards-audit, docs-placement-audit, markdownlint-audit)" \
-  "ci lint runtime metadata GitHub token"
-require_step_github_token "$ci_workflow" \
-  "Third-party artifacts audit (strict)" \
-  "ci strict artifact runtime metadata GitHub token"
-require_step_github_token "$ci_workflow" \
-  "Test" \
-  "ci test runtime metadata GitHub token"
+  "Validate project" \
+  "ci project validation runtime metadata GitHub token"
 require_step_github_token "$release_workflow" \
   "Run release package gates" \
   "release package runtime metadata GitHub token"
 require_step_github_token "$release_workflow" \
   "Regenerate third-party artifacts" \
   "release matrix runtime metadata GitHub token"
-require_fixed \
-  "$ci_workflow" \
-  "run: bash scripts/ci/ci-run-gates.sh node-scraper-tests" \
-  "ci node scraper test gate entrypoint" \
-  "Route node scraper tests through ci-run-gates."
-require_fixed \
-  "$ci_workflow" \
-  "run: bash scripts/ci/ci-run-gates.sh script-tests" \
-  "ci shell script test gate entrypoint" \
-  "Route shell script tests through ci-run-gates script-tests."
-require_fixed \
-  "$ci_workflow" \
-  "run: bash scripts/ci/ci-run-gates.sh test" \
-  "ci test gate entrypoint" \
-  "Route test checks through scripts/ci/ci-run-gates.sh test."
+require_run_exact \
+  "$ci_run_commands" \
+  "bash scripts/local-pre-commit.sh --mode ci" \
+  "ci project validation entrypoint" \
+  "Route the ordinary CI gates through the repository-owned local-pre-commit wrapper."
 require_fixed \
   "$ci_workflow" \
   "run: bash scripts/ci/ci-run-gates.sh package-smoke --skip-arch-check" \
@@ -242,6 +299,11 @@ reject_fixed \
   "run: scripts/workflow-pack.sh --all" \
   "legacy direct package workflow call" \
   "Use ci-run-gates package-smoke instead of direct scripts/workflow-pack.sh."
+reject_run_regex \
+  "$ci_run_commands" \
+  '(^|[;&|[:space:]])bash[[:space:]]+scripts/ci/ci-run-gates\.sh[[:space:]]+(lint|third-party-artifacts-audit|node-scraper-tests|script-tests|test)([;&|[:space:]]|$)' \
+  "duplicate direct ordinary gate workflow call" \
+  "Route the ordinary gate sequence through scripts/local-pre-commit.sh --mode ci."
 reject_fixed \
   "$release_workflow" \
   "run: scripts/workflow-pack.sh --all" \

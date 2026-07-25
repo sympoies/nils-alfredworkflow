@@ -390,8 +390,9 @@ non-removed workflow directory.
 
 ### Reference policy
 
-- Active maintainer entry-point documents (`TROUBLESHOOTING.md`, `DEVELOPMENT.md`, `docs/PACKAGING.md`,
-  `docs/ARCHITECTURE.md`, `AGENT_DOCS.toml`, and `workflows/<workflow-id>/README.md`) must link to:
+- Active maintainer entry-point documents (`AGENTS.md`, `TROUBLESHOOTING.md`, `DEVELOPMENT.md`,
+  `docs/PACKAGING.md`, `docs/ARCHITECTURE.md`, `AGENT_DOCS.toml`, and
+  `workflows/<workflow-id>/README.md`) must link to:
   - `ALFRED_WORKFLOW_DEVELOPMENT.md` for global standards.
   - `workflows/<workflow-id>/TROUBLESHOOTING.md` for workflow-specific operations.
 - `README.md` stays user-facing and should route to `TROUBLESHOOTING.md`, not directly to maintainer-only guides.

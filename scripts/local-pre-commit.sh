@@ -42,7 +42,7 @@ run_default_mode() {
   run bash scripts/workflow-sync-script-filter-policy.sh --check
 
   if [[ "$skip_node_scraper_tests" -eq 0 ]]; then
-    run npm run test:cambridge-scraper
+    run "$npm_path" run test:cambridge-scraper
   else
     echo "skip: node scraper tests disabled (--skip-node-scraper-tests)"
   fi
@@ -94,6 +94,20 @@ if [[ "$mode" != "default" && "$mode" != "ci" ]]; then
 fi
 
 cd "$repo_root"
+
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+if [[ ! "$node_major" =~ ^[0-9]+$ ]] || ((node_major < 20)); then
+  die "Node.js 20 or newer is required"
+fi
+node_path="$(command -v node)"
+node_bin_dir="$(dirname -- "$node_path")"
+npm_path="$node_bin_dir/npm"
+[[ -x "$npm_path" ]] ||
+  die "npm must be installed beside the selected Node.js executable"
+# Keep every child gate on the same Node/npm pair even when an earlier PATH
+# directory contains an unrelated npm shim but no node executable.
+export PATH="$node_bin_dir:$PATH"
+run "$npm_path" ci
 
 if [[ "$mode" == "default" ]]; then
   run_default_mode

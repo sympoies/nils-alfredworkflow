@@ -90,6 +90,9 @@ Use this file for day-to-day development, quality gates, and local validation fl
 ### Required before committing
 
 - Default local pre-commit entrypoint (recommended): `scripts/local-pre-commit.sh`
+  - Verifies a supported Node.js version, installs the locked npm dependency
+    tree, then runs the owned validation phases. A clean worktree needs no
+    caller-side npm setup.
   - Runs an early `scripts/ci/third-party-artifacts-change-gate.sh` check, then
     `scripts/workflow-lint.sh --skip-third-party-audit`,
     `scripts/workflow-sync-script-filter-policy.sh --check`, `npm run test:cambridge-scraper`,

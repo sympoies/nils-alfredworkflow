@@ -2,25 +2,25 @@
 context = "project-dev"
 scope = "project"
 path = "BINARY_DEPENDENCIES.md"
-required = true
+required = false
 when = "always"
-notes = "Required local toolchain and shell tool installation baseline"
+notes = "On-demand local toolchain and dependency reference; read for setup, dependency, or degradation changes."
 
 [[document]]
 context = "project-dev"
 scope = "project"
 path = "ALFRED_WORKFLOW_DEVELOPMENT.md"
-required = true
+required = false
 when = "always"
-notes = "Global Alfred workflow development standards file with project-wide ownership boundaries"
+notes = "On-demand workflow runtime, Script Filter, and troubleshooting standard; read for applicable workflow changes."
 
 [[document]]
 context = "project-dev"
 scope = "project"
 path = "docs/PACKAGING.md"
-required = true
+required = false
 when = "always"
-notes = "Workflow packaging, install, and macOS acceptance guide for maintainer tasks"
+notes = "On-demand packaging, install, and macOS acceptance guide; read only for packaging or release surfaces."
 
 # Finish-line validation contract: code edits in this repo must run the local
 # pre-commit gate before a project-dev task is declared done (agent-docs v0.30+).
