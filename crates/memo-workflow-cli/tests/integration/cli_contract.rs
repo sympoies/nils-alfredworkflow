@@ -173,6 +173,11 @@ fn script_filter_recent_rows_offer_manage_autocomplete() {
 
     let payload: Value =
         serde_json::from_slice(&output.stdout).expect("script-filter stdout must be JSON");
+    assert_eq!(
+        payload.get("skipknowledge").and_then(Value::as_bool),
+        Some(true),
+        "recent memo uid rows must stay newest-first"
+    );
     let items = payload
         .get("items")
         .and_then(Value::as_array)

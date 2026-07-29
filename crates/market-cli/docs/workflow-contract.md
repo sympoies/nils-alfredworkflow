@@ -167,21 +167,22 @@ For `favorites`, successful output is Alfred Script Filter JSON with a prompt ro
 
 ```json
 {
+  "skipknowledge": true,
   "items": [
     {
-      "uid": "market-favorites-prompt",
+      "uid": "market-favorites-ordered-prompt-v1",
       "title": "Enter a market expression",
       "subtitle": "Example: 1 BTC + 3 ETH to JPY (default fiat: USD)",
       "valid": false
     },
     {
-      "uid": "market-favorite-btc-usd",
+      "uid": "market-favorite-ordered-v1-btc-usd",
       "title": "1 BTC = 68194 USD",
       "subtitle": "provider: coinbase · freshness: live",
       "valid": false
     },
     {
-      "uid": "market-favorite-usd-usd",
+      "uid": "market-favorite-ordered-v1-usd-usd",
       "title": "1 USD = 1 USD",
       "subtitle": "provider: identity · freshness: fixed",
       "valid": false
@@ -212,7 +213,8 @@ Favorites row requirements:
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `items[].uid` | string | Stable Alfred row identity for prompt and favorite quote rows (`market-favorite-<base>-<quote>`) |
+| `skipknowledge` | boolean | Always `true` so stable item UIDs do not override configured favorite order |
+| `items[].uid` | string | Stable Alfred row identity for prompt and favorite quote rows (`market-favorite-ordered-v1-<base>-<quote>`) |
 | `items[].title` | string | Prompt title or favorite quote title (`1 BTC = ... USD`, `1 JPY = ... TWD`) |
 | `items[].subtitle` | string | Prompt guidance, quote metadata, or symbol/pair-hint fallback when quote lookup fails |
 | `items[].valid` | boolean | Must be `false` for every favorites item (non-actionable / non-selectable policy) |

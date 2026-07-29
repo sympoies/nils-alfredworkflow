@@ -159,7 +159,7 @@ for zone in zones:
         }
     )
 
-print(json.dumps({"items": items}))
+print(json.dumps({"skipknowledge": True, "items": items}))
 PY
 EOS
 chmod +x "$tmp_dir/stubs/timezone-cli-ok"
@@ -189,6 +189,7 @@ chmod +x "$tmp_dir/stubs/timezone-cli-malformed"
 
 success_json="$({ TIMEZONE_CLI_BIN="$tmp_dir/stubs/timezone-cli-ok" "$workflow_dir/scripts/script_filter.sh" "Asia/Taipei,America/New_York,Europe/London"; })"
 assert_jq_json "$success_json" '.items | type == "array" and length == 3' "script_filter success must output three-item array"
+assert_jq_json "$success_json" '.skipknowledge == true' "script_filter must retain uid without Alfred knowledge sorting"
 assert_jq_json "$success_json" '[.items[].uid] == ["Asia/Taipei","America/New_York","Europe/London"]' "script_filter must preserve query order"
 
 mixed_query_json="$({ TIMEZONE_CLI_BIN="$tmp_dir/stubs/timezone-cli-ok" "$workflow_dir/scripts/script_filter.sh" $' , Asia/Taipei,\n,America/New_York ,,Europe/London '; })"

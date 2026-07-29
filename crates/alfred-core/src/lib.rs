@@ -4,12 +4,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Feedback {
+    #[serde(rename = "skipknowledge", skip_serializing_if = "Option::is_none")]
+    pub skip_knowledge: Option<bool>,
     pub items: Vec<Item>,
 }
 
 impl Feedback {
     pub fn new(items: Vec<Item>) -> Self {
-        Self { items }
+        Self {
+            skip_knowledge: None,
+            items,
+        }
+    }
+
+    pub fn with_skip_knowledge(mut self, skip_knowledge: bool) -> Self {
+        self.skip_knowledge = Some(skip_knowledge);
+        self
     }
 
     pub fn single_error(code: &str, message: impl Into<String>) -> Self {
@@ -183,6 +193,22 @@ mod tests {
         let payload = Feedback::new(vec![Item::new("hello").with_subtitle("world")]);
         let json = payload.to_json().expect("serialize feedback");
         assert!(json.contains("items"), "json should contain items field");
+        assert!(
+            !json.contains("skipknowledge"),
+            "skipknowledge must be omitted unless explicitly configured"
+        );
+    }
+
+    #[test]
+    fn feedback_serializes_skip_knowledge_for_ordered_uid_rows() {
+        let payload =
+            Feedback::new(vec![Item::new("hello").with_uid("stable-id")]).with_skip_knowledge(true);
+        let json = payload.to_json().expect("serialize feedback");
+
+        assert!(
+            json.contains("\"skipknowledge\":true"),
+            "ordered uid feedback must disable Alfred knowledge sorting"
+        );
     }
 
     #[test]

@@ -65,6 +65,7 @@ Success row schema:
 
 Rules:
 
+- Top-level `skipknowledge` must be `true` so stable timezone UIDs do not override resolved input order.
 - `uid` must equal timezone ID for deterministic order assertions.
 - `title` is formatted local time (`YYYY-MM-DD HH:MM:SS`) in that timezone.
 - `subtitle` must include timezone ID and UTC offset.

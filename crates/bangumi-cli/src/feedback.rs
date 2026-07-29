@@ -42,7 +42,7 @@ where
         items.push(item);
     }
 
-    Feedback::new(items)
+    Feedback::new(items).with_skip_knowledge(true)
 }
 
 fn subject_to_item(subject: &BangumiSubject, requested_type: SubjectType) -> Item {
@@ -242,8 +242,18 @@ mod tests {
     #[test]
     fn feedback_maps_subjects_to_alfred_item_fields() {
         let feedback = subjects_to_feedback(&[fixture_subject()], SubjectType::Anime);
+        let json = feedback.to_json().expect("feedback should serialize");
+        let payload: serde_json::Value =
+            serde_json::from_str(&json).expect("feedback should be valid JSON");
         let item = feedback.items.first().expect("item should exist");
 
+        assert_eq!(
+            payload
+                .get("skipknowledge")
+                .and_then(serde_json::Value::as_bool),
+            Some(true),
+            "subject uid rows must preserve API match order"
+        );
         assert_eq!(item.title, "Cowboy Bebop");
         assert_eq!(item.arg.as_deref(), Some("https://bgm.tv/subject/2782"));
         assert_eq!(item.valid, Some(true));

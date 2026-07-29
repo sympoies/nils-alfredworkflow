@@ -358,17 +358,23 @@ fn cli_contract_favorites_alfred_rows_include_explicit_fx_pairs() {
         ]
     );
     let items = favorite_items(&output);
+    let payload: Value =
+        serde_json::from_slice(&output.stdout).expect("favorites output should be valid JSON");
+    assert_eq!(
+        payload.get("skipknowledge").and_then(Value::as_bool),
+        Some(true)
+    );
     assert_eq!(
         items[1].get("uid").and_then(Value::as_str),
-        Some("market-favorite-jpy-usd")
+        Some("market-favorite-ordered-v1-jpy-usd")
     );
     assert_eq!(
         items[2].get("uid").and_then(Value::as_str),
-        Some("market-favorite-jpy-twd")
+        Some("market-favorite-ordered-v1-jpy-twd")
     );
     assert_eq!(
         items[3].get("uid").and_then(Value::as_str),
-        Some("market-favorite-usd-jpy")
+        Some("market-favorite-ordered-v1-usd-jpy")
     );
     assert_icon_path_suffix(&items[1], "/jpy.png");
     assert_icon_path_suffix(&items[2], "/jpy.png");

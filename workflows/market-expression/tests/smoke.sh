@@ -186,7 +186,7 @@ symbol_quote_values = {
 
 items = [
     {
-        "uid": "market-favorites-prompt",
+        "uid": "market-favorites-ordered-prompt-v1",
         "title": "Enter a market expression",
         "subtitle": f"Example: 1 BTC + 3 ETH to JPY (default fiat: {default_fiat})",
         "valid": False,
@@ -201,7 +201,7 @@ for entry in entries:
     if base == quote:
         items.append(
             {
-                "uid": f"market-favorite-{base.lower()}-{quote.lower()}",
+                "uid": f"market-favorite-ordered-v1-{base.lower()}-{quote.lower()}",
                 "title": f"1 {base} = 1 {quote}",
                 "subtitle": "provider: identity · freshness: fixed",
                 "valid": False,
@@ -215,7 +215,7 @@ for entry in entries:
     rendered = pair_quote_values.get((base, quote), symbol_quote_values.get(base, "1"))
     items.append(
         {
-            "uid": f"market-favorite-{base.lower()}-{quote.lower()}",
+            "uid": f"market-favorite-ordered-v1-{base.lower()}-{quote.lower()}",
             "title": f"1 {base} = {rendered} {quote}",
             "subtitle": "provider: stub-provider · freshness: cache_fresh",
             "valid": False,
@@ -226,6 +226,7 @@ for entry in entries:
     )
 
 payload = {
+    "skipknowledge": True,
     "items": items
 }
 print(json.dumps(payload))
@@ -304,6 +305,7 @@ assert_jq_json "$success_default_json" '.items[0].subtitle == "default fiat=USD"
 
 favorites_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST=$'ETH\nBTC,USD,JPY' "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_json" '.items | type == "array" and length == 5' "favorites query should output prompt plus four configured rows"
+assert_jq_json "$favorites_json" '.skipknowledge == true' "favorites query must retain uid without Alfred knowledge sorting"
 assert_jq_json "$favorites_json" '.items[0].title == "Enter a market expression"' "favorites query must include prompt row first"
 assert_jq_json "$favorites_json" '(.items[1:] | map(.title)) == ["1 ETH = 1980 USD","1 BTC = 68194 USD","1 USD = 1 USD","1 JPY = 0.010 USD"]' "favorites query must preserve configured order with quote rows"
 assert_jq_json "$favorites_json" '[.items[].valid] | all(. == false)' "favorites rows must be non-actionable"
@@ -311,7 +313,7 @@ assert_jq_json "$favorites_json" '(.items[1:] | map(.icon.path)) == ["cache/icon
 
 favorites_pair_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="USD" MARKET_FAVORITE_LIST="JPY/USD,JPY/TWD,USD/JPY" "$workflow_dir/scripts/script_filter.sh" ""; })"
 assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.title)) == ["1 JPY = 0.010 USD","1 JPY = 0.220 TWD","1 USD = 150.3 JPY"]' "favorites query must support explicit FX pairs"
-assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.uid)) == ["market-favorite-jpy-usd","market-favorite-jpy-twd","market-favorite-usd-jpy"]' "favorites FX pair rows must use base/quote uid keys"
+assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.uid)) == ["market-favorite-ordered-v1-jpy-usd","market-favorite-ordered-v1-jpy-twd","market-favorite-ordered-v1-usd-jpy"]' "favorites FX pair rows must use ordered base/quote uid keys"
 assert_jq_json "$favorites_pair_json" '(.items[1:] | map(.icon.path)) == ["cache/icons/jpy.png","cache/icons/jpy.png","cache/icons/usd.png"]' "favorites FX pair rows should use base symbol icon paths"
 
 favorites_default_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-ok" MARKET_DEFAULT_FIAT="TWD" MARKET_FAVORITE_LIST="" "$workflow_dir/scripts/script_filter.sh" ""; })"

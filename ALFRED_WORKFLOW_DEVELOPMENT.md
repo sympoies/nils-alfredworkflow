@@ -149,6 +149,13 @@ The four canonical sections are the contract. Two narrow exceptions are explicit
 - Script Filter scripts must always return valid Alfred JSON, including failure paths.
 - Fallback errors should be non-actionable rows (`valid=false`) with clear operator guidance.
 - Keep payload arguments newline-safe for action-chain handoff.
+- When result items have stable `uid` values but workflow behavior requires the
+  emitted order to remain authoritative, set top-level `skipknowledge=true`.
+  Rust producers must use `Feedback::with_skip_knowledge(true)`. Do not place
+  `skipknowledge` on individual items; Alfred defines it on the feedback object.
+- Keep Alfred knowledge sorting enabled when usage-based reprioritization is an
+  intentional part of the workflow. Items without `uid` already retain emitted
+  order and do not need `skipknowledge`.
 
 ### `alfredfiltersresults` guardrail
 

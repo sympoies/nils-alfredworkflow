@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Keep local-auth scenarios independent of the caller's remote-auth environment.
+unset CODEX_AUTH_REMOTE_SSH
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workflow_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$workflow_dir/../.." && pwd)"

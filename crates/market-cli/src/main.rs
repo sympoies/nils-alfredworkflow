@@ -75,6 +75,8 @@ const ERROR_CODE_RUNTIME_PROVIDER_FAILED: &str = "NILS_MARKET_002";
 const ERROR_CODE_RUNTIME_SERIALIZE: &str = "NILS_COMMON_005";
 const FAVORITES_PROMPT_TITLE: &str = "Enter a market expression";
 const FAVORITES_PROMPT_EXAMPLE: &str = "Example: 1 BTC + 3 ETH to JPY";
+const FAVORITES_PROMPT_UID: &str = "market-favorites-ordered-prompt-v1";
+const FAVORITES_UID_NAMESPACE: &str = "market-favorite-ordered-v1";
 const FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE: &str =
     "Favorite quote. Type an expression to convert. Quote unavailable.";
 
@@ -340,7 +342,7 @@ where
     let mut items = Vec::with_capacity(favorites.len() + 1);
     items.push(
         Item::new(FAVORITES_PROMPT_TITLE)
-            .with_uid("market-favorites-prompt")
+            .with_uid(FAVORITES_PROMPT_UID)
             .with_subtitle(format!(
                 "{FAVORITES_PROMPT_EXAMPLE} (default fiat: {default_fiat})"
             ))
@@ -368,12 +370,15 @@ where
         });
     items.extend(favorite_items);
 
-    Feedback::new(items).to_json().map_err(|error| {
-        runtime_error(
-            ERROR_CODE_RUNTIME_SERIALIZE,
-            format!("failed to serialize favorites Alfred output: {error}"),
-        )
-    })
+    Feedback::new(items)
+        .with_skip_knowledge(true)
+        .to_json()
+        .map_err(|error| {
+            runtime_error(
+                ERROR_CODE_RUNTIME_SERIALIZE,
+                format!("failed to serialize favorites Alfred output: {error}"),
+            )
+        })
 }
 
 fn build_favorite_quote_item<P, N>(
@@ -464,7 +469,7 @@ where
 
 fn favorite_item_uid(base: &str, quote: &str) -> String {
     format!(
-        "market-favorite-{}-{}",
+        "{FAVORITES_UID_NAMESPACE}-{}-{}",
         base.to_ascii_lowercase(),
         quote.to_ascii_lowercase()
     )
@@ -1115,6 +1120,11 @@ mod tests {
         let output = run_with(cli, &config_in_tempdir(), &FavoritesProviders, fixed_now)
             .expect("favorites Alfred output should pass");
         let json: Value = serde_json::from_str(&output).expect("json");
+        assert_eq!(
+            json.get("skipknowledge").and_then(Value::as_bool),
+            Some(true),
+            "favorite uid rows must preserve configured order"
+        );
         let items = json
             .get("items")
             .and_then(Value::as_array)
@@ -1182,7 +1192,7 @@ mod tests {
         assert_eq!(items.len(), 4);
         assert_eq!(
             items[1].get("uid").and_then(Value::as_str),
-            Some("market-favorite-jpy-usd")
+            Some("market-favorite-ordered-v1-jpy-usd")
         );
         assert_eq!(
             items[1].get("title").and_then(Value::as_str),
@@ -1190,7 +1200,7 @@ mod tests {
         );
         assert_eq!(
             items[2].get("uid").and_then(Value::as_str),
-            Some("market-favorite-jpy-twd")
+            Some("market-favorite-ordered-v1-jpy-twd")
         );
         assert_eq!(
             items[2].get("title").and_then(Value::as_str),
@@ -1198,7 +1208,7 @@ mod tests {
         );
         assert_eq!(
             items[3].get("uid").and_then(Value::as_str),
-            Some("market-favorite-usd-jpy")
+            Some("market-favorite-ordered-v1-usd-jpy")
         );
         assert_eq!(
             items[3].get("title").and_then(Value::as_str),

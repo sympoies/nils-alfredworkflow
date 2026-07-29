@@ -25,7 +25,7 @@ pub fn rows_to_feedback(rows: &[ConversionRow]) -> Feedback {
         })
         .collect();
 
-    Feedback::new(items)
+    Feedback::new(items).with_skip_knowledge(true)
 }
 
 #[cfg(test)]
@@ -43,6 +43,7 @@ mod tests {
 
         let feedback = rows_to_feedback(&rows);
 
+        assert_eq!(feedback.skip_knowledge, Some(true));
         assert_eq!(feedback.items.len(), 1);
         assert_eq!(feedback.items[0].uid.as_deref(), Some("Asia/Taipei"));
         assert_eq!(feedback.items[0].valid, Some(true));

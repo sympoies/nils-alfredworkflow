@@ -261,6 +261,7 @@ assert_jq_json "$invalid_config_json" '.items[0].title == "Invalid Bangumi workf
 
 empty_query_json="$({ BANGUMI_CLI_BIN="$tmp_dir/stubs/bangumi-cli-ok" "$workflow_dir/scripts/script_filter.sh" "   "; })"
 assert_jq_json "$empty_query_json" '.items[0].title == "Enter a search query"' "empty query guidance title mismatch"
+assert_jq_json "$empty_query_json" 'all(.items[]; has("skipknowledge") | not)' "skipknowledge must not be placed on individual items"
 assert_jq_json "$empty_query_json" '.items[0].valid == false' "empty query item must be invalid"
 assert_jq_json "$empty_query_json" '.items | any(.title == "Clear Bangumi query cache" and .arg == "__BANGUMI_CLEAR_CACHE__" and .valid == true)' "empty query must include clear-cache quick action"
 assert_jq_json "$empty_query_json" '.items | any(.title == "Clear Bangumi cache dir" and .arg == "__BANGUMI_CLEAR_CACHE_DIR__" and .valid == true)' "empty query must include clear-cache-dir quick action"

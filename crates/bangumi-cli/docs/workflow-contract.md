@@ -50,6 +50,7 @@ Success item contract:
 
 ```json
 {
+  "uid": "subject-123",
   "title": "Subject name",
   "subtitle": "Type + localized metadata",
   "arg": "https://bgm.tv/subject/123",
@@ -59,6 +60,7 @@ Success item contract:
 
 Rules:
 
+- Successful subject feedback sets top-level `skipknowledge: true` so stable subject UIDs retain API match order.
 - `title` uses localized name when available, otherwise canonical name.
 - `subtitle` should include type tag and score/rank metadata when available.
 - `arg` uses API `url` when present.

@@ -870,7 +870,7 @@ fn build_search_feedback(rest: &str, config: &RuntimeConfig) -> Result<Feedback,
         );
     }
 
-    Ok(Feedback::new(items))
+    Ok(Feedback::new(items).with_skip_knowledge(true))
 }
 
 fn parse_search_intent(
@@ -1001,7 +1001,7 @@ fn build_empty_query_feedback(config: &RuntimeConfig) -> Result<Feedback, AppErr
         );
     }
 
-    Ok(Feedback::new(items))
+    Ok(Feedback::new(items).with_skip_knowledge(true))
 }
 
 fn render_item_detail_json(detail: &ItemDetailResult) -> String {
@@ -1621,6 +1621,7 @@ mod tests {
 
         let feedback = build_script_filter("search milk", &config).expect("script filter");
 
+        assert_eq!(feedback.skip_knowledge, Some(true));
         assert_eq!(
             feedback.items.len(),
             1,

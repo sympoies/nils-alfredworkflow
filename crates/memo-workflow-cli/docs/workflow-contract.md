@@ -111,6 +111,8 @@ update/delete token shapes are handled as user errors.
 
 - Empty query with existing db includes a recent-records section so users can verify latest captures immediately.
 - Recent records default to `MEMO_RECENT_LIMIT=8` and are ordered by `created_at DESC`, then `item_id DESC`.
+- Feedback containing stable recent/search row UIDs sets top-level `skipknowledge=true`, preserving newest-first or
+  search-score order instead of allowing Alfred usage learning to reorder rows.
 - Recent rows are informational (`valid=false`) but include `autocomplete=item <number>` for item-level action routing.
 - Recent/search row titles render short item refs (`#<number>`) for readability; internal action tokens remain canonical
   `itm_XXXXXXXX`.

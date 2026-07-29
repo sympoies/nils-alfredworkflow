@@ -206,6 +206,11 @@ mod tests {
         let json: Value = serde_json::from_str(&output).expect("json output");
 
         assert_eq!(
+            json.get("skipknowledge").and_then(Value::as_bool),
+            Some(true),
+            "timezone uid rows must preserve configured order"
+        );
+        assert_eq!(
             item_uids(&json),
             vec!["Asia/Taipei", "America/New_York", "Europe/London"]
         );
