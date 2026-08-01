@@ -413,6 +413,35 @@ impl CalendarSession {
         Ok(event_view_from_json(&response))
     }
 
+    pub fn delete_event(&self, request: &EventGetRequest) -> Result<(), AppError> {
+        if let Some(fixture) = &self.fixture {
+            // Fixture mode never mutates remote state, but it must still fail on
+            // an id that is not there, or the command's not-found path is untested.
+            return fixture
+                .events
+                .iter()
+                .find(|event| event.id == request.event_id)
+                .map(|_| ())
+                .ok_or_else(|| AppError::calendar_not_found("event", &request.event_id));
+        }
+
+        let path = format!(
+            "calendars/{}/events/{}",
+            encode_path(&request.calendar_id),
+            encode_path(&request.event_id)
+        );
+        self.delete_json(&path, Some(("event", request.event_id.as_str())))?;
+        Ok(())
+    }
+
+    fn delete_json(&self, path: &str, not_found: Option<(&str, &str)>) -> Result<Value, AppError> {
+        let url = format!("{CALENDAR_API_BASE}/{path}");
+        let response = bounded(self.client.delete(&url).bearer_auth(&self.access_token))
+            .send()
+            .map_err(|error| AppError::calendar_failure(format!("DELETE {url} failed: {error}")))?;
+        parse_calendar_response(response, format!("DELETE {path}").as_str(), not_found)
+    }
+
     fn get_json(
         &self,
         path: &str,
@@ -659,7 +688,10 @@ fn parse_calendar_response(
         AppError::calendar_failure(format!("{context} failed reading body: {error}"))
     })?;
 
-    if status.as_u16() == 404
+    // 410 Gone is what Calendar returns for an event that was already deleted.
+    // Reporting it as not-found makes a repeated delete say so plainly instead of
+    // surfacing a raw HTTP failure.
+    if matches!(status.as_u16(), 404 | 410)
         && let Some((entity, id)) = not_found
     {
         return Err(AppError::calendar_not_found(entity, id));

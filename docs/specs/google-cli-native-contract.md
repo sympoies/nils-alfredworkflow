@@ -84,7 +84,7 @@ exactly this list. Callers must not infer a scope boundary from this list alone.
 
 ## Calendar service contract
 
-Command IDs are `google.calendar.calendars.list` and `google.calendar.events.{list,get,create}`.
+Command IDs are `google.calendar.calendars.list` and `google.calendar.events.{list,get,create,delete}`.
 
 - `--calendar-id` is required for every `events` command. The crate does not resolve calendar aliases, own a default
   calendar, or know about any caller-side grouping; a consumer that maps its own identifiers to calendars owns that
@@ -101,8 +101,12 @@ Command IDs are `google.calendar.calendars.list` and `google.calendar.events.{li
 - `--private-property key=value` is repeatable and maps to `extendedProperties.private`, which `events list` can filter
   on through `privateExtendedProperty`. This is the supported way for a consumer to store and query its own
   back-references on an event.
+- `events delete <eventId>` removes one event and answers `deleted: true`. Calendar returns 410 Gone for an event that
+  was already deleted, which maps to the same not-found error as 404 so a repeated delete says so plainly instead of
+  surfacing a raw HTTP failure. It never reports success for an id that is not there.
 - `GOOGLE_CLI_CALENDAR_FIXTURE_PATH` / `GOOGLE_CLI_CALENDAR_FIXTURE_JSON` serve a local fixture store so command wiring
-  is testable without network access. Fixture mode never mutates remote state: `events create` echoes the built request.
+  is testable without network access. Fixture mode never mutates remote state: `events create` echoes the built request
+  and `events delete` resolves the id, then reports success without removing anything.
 
 ## Compatibility notes
 

@@ -268,3 +268,94 @@ fn events_create_rejects_a_naive_start_without_a_zone() {
         "an ambiguous wall-clock start is a user input error"
     );
 }
+
+#[test]
+fn events_delete_confirms_the_target_and_reports_missing_ids() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    let deleted = native_calendar::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "delete",
+            "ev-hotpot",
+            "--calendar-id",
+            CALENDAR_ID,
+        ],
+        &[(key, value.as_str())],
+    );
+    assert_eq!(deleted.status.code(), Some(0));
+    let payload = native_calendar::json(&deleted);
+    assert_eq!(payload["result"]["deleted"].as_bool(), Some(true));
+    assert_eq!(payload["result"]["event_id"].as_str(), Some("ev-hotpot"));
+    assert_eq!(payload["result"]["calendar_id"].as_str(), Some(CALENDAR_ID));
+
+    // Deleting an id that is not there must not report success; a caller that
+    // trusted `deleted: true` would tell a chat group the event is gone when
+    // some other event still stands.
+    let missing = native_calendar::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "delete",
+            "ev-nope",
+            "--calendar-id",
+            CALENDAR_ID,
+        ],
+        &[(key, value.as_str())],
+    );
+    assert_ne!(missing.status.code(), Some(0));
+    let error = native_calendar::json(&missing);
+    assert_eq!(error.get("ok").and_then(Value::as_bool), Some(false));
+    assert_eq!(
+        error["error"]["code"].as_str(),
+        Some("NILS_GOOGLE_016"),
+        "a missing event must map to the calendar not-found code"
+    );
+}
+
+#[test]
+fn events_delete_requires_a_calendar_and_an_event_id() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    for arguments in [
+        vec![
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "delete",
+            "ev-hotpot",
+        ],
+        vec![
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "delete",
+            "--calendar-id",
+            CALENDAR_ID,
+        ],
+    ] {
+        let output = native_calendar::run(temp.path(), &arguments, &[(key, value.as_str())]);
+        assert_ne!(output.status.code(), Some(0));
+        let error = native_calendar::json(&output);
+        assert_eq!(
+            error["error"]["code"].as_str(),
+            Some("NILS_GOOGLE_015"),
+            "an incomplete delete is a user input error"
+        );
+    }
+}
