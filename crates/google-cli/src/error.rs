@@ -19,6 +19,9 @@ pub const ERROR_CODE_RUNTIME_GMAIL_FAILED: &str = "NILS_GOOGLE_011";
 pub const ERROR_CODE_USER_DRIVE_INVALID_INPUT: &str = "NILS_GOOGLE_012";
 pub const ERROR_CODE_RUNTIME_DRIVE_NOT_FOUND: &str = "NILS_GOOGLE_013";
 pub const ERROR_CODE_RUNTIME_DRIVE_FAILED: &str = "NILS_GOOGLE_014";
+pub const ERROR_CODE_USER_CALENDAR_INVALID_INPUT: &str = "NILS_GOOGLE_015";
+pub const ERROR_CODE_RUNTIME_CALENDAR_NOT_FOUND: &str = "NILS_GOOGLE_016";
+pub const ERROR_CODE_RUNTIME_CALENDAR_FAILED: &str = "NILS_GOOGLE_017";
 
 #[derive(Debug, Clone)]
 pub struct AppError {
@@ -171,6 +174,34 @@ impl AppError {
             ERROR_CODE_RUNTIME_DRIVE_FAILED,
             message,
             Some(json!({ "kind": "drive_runtime_failure" })),
+        )
+    }
+
+    pub fn invalid_calendar_input(message: impl Into<String>) -> Self {
+        Self::user(
+            ERROR_CODE_USER_CALENDAR_INVALID_INPUT,
+            message,
+            Some(json!({ "kind": "calendar_invalid_input" })),
+        )
+    }
+
+    pub fn calendar_not_found(entity: &str, id: &str) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_CALENDAR_NOT_FOUND,
+            format!("{entity} `{id}` not found"),
+            Some(json!({
+                "kind": "calendar_not_found",
+                "entity": entity,
+                "id": id,
+            })),
+        )
+    }
+
+    pub fn calendar_failure(message: impl Into<String>) -> Self {
+        Self::runtime(
+            ERROR_CODE_RUNTIME_CALENDAR_FAILED,
+            message,
+            Some(json!({ "kind": "calendar_runtime_failure" })),
         )
     }
 }

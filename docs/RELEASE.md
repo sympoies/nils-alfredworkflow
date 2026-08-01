@@ -86,6 +86,7 @@ Current bundled binaries:
 - `bangumi-cli`
 - `bilibili-cli`
 - `epoch-cli`
+- `google-cli`
 - `market-cli`
 - `quote-cli`
 - `randomer-cli`
@@ -102,10 +103,13 @@ Excluded from the standalone bundle for now:
 - `spotify-cli`: requires Spotify credentials and is still legacy Alfred JSON-first.
 - `youtube-cli`: requires a YouTube API key and is still legacy Alfred JSON-first.
 - `cambridge-cli`: requires the external Node/Playwright scraper runtime.
-- `google-cli`: native auth/keyring support currently pulls native Turso/simsimd dependencies that are not yet stable
-  across the four standalone release targets.
 - `memo-workflow-cli`: local memo DB operations currently pull native Turso/simsimd dependencies that are not yet
   stable across the four standalone release targets.
+
+`google-cli` was previously excluded for the same Turso/simsimd reason, but that no longer describes its dependency
+tree: `cargo tree -p nils-google-cli` has no Turso, simsimd, or libsql edge, and `keyring` 4.x resolves to
+`apple-native-keyring-store`, `windows-native-keyring-store`, and the pure-Rust `zbus-secret-service-keyring-store`.
+Requiring OAuth login before use is explicitly allowed by the manifest's own inclusion rule.
 
 To validate the bundle packaging locally without building release binaries:
 

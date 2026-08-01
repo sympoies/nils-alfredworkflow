@@ -8,7 +8,7 @@ Crate-local documentation index for `nils-google-cli`.
 
 ## Intended Readers
 
-- Maintainers responsible for native Google auth, Gmail, and Drive runtime behavior.
+- Maintainers responsible for native Google auth, Gmail, Drive, and Calendar runtime behavior.
 - Contributors changing OAuth flows, account persistence, or direct CLI contracts.
 
 ## Canonical Documents
@@ -20,3 +20,4 @@ Crate-local documentation index for `nils-google-cli`.
 - [`auth.md`](auth.md): auth command scope, storage model, and troubleshooting.
 - [`gmail.md`](gmail.md): Gmail command surface and native runtime notes.
 - [`drive.md`](drive.md): Drive command surface and native runtime notes.
+- [`calendar.md`](calendar.md): Calendar command surface, time-value rules, and native runtime notes.
