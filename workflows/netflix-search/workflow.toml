@@ -1,7 +1,7 @@
 id = "netflix-search"
 name = "Netflix Search"
 bundle_id = "com.sympoies.netflix-search"
-version = "1.3.4"
+version = "1.4.0"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
 rust_binary = "brave-cli"

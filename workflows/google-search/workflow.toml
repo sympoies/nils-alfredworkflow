@@ -1,7 +1,7 @@
 id = "google-search"
 name = "Google Search"
 bundle_id = "com.sympoies.google-search"
-version = "1.3.4"
+version = "1.4.0"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
 rust_binary = "brave-cli"

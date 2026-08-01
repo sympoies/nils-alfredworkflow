@@ -1,7 +1,7 @@
 id = "open-project"
 name = "Open Project"
 bundle_id = "com.sympoies.open-project"
-version = "1.3.4"
+version = "1.4.0"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
 rust_binary = "workflow-cli"
