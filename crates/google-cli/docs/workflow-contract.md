@@ -5,7 +5,7 @@
 ## Scope
 
 Per-subcommand JSON envelope, error-code, and exit-code contract for the `nils-google-cli` binary
-(`google-cli`). Covers all three native sub-namespaces — `auth`, `gmail`, and `drive` — that back the
+(`google-cli`). Covers all four native sub-namespaces — `auth`, `gmail`, `drive`, and `calendar` — that back the
 `google-service` Alfred workflow. The native command tree definition (clap clauses, subcommand semantics)
 lives in [`docs/specs/google-cli-native-contract.md`](../../../docs/specs/google-cli-native-contract.md);
 this document is the per-binary envelope and operator contract.
@@ -59,6 +59,15 @@ Authoritative help: `cargo run -p nils-google-cli -- <namespace> <subcommand> --
 | `drive download <target>` | file id / share link | Download a file. |
 | `drive upload` | upload inputs | Upload a file. |
 
+### `calendar`
+
+| Subcommand | Inputs | Behavior |
+| --- | --- | --- |
+| `calendar calendars list` | `--max <n>` | List calendars visible to the account. |
+| `calendar events list` | `--calendar-id`, `--from`, `--to`, `--query`, `--max`, `--private-property` | List events, expanded to single instances and ordered by start time. |
+| `calendar events get` | event id, `--calendar-id` | Fetch one event. |
+| `calendar events create` | `--calendar-id`, `--summary`, `--start`, `--end`, `--time-zone`, `--location`, `--description`, `--attendee`, `--private-property` | Create an all-day or timed event. |
+
 ## JSON envelope shape
 
 Cross-references:
@@ -93,7 +102,7 @@ Failure envelope:
 ```
 
 Native command identifiers stay scoped to the namespace: `google.auth.<verb>`, `google.gmail.<verb>`,
-`google.drive.<verb>`.
+`google.drive.<verb>`, `google.calendar.<group>.<verb>`.
 
 ## Reserved error codes
 
@@ -105,6 +114,7 @@ The reserved domain prefix is `NILS_GOOGLE_` (range `001-099`). Per the registry
   state mismatch).
 - `NILS_GOOGLE_009`–`011` — Gmail (invalid input, resource not found, runtime).
 - `NILS_GOOGLE_012`–`014` — Drive (invalid input, resource not found, runtime).
+- `NILS_GOOGLE_015`–`017` — Calendar (invalid input, resource not found, runtime).
 
 Adding a new code requires a registry update in
 [`cli-error-code-registry.md`](../../../docs/specs/cli-error-code-registry.md), a contract test update in

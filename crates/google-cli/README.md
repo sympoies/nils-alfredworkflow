@@ -1,6 +1,6 @@
 # nils-google-cli
 
-Native Rust package for the `google-cli` binary, scoped to Google `auth`, `gmail`, and `drive` commands.
+Native Rust package for the `google-cli` binary, scoped to Google `auth`, `gmail`, `drive`, and `calendar` commands.
 
 ## Commands
 
@@ -9,6 +9,7 @@ Native Rust package for the `google-cli` binary, scoped to Google `auth`, `gmail
 | `google-cli auth <...>` | Manage OAuth credentials, account login, aliases, and account status. |
 | `google-cli gmail <...>` | Search, inspect, and send Gmail messages through the native Gmail API client. |
 | `google-cli drive <...>` | List, inspect, download, and upload Drive files through the native Drive API client. |
+| `google-cli calendar <...>` | List calendars and list, inspect, or create events through the native Calendar API client. |
 
 ## Quick Start
 
@@ -50,6 +51,7 @@ cargo run -p nils-google-cli -- --json auth status -a you@example.com
 cargo run -p nils-google-cli -- auth --help
 cargo run -p nils-google-cli -- gmail --help
 cargo run -p nils-google-cli -- drive --help
+cargo run -p nils-google-cli -- calendar --help
 ```
 
 ## Environment Variables
@@ -62,6 +64,8 @@ cargo run -p nils-google-cli -- drive --help
 - `GOOGLE_CLI_GMAIL_FIXTURE_JSON`: inline Gmail fixture JSON for local tests.
 - `GOOGLE_CLI_DRIVE_FIXTURE_PATH`: Drive fixture JSON file path for local tests.
 - `GOOGLE_CLI_DRIVE_FIXTURE_JSON`: inline Drive fixture JSON for local tests.
+- `GOOGLE_CLI_CALENDAR_FIXTURE_PATH`: Calendar fixture JSON file path for local tests.
+- `GOOGLE_CLI_CALENDAR_FIXTURE_JSON`: inline Calendar fixture JSON for local tests.
 
 ## Output Contract
 
@@ -84,6 +88,7 @@ cargo run -p nils-google-cli -- drive --help
 - [`docs/auth.md`](docs/auth.md)
 - [`docs/gmail.md`](docs/gmail.md)
 - [`docs/drive.md`](docs/drive.md)
+- [`docs/calendar.md`](docs/calendar.md)
 
 ## Validation
 

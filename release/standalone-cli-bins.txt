@@ -9,6 +9,7 @@
 bangumi-cli|crates/bangumi-cli|Public Bangumi subject search; legacy JSON-first output.
 bilibili-cli|crates/bilibili-cli|Public Bilibili suggestion search; legacy JSON-first output.
 epoch-cli|crates/epoch-cli|Local epoch and datetime conversion.
+google-cli|crates/google-cli|Google auth, Gmail, Drive, and Calendar CLI; requires `auth credentials set` plus `auth add` before use.
 market-cli|crates/market-cli|Public FX and crypto market lookup; partial human-output migration.
 quote-cli|crates/quote-cli|Quote feed refresh and filtering; legacy JSON-first output.
 randomer-cli|crates/randomer-cli|Local random value generation.

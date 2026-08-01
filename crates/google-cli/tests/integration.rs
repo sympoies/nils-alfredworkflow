@@ -5,6 +5,8 @@
 
 #[path = "integration/common/mod.rs"]
 pub mod common;
+#[path = "integration/common/native_calendar.rs"]
+pub mod native_calendar;
 #[path = "integration/common/native_drive.rs"]
 pub mod native_drive;
 #[path = "integration/common/native_gmail.rs"]
@@ -20,6 +22,8 @@ mod auth_cli_contract;
 mod auth_oauth_flow;
 #[path = "integration/auth_storage.rs"]
 mod auth_storage;
+#[path = "integration/calendar_read.rs"]
+mod calendar_read;
 #[path = "integration/cli_contract.rs"]
 mod cli_contract;
 #[path = "integration/drive_cli_contract.rs"]

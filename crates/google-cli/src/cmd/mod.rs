@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod calendar;
 pub mod common;
 pub mod drive;
 pub mod gmail;
@@ -14,7 +15,7 @@ pub use common::GlobalOptions;
 #[command(
     author,
     version,
-    about = "Native Rust Google CLI for auth, Gmail, and Drive commands"
+    about = "Native Rust Google CLI for auth, Gmail, Drive, and Calendar commands"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -31,6 +32,8 @@ pub enum Commands {
     Gmail(gmail::GmailArgs),
     /// Native Drive commands.
     Drive(drive::DriveArgs),
+    /// Native Calendar commands.
+    Calendar(calendar::CalendarArgs),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +52,7 @@ impl Cli {
             Commands::Auth(command) => command.command_id_hint(),
             Commands::Gmail(command) => command.command_id_hint(),
             Commands::Drive(command) => command.command_id_hint(),
+            Commands::Calendar(command) => command.command_id_hint(),
         }
     }
 
@@ -58,6 +62,7 @@ impl Cli {
             Commands::Auth(command) => command.into_invocation(),
             Commands::Gmail(command) => command.into_invocation(),
             Commands::Drive(command) => command.into_invocation(),
+            Commands::Calendar(command) => command.into_invocation(),
         };
 
         Ok(Request {

@@ -18,8 +18,14 @@ pub const GOOGLE_CLI_AUTH_TEST_CODE_ENV: &str = "GOOGLE_CLI_AUTH_TEST_CODE";
 pub const GOOGLE_CLI_AUTH_TEST_CALLBACK_ENV: &str = "GOOGLE_CLI_AUTH_TEST_CALLBACK";
 pub const GOOGLE_CLI_AUTH_ALLOW_FAKE_EXCHANGE_ENV: &str = "GOOGLE_CLI_AUTH_ALLOW_FAKE_EXCHANGE";
 
-const GOOGLE_SCOPE: &str =
-    "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive";
+// Requested on every `auth add`. Google returns the union of scopes already
+// granted to this client for the account, so an existing grant can carry more
+// than this list; a fresh grant carries exactly this list.
+const GOOGLE_SCOPE: &str = concat!(
+    "https://www.googleapis.com/auth/gmail.modify",
+    " https://www.googleapis.com/auth/drive",
+    " https://www.googleapis.com/auth/calendar",
+);
 
 // Bound OAuth token endpoint calls so a stalled server cannot hang the CLI
 // indefinitely. OAuth round-trips can be slower than a plain API read, so 15s

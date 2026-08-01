@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod calendar;
 pub mod client;
 pub mod cmd;
 pub mod drive;
@@ -40,6 +41,20 @@ pub fn run_request(request: &Request) -> Result<RenderedOutput, AppError> {
 
     if request.invocation.command_id.starts_with("google.drive.") {
         let native = drive::execute_native(&request.global, &request.invocation)?;
+        return Ok(render_success(
+            request.invocation.command_id.as_str(),
+            request.global.output_mode_hint(),
+            native.payload,
+            native.text.as_str(),
+        ));
+    }
+
+    if request
+        .invocation
+        .command_id
+        .starts_with("google.calendar.")
+    {
+        let native = calendar::execute_native(&request.global, &request.invocation)?;
         return Ok(render_success(
             request.invocation.command_id.as_str(),
             request.global.output_mode_hint(),
