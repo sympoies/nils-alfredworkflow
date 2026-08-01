@@ -8,9 +8,11 @@ Authoritative Calendar documentation for `google-cli`.
 - `calendar events list`
 - `calendar events get <eventId>`
 - `calendar events create`
+- `calendar events delete <eventId>`
 
-Event mutation beyond creation (`events update`, `events delete`), calendar creation/deletion, and ACL changes are
-deliberately out of scope.
+Editing an existing event (`events update`), calendar creation/deletion, and ACL changes are deliberately out of
+scope. Delete is in scope because an event a consumer created is an event it must be able to retract; without it the
+only way back is the Calendar UI.
 
 ## Runtime model
 
@@ -21,8 +23,8 @@ deliberately out of scope.
 - Fixture mode is enabled only when one of these env vars is set:
   - `GOOGLE_CLI_CALENDAR_FIXTURE_PATH`
   - `GOOGLE_CLI_CALENDAR_FIXTURE_JSON`
-- Fixture mode never mutates remote state. `events create` echoes the request it built, so command wiring stays
-  testable without network access.
+- Fixture mode never mutates remote state. `events create` echoes the request it built and `events delete` resolves
+  the id then reports success without removing anything, so command wiring stays testable without network access.
 
 ## Calendar selection
 
@@ -119,6 +121,16 @@ cargo run -p nils-google-cli -- --output json -a you@example.com \
   --start 2026-08-15 \
   --end 2026-08-18
 ```
+
+Delete an event:
+
+```bash
+cargo run -p nils-google-cli -- --output json -a you@example.com \
+  calendar events delete <event_id> --calendar-id "<calendar_id>"
+```
+
+`deleted: true` means that id is gone. An id that was never there, or was already deleted, is
+`NILS_GOOGLE_016` — the command never reports success for an event it did not remove.
 
 ## Error codes
 

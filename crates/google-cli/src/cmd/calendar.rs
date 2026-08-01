@@ -13,7 +13,7 @@ enum CalendarCommand {
     /// Calendar list operations: `list`.
     #[command(alias = "calendar")]
     Calendars(NestedArgs),
-    /// Event operations: `list`, `get`, `create`.
+    /// Event operations: `list`, `get`, `create`, `delete`.
     #[command(alias = "event")]
     Events(NestedArgs),
 }

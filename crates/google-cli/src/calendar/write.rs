@@ -2,9 +2,70 @@ use serde_json::json;
 
 use crate::error::AppError;
 
-use super::client::{CalendarSession, EventCreateRequest, TimeSpec};
+use super::client::{CalendarSession, EventCreateRequest, EventGetRequest, TimeSpec};
 use super::read::{parse_property, require_calendar_id, value_for};
 use super::{NativeCalendarResponse, response};
+
+pub fn execute_events_delete(
+    session: &CalendarSession,
+    args: &[String],
+) -> Result<NativeCalendarResponse, AppError> {
+    let mut calendar_id = None;
+    let mut event_id = None;
+
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--calendar-id" => {
+                index += 1;
+                calendar_id = Some(value_for(args, index, "--calendar-id")?.clone());
+            }
+            "--event-id" => {
+                index += 1;
+                event_id = Some(value_for(args, index, "--event-id")?.clone());
+            }
+            unknown if unknown.starts_with('-') => {
+                return Err(AppError::invalid_calendar_input(format!(
+                    "unknown events delete flag `{unknown}`"
+                )));
+            }
+            positional => {
+                if event_id.is_some() {
+                    return Err(AppError::invalid_calendar_input(format!(
+                        "unexpected extra event id `{positional}`"
+                    )));
+                }
+                event_id = Some(positional.to_string());
+            }
+        }
+        index += 1;
+    }
+
+    let request = EventGetRequest {
+        calendar_id: require_calendar_id(calendar_id)?,
+        event_id: event_id.ok_or_else(|| {
+            AppError::invalid_calendar_input(
+                "`events delete` requires an event id, either positional or via --event-id",
+            )
+        })?,
+    };
+    session.delete_event(&request)?;
+
+    Ok(response(
+        json!({
+            "account": session.account,
+            "account_source": session.account_source,
+            "calendar_id": request.calendar_id,
+            "event_id": request.event_id,
+            "fixture_mode": session.is_fixture_mode(),
+            "deleted": true,
+        }),
+        format!(
+            "Deleted event `{}` from `{}`.",
+            request.event_id, request.calendar_id
+        ),
+    ))
+}
 
 pub fn execute_events_create(
     session: &CalendarSession,
