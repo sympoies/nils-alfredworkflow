@@ -1641,7 +1641,7 @@ dependencies = [
 
 [[package]]
 name = "nils-alfred-core"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1649,14 +1649,14 @@ dependencies = [
 
 [[package]]
 name = "nils-alfred-plist"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "nils-bangumi-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1670,7 +1670,7 @@ dependencies = [
 
 [[package]]
 name = "nils-bilibili-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1683,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "nils-brave-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1702,7 +1702,7 @@ checksum = "a6df493f60c69d3aa3233b9cf599f56600844e18828d11d02dbfd1a2bedc7c1a"
 
 [[package]]
 name = "nils-cambridge-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1730,7 +1730,7 @@ dependencies = [
 
 [[package]]
 name = "nils-epoch-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1742,7 +1742,7 @@ dependencies = [
 
 [[package]]
 name = "nils-google-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "base64",
  "clap",
@@ -1765,7 +1765,7 @@ dependencies = [
 
 [[package]]
 name = "nils-market-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1800,7 +1800,7 @@ dependencies = [
 
 [[package]]
 name = "nils-memo-workflow-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1813,7 +1813,7 @@ dependencies = [
 
 [[package]]
 name = "nils-quote-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "nils-randomer-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1839,7 +1839,7 @@ dependencies = [
 
 [[package]]
 name = "nils-spotify-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "nils-steam-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "base64",
  "clap",
@@ -1876,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "nils-timezone-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "nils-weather-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "nils-wiki-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",
@@ -1919,7 +1919,7 @@ dependencies = [
 
 [[package]]
 name = "nils-workflow-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-workflow-common",
@@ -1929,7 +1929,7 @@ dependencies = [
 
 [[package]]
 name = "nils-workflow-common"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "nils-workflow-readme-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-workflow-common",
@@ -1953,7 +1953,7 @@ dependencies = [
 
 [[package]]
 name = "nils-youtube-cli"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "clap",
  "nils-alfred-core",

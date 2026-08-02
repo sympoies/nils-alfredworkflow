@@ -1,7 +1,7 @@
 id = "steam-search"
 name = "Steam Search"
 bundle_id = "com.sympoies.steam-search"
-version = "1.4.0"
+version = "1.5.0"
 script_filter = "script_filter.sh"
 action = "action_open.sh"
 rust_binary = "steam-cli"
