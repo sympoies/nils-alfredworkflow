@@ -9,7 +9,7 @@ Native Rust package for the `google-cli` binary, scoped to Google `auth`, `gmail
 | `google-cli auth <...>` | Manage OAuth credentials, account login, aliases, and account status. |
 | `google-cli gmail <...>` | Search, inspect, and send Gmail messages through the native Gmail API client. |
 | `google-cli drive <...>` | List, inspect, download, and upload Drive files through the native Drive API client. |
-| `google-cli calendar <...>` | List calendars and list, inspect, or create events through the native Calendar API client. |
+| `google-cli calendar <...>` | List calendars and list, inspect, create, update, or delete events through the native Calendar API client. Event creation and update accept `--google-meet`. |
 
 ## Quick Start
 

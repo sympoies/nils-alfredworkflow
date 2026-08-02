@@ -185,6 +185,8 @@ pub struct EventView {
     pub description: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub html_link: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub meet_link: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attendees: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -226,6 +228,20 @@ pub struct EventCreateRequest {
     pub description: Option<String>,
     pub attendees: Vec<String>,
     pub private_properties: Vec<(String, String)>,
+    pub google_meet: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct EventUpdateRequest {
+    pub calendar_id: String,
+    pub event_id: String,
+    pub summary: Option<String>,
+    pub start: Option<TimeSpec>,
+    pub end: Option<TimeSpec>,
+    pub time_zone: Option<String>,
+    pub location: Option<String>,
+    pub description: Option<String>,
+    pub google_meet: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -405,10 +421,41 @@ impl CalendarSession {
         }
 
         let path = format!("calendars/{}/events", encode_path(&request.calendar_id));
+        let query = conference_query(request.google_meet);
         let response = self.post_json(
             &path,
+            &query,
             payload,
             Some(("calendar", request.calendar_id.as_str())),
+        )?;
+        Ok(event_view_from_json(&response))
+    }
+
+    pub fn update_event(&self, request: &EventUpdateRequest) -> Result<EventView, AppError> {
+        let payload = build_event_update_payload(request)?;
+
+        if let Some(fixture) = &self.fixture {
+            let mut event = fixture
+                .events
+                .iter()
+                .find(|event| event.id == request.event_id)
+                .cloned()
+                .ok_or_else(|| AppError::calendar_not_found("event", &request.event_id))?;
+            apply_fixture_update(&mut event, request);
+            return Ok(event);
+        }
+
+        let path = format!(
+            "calendars/{}/events/{}",
+            encode_path(&request.calendar_id),
+            encode_path(&request.event_id)
+        );
+        let query = conference_query(request.google_meet);
+        let response = self.patch_json(
+            &path,
+            &query,
+            payload,
+            Some(("event", request.event_id.as_str())),
         )?;
         Ok(event_view_from_json(&response))
     }
@@ -463,6 +510,7 @@ impl CalendarSession {
     fn post_json(
         &self,
         path: &str,
+        query: &[(&str, String)],
         payload: Value,
         not_found: Option<(&str, &str)>,
     ) -> Result<Value, AppError> {
@@ -471,11 +519,32 @@ impl CalendarSession {
             self.client
                 .post(&url)
                 .bearer_auth(&self.access_token)
+                .query(query)
                 .json(&payload),
         )
         .send()
         .map_err(|error| AppError::calendar_failure(format!("POST {url} failed: {error}")))?;
         parse_calendar_response(response, format!("POST {path}").as_str(), not_found)
+    }
+
+    fn patch_json(
+        &self,
+        path: &str,
+        query: &[(&str, String)],
+        payload: Value,
+        not_found: Option<(&str, &str)>,
+    ) -> Result<Value, AppError> {
+        let url = format!("{CALENDAR_API_BASE}/{path}");
+        let response = bounded(
+            self.client
+                .patch(&url)
+                .bearer_auth(&self.access_token)
+                .query(query)
+                .json(&payload),
+        )
+        .send()
+        .map_err(|error| AppError::calendar_failure(format!("PATCH {url} failed: {error}")))?;
+        parse_calendar_response(response, format!("PATCH {path}").as_str(), not_found)
     }
 }
 
@@ -582,8 +651,129 @@ pub fn build_event_payload(request: &EventCreateRequest) -> Result<Value, AppErr
             .collect::<serde_json::Map<_, _>>();
         payload["extendedProperties"] = json!({ "private": private });
     }
+    add_conference_request(&mut payload, request.google_meet);
 
     Ok(payload)
+}
+
+pub fn build_event_update_payload(request: &EventUpdateRequest) -> Result<Value, AppError> {
+    if request
+        .summary
+        .as_ref()
+        .is_some_and(|value| value.trim().is_empty())
+    {
+        return Err(AppError::invalid_calendar_input(
+            "`events update` requires a non-empty --summary when supplied",
+        ));
+    }
+    if request.start.is_none()
+        && request.end.is_none()
+        && request.summary.is_none()
+        && request.location.is_none()
+        && request.description.is_none()
+        && !request.google_meet
+    {
+        return Err(AppError::invalid_calendar_input(
+            "`events update` requires at least one field to change",
+        ));
+    }
+    if let (Some(start), Some(end)) = (&request.start, &request.end)
+        && start.is_date() != end.is_date()
+    {
+        return Err(AppError::invalid_calendar_input(
+            "--start and --end must both be dates (all-day) or both be date-times",
+        ));
+    }
+
+    let mut payload = json!({});
+    if let Some(summary) = &request.summary {
+        payload["summary"] = json!(summary);
+    }
+    if let Some(start) = &request.start {
+        payload["start"] = update_time_slot(start, request.time_zone.as_deref())?;
+    }
+    if let Some(end) = &request.end {
+        payload["end"] = update_time_slot(end, request.time_zone.as_deref())?;
+    }
+    if let Some(location) = &request.location {
+        payload["location"] = json!(location);
+    }
+    if let Some(description) = &request.description {
+        payload["description"] = json!(description);
+    }
+    add_conference_request(&mut payload, request.google_meet);
+    Ok(payload)
+}
+
+fn update_time_slot(time: &TimeSpec, time_zone: Option<&str>) -> Result<Value, AppError> {
+    match time {
+        TimeSpec::Date(value) => Ok(json!({ "date": value })),
+        TimeSpec::DateTime { value, has_offset } => {
+            if !has_offset && time_zone.is_none() {
+                return Err(AppError::invalid_calendar_input(
+                    "updated date-time has no UTC offset; pass --time-zone <IANA zone> or include an offset such as `+08:00`",
+                ));
+            }
+            let mut slot = json!({ "dateTime": value });
+            if let Some(zone) = time_zone {
+                slot["timeZone"] = json!(zone);
+            }
+            Ok(slot)
+        }
+    }
+}
+
+fn apply_fixture_update(event: &mut EventView, request: &EventUpdateRequest) {
+    if let Some(summary) = &request.summary {
+        event.summary.clone_from(summary);
+    }
+    if let Some(start) = &request.start {
+        event.start = time_spec_value(start);
+        event.all_day = start.is_date();
+    }
+    if let Some(end) = &request.end {
+        event.end = time_spec_value(end);
+    }
+    if let Some(location) = &request.location {
+        event.location.clone_from(location);
+    }
+    if let Some(description) = &request.description {
+        event.description.clone_from(description);
+    }
+}
+
+fn time_spec_value(time: &TimeSpec) -> String {
+    match time {
+        TimeSpec::Date(value) | TimeSpec::DateTime { value, .. } => value.clone(),
+    }
+}
+
+fn conference_query(enabled: bool) -> Vec<(&'static str, String)> {
+    if enabled {
+        vec![("conferenceDataVersion", "1".to_string())]
+    } else {
+        Vec::new()
+    }
+}
+
+fn add_conference_request(payload: &mut Value, enabled: bool) {
+    if enabled {
+        payload["conferenceData"] = json!({
+            "createRequest": {
+                "requestId": conference_request_id(),
+                "conferenceSolutionKey": { "type": "hangoutsMeet" }
+            }
+        });
+    }
+}
+
+fn conference_request_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    format!("google-cli-{nanos}-{}", std::process::id())
 }
 
 fn bounded(request: RequestBuilder) -> RequestBuilder {
@@ -632,6 +822,7 @@ fn event_view_from_json(value: &Value) -> EventView {
         location: string_field(value, "location"),
         description: string_field(value, "description"),
         html_link: string_field(value, "htmlLink"),
+        meet_link: meet_link_from_json(value),
         attendees: value
             .get("attendees")
             .and_then(Value::as_array)
@@ -657,6 +848,26 @@ fn event_view_from_json(value: &Value) -> EventView {
             })
             .unwrap_or_default(),
     }
+}
+
+fn meet_link_from_json(value: &Value) -> String {
+    let hangout_link = string_field(value, "hangoutLink");
+    if !hangout_link.is_empty() {
+        return hangout_link;
+    }
+    value
+        .get("conferenceData")
+        .and_then(|conference| conference.get("entryPoints"))
+        .and_then(Value::as_array)
+        .and_then(|entries| {
+            entries.iter().find_map(|entry| {
+                (entry.get("entryPointType").and_then(Value::as_str) == Some("video"))
+                    .then(|| entry.get("uri").and_then(Value::as_str))
+                    .flatten()
+            })
+        })
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn time_slot(slot: Option<&Value>) -> String {
@@ -853,6 +1064,7 @@ mod tests {
             description: None,
             attendees: Vec::new(),
             private_properties: Vec::new(),
+            google_meet: false,
         })
         .expect("payload");
 
@@ -872,6 +1084,7 @@ mod tests {
             description: None,
             attendees: Vec::new(),
             private_properties: Vec::new(),
+            google_meet: false,
         })
         .expect_err("missing zone");
 
@@ -893,6 +1106,7 @@ mod tests {
             description: None,
             attendees: vec!["someone@example.com".to_string()],
             private_properties: vec![("gn_note_id".to_string(), "n_e923e876".to_string())],
+            google_meet: false,
         })
         .expect("payload");
 
@@ -918,6 +1132,7 @@ mod tests {
             description: None,
             attendees: Vec::new(),
             private_properties: Vec::new(),
+            google_meet: false,
         })
         .expect_err("mixed bounds");
 
@@ -925,6 +1140,43 @@ mod tests {
             error.code(),
             crate::error::ERROR_CODE_USER_CALENDAR_INVALID_INPUT
         );
+    }
+
+    #[test]
+    fn google_meet_payload_and_normalized_link_are_exposed() {
+        let payload = build_event_payload(&EventCreateRequest {
+            calendar_id: "primary".to_string(),
+            summary: "Video call".to_string(),
+            start: TimeSpec::parse("2026-08-15T11:20Z").expect("start"),
+            end: Some(TimeSpec::parse("2026-08-15T12:00Z").expect("end")),
+            time_zone: None,
+            location: None,
+            description: None,
+            attendees: Vec::new(),
+            private_properties: Vec::new(),
+            google_meet: true,
+        })
+        .expect("payload");
+        assert_eq!(
+            payload["conferenceData"]["createRequest"]["conferenceSolutionKey"]["type"],
+            "hangoutsMeet"
+        );
+        assert!(
+            payload["conferenceData"]["createRequest"]["requestId"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+        );
+
+        let event = event_view_from_json(&json!({
+            "id": "event-with-meet",
+            "conferenceData": {
+                "entryPoints": [
+                    { "entryPointType": "phone", "uri": "tel:+100000000" },
+                    { "entryPointType": "video", "uri": "https://meet.google.com/abc-defg-hij" }
+                ]
+            }
+        }));
+        assert_eq!(event.meet_link, "https://meet.google.com/abc-defg-hij");
     }
 
     #[test]

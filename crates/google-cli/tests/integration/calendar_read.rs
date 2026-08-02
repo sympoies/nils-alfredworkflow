@@ -32,6 +32,7 @@ fn fixture_payload() -> Value {
                 "end": "2026-08-15T13:00:00+08:00",
                 "all_day": false,
                 "location": "千葉火鍋",
+                "description": "Original family dinner",
                 "html_link": "https://example.invalid/ev-hotpot",
                 "private_properties": {
                     "gn_platform": "line",
@@ -358,4 +359,48 @@ fn events_delete_requires_a_calendar_and_an_event_id() {
             "an incomplete delete is a user input error"
         );
     }
+}
+
+#[test]
+fn events_update_changes_only_supplied_fields() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    let output = native_calendar::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "update",
+            "ev-hotpot",
+            "--calendar-id",
+            CALENDAR_ID,
+            "--summary",
+            "Updated dinner",
+            "--location",
+            "New restaurant",
+        ],
+        &[(key, value.as_str())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+
+    let payload = native_calendar::json(&output);
+    assert_eq!(
+        payload.get("command").and_then(Value::as_str),
+        Some("google.calendar.events.update")
+    );
+    let event = &payload["result"]["event"];
+    assert_eq!(event["id"].as_str(), Some("ev-hotpot"));
+    assert_eq!(event["summary"].as_str(), Some("Updated dinner"));
+    assert_eq!(event["location"].as_str(), Some("New restaurant"));
+    assert_eq!(
+        event["description"].as_str(),
+        Some("Original family dinner")
+    );
+    assert_eq!(event["start"].as_str(), Some("2026-08-15T11:20:00+08:00"));
+    assert_eq!(event["end"].as_str(), Some("2026-08-15T13:00:00+08:00"));
 }
