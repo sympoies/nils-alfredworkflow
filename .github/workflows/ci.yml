@@ -5,6 +5,11 @@ on:
     branches:
       - main
   pull_request:
+  # A push whose author GitHub declines to run Actions for lands on `main` with
+  # no `validate` check, which then blocks `release.yml`'s CI gate on a commit
+  # that is otherwise fine. Manual dispatch is the recovery lever for that: it
+  # produces the missing check without rewriting history or retagging.
+  workflow_dispatch:
 
 jobs:
   validate:
