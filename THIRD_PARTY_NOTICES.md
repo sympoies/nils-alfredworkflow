@@ -3,8 +3,8 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `92b8191ab3493f7a20be52112d375a381e65a00943dff51fe913098ef4a345a2`
-- Third-party crates (`source != null`): 326
+- Cargo.lock SHA256: `be364b451712f3df1da3a19be1e63357136ce5d648018b66251c82bdd000cfeb`
+- Third-party crates (`source != null`): 327
 
 ## Notice Extraction Policy
 
@@ -305,6 +305,15 @@ This file documents third-party notice-file discovery for Rust crates used by th
 ### borsh-derive 1.6.1
 
 - License: `Apache-2.0`
+- Source: `crates.io`
+- Notice files: No explicit NOTICE file discovered.
+- License file references:
+  - `LICENSE-APACHE`
+  - `LICENSE-MIT`
+
+### bs58 0.5.1
+
+- License: `MIT/Apache-2.0`
 - Source: `crates.io`
 - Notice files: No explicit NOTICE file discovered.
 - License file references:
@@ -2156,7 +2165,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### serde_with 3.19.0
+### serde_with 3.22.0
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2165,7 +2174,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### serde_with_macros 3.19.0
+### serde_with_macros 3.22.0
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
