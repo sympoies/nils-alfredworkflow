@@ -19,8 +19,9 @@ write_executable() {
   chmod +x "$path"
 }
 
+# shellcheck disable=SC2016
 write_executable "$fixture_root/selected-bin/node" \
-  'printf "22\n"'
+  'printf "%s\n" "${CONTRACT_NODE_MAJOR:-24}"'
 # shellcheck disable=SC2016
 write_executable "$fixture_root/selected-bin/npm" '
   printf "npm %s\n" "$*" >>"${CONTRACT_LOG:?}"
@@ -76,6 +77,16 @@ assert_log() {
     exit 1
   fi
 }
+
+below_minimum_log="$fixture_root/below-minimum.log"
+below_minimum_error="$fixture_root/below-minimum.err"
+if CONTRACT_NODE_MAJOR=23 run_wrapper "$below_minimum_log" "" --mode ci \
+  >/dev/null 2>"$below_minimum_error"; then
+  echo "error: Node.js 23 unexpectedly passed the minimum-version gate" >&2
+  exit 1
+fi
+grep -Fqx 'error: Node.js 24 or newer is required' "$below_minimum_error"
+[[ ! -s "$below_minimum_log" ]]
 
 ci_expected=$'npm ci\ngate lint\ngate third-party-artifacts-audit\ngate node-scraper-tests\ngate script-tests\ngate test'
 ci_log="$fixture_root/ci.log"

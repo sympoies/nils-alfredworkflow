@@ -112,7 +112,7 @@ Mapping requirements:
 
 Bootstrap steps for future enablement:
 
-1. Ensure Node runtime is present (`node >= 20`).
+1. Ensure Node runtime is present (`node >= 24`).
 2. Ensure workflow-local or repo-managed Playwright dependencies are installed.
 3. Verify bridge script path (`BANGUMI_SCRAPER_SCRIPT`) resolves in package/repo layouts.
 4. Run deterministic contract tests before live-network checks.

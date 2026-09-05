@@ -12,7 +12,7 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `73cdbbc402bdd4872916a6b23a59535457085943023ac08603e4935ac70d8259`
+- Data source fingerprint (SHA256): `dfd994c2bc87e0967bda54b0d3abaa8abf9aa04a831f76b5ca709063b26ef048`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
@@ -20,7 +20,7 @@ Do not edit manually.
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
 | Cargo lockfile | `Cargo.lock` | `92b8191ab3493f7a20be52112d375a381e65a00943dff51fe913098ef4a345a2` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
-| Node lockfile | `package-lock.json` | `dac8cc6b6a422d650d9ff294a8e7198a63093b6bd07779f36eff377df0f0d577` | `jq package-lock extraction` |
+| Node lockfile | `package-lock.json` | `5207bd65ad90a762bb4df1380b142ee7221803adc8ad1656f082fc4cc08dd63d` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
