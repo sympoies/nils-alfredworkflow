@@ -23,11 +23,11 @@ directories = "=6.0.0"
 google-apis-common = "=8.0.0"
 google-drive3 = "=7.0.0"
 google-gmail1 = "=7.0.0"
-keyring = "=4.1.4"
+keyring = "=4.1.6"
 mail-builder = "=0.4.4"
 mime_guess = "=2.0.5"
 workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["http"] }
-open = "=5.3.6"
+open = "=5.4.0"
 reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
 yup-oauth2 = "=12.1.2"
 
