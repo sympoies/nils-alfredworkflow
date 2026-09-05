@@ -12,23 +12,23 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `f68e49ce8c309d826c41820f13693c33c435a205842c6dd9b825bb75cb2ea77f`
+- Data source fingerprint (SHA256): `73cdbbc402bdd4872916a6b23a59535457085943023ac08603e4935ac70d8259`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `88309cee18878d203d3615af5afda39cdf1629e9870f72454bbf48fe5425f24c` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `92b8191ab3493f7a20be52112d375a381e65a00943dff51fe913098ef4a345a2` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `dac8cc6b6a422d650d9ff294a8e7198a63093b6bd07779f36eff377df0f0d577` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
-## Rust License Summary (329 crates)
+## Rust License Summary (326 crates)
 
 | Count | License Expression |
 | ---: | --- |
-| 170 | MIT OR Apache-2.0 |
+| 167 | MIT OR Apache-2.0 |
 | 71 | MIT |
 | 30 | Apache-2.0 OR MIT |
 | 18 | Unicode-3.0 |
@@ -159,7 +159,6 @@ Do not edit manually.
 | generic-array | 0.14.7 | MIT | <https://github.com/fizyk20/generic-array.git> |
 | gethostname | 1.1.0 | Apache-2.0 | <https://codeberg.org/swsnr/gethostname.rs.git> |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
-| getrandom | 0.3.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
 | getrandom | 0.4.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
 | google-apis-common | 8.0.0 | MIT | <https://github.com/Byron/google-apis-rs> |
 | google-drive3 | 7.0.0+20251218 | MIT | <https://github.com/Byron/google-apis-rs/tree/main/gen/drive3> |
@@ -258,18 +257,16 @@ Do not edit manually.
 | ptr_meta | 0.1.4 | MIT | <https://github.com/djkoloski/ptr_meta> |
 | ptr_meta_derive | 0.1.4 | MIT | <https://github.com/djkoloski/ptr_meta> |
 | quinn | 0.11.9 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
-| quinn-proto | 0.11.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
+| quinn-proto | 0.11.17 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-udp | 0.5.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quote | 1.0.45 | MIT OR Apache-2.0 | <https://github.com/dtolnay/quote> |
 | radium | 0.7.0 | MIT | <https://github.com/bitvecto-rs/radium> |
 | rand | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.8.6 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
-| rand | 0.9.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
-| rand_chacha | 0.9.0 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand_core> |
 | rand_core | 0.6.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
-| rand_core | 0.9.5 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| rand_pcg | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/rngs> |
 | ref-cast | 1.0.25 | MIT OR Apache-2.0 | <https://github.com/dtolnay/ref-cast> |
 | ref-cast-impl | 1.0.25 | MIT OR Apache-2.0 | <https://github.com/dtolnay/ref-cast> |
 | regex | 1.12.3 | MIT OR Apache-2.0 | <https://github.com/rust-lang/regex> |
