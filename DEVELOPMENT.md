@@ -30,7 +30,7 @@ Use this file for day-to-day development, quality gates, and local validation fl
   - Install Rust via rustup (stable toolchain).
   - Ensure `rustfmt` and `clippy` components are installed:
     - `rustup component add rustfmt clippy`
-  - Install Node.js (>=20) and run:
+  - Install Node.js (>=24; `fnm use` reads `.node-version`) and run:
     - `npm ci`
 - For the full local tool list and install commands, use `BINARY_DEPENDENCIES.md`.
 

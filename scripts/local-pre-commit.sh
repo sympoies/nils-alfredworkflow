@@ -96,8 +96,8 @@ fi
 cd "$repo_root"
 
 node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
-if [[ ! "$node_major" =~ ^[0-9]+$ ]] || ((node_major < 20)); then
-  die "Node.js 20 or newer is required"
+if [[ ! "$node_major" =~ ^[0-9]+$ ]] || ((node_major < 24)); then
+  die "Node.js 24 or newer is required"
 fi
 node_path="$(command -v node)"
 node_bin_dir="$(dirname -- "$node_path")"
