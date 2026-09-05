@@ -3,8 +3,8 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `88309cee18878d203d3615af5afda39cdf1629e9870f72454bbf48fe5425f24c`
-- Third-party crates (`source != null`): 329
+- Cargo.lock SHA256: `92b8191ab3493f7a20be52112d375a381e65a00943dff51fe913098ef4a345a2`
+- Third-party crates (`source != null`): 326
 
 ## Notice Extraction Policy
 
@@ -934,15 +934,6 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### getrandom 0.3.4
-
-- License: `MIT OR Apache-2.0`
-- Source: `crates.io`
-- Notice files: No explicit NOTICE file discovered.
-- License file references:
-  - `LICENSE-APACHE`
-  - `LICENSE-MIT`
-
 ### getrandom 0.4.2
 
 - License: `MIT OR Apache-2.0`
@@ -1792,7 +1783,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### quinn-proto 0.11.14
+### quinn-proto 0.11.17
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1845,25 +1836,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### rand 0.9.4
-
-- License: `MIT OR Apache-2.0`
-- Source: `crates.io`
-- Notice files: No explicit NOTICE file discovered.
-- License file references:
-  - `LICENSE-APACHE`
-  - `LICENSE-MIT`
-
 ### rand_chacha 0.3.1
-
-- License: `MIT OR Apache-2.0`
-- Source: `crates.io`
-- Notice files: No explicit NOTICE file discovered.
-- License file references:
-  - `LICENSE-APACHE`
-  - `LICENSE-MIT`
-
-### rand_chacha 0.9.0
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1890,7 +1863,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### rand_core 0.9.5
+### rand_pcg 0.10.2
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
