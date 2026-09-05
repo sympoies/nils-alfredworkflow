@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `bc172312b0ee8ad60d0f66c83760e5abe08a0d25c4c997a52d49acea1b9309e4`
+- Data source fingerprint (SHA256): `f68e49ce8c309d826c41820f13693c33c435a205842c6dd9b825bb75cb2ea77f`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `6a155b820bf16006f4103ae87de40aeee02b3cd2904e2b3d5d7bac68c2f3e7f9` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `88309cee18878d203d3615af5afda39cdf1629e9870f72454bbf48fe5425f24c` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `dac8cc6b6a422d650d9ff294a8e7198a63093b6bd07779f36eff377df0f0d577` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -95,7 +95,7 @@ Do not edit manually.
 | cc | 1.2.62 | MIT OR Apache-2.0 | <https://github.com/rust-lang/cc-rs> |
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 | <https://github.com/rust-lang/cfg-if> |
 | cfg_aliases | 0.2.1 | MIT | <https://github.com/katharostech/cfg_aliases> |
-| chacha20 | 0.10.0 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/stream-ciphers> |
+| chacha20 | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/stream-ciphers> |
 | chrono | 0.4.45 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono> |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono-tz> |
 | cipher | 0.4.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/traits> |
@@ -164,7 +164,7 @@ Do not edit manually.
 | google-apis-common | 8.0.0 | MIT | <https://github.com/Byron/google-apis-rs> |
 | google-drive3 | 7.0.0+20251218 | MIT | <https://github.com/Byron/google-apis-rs/tree/main/gen/drive3> |
 | google-gmail1 | 7.0.0+20251215 | MIT | <https://github.com/Byron/google-apis-rs/tree/main/gen/gmail1> |
-| h2 | 0.4.14 | MIT | <https://github.com/hyperium/h2> |
+| h2 | 0.4.19 | MIT | <https://github.com/hyperium/h2> |
 | hashbrown | 0.12.3 | MIT OR Apache-2.0 | <https://github.com/rust-lang/hashbrown> |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 | <https://github.com/rust-lang/hashbrown> |
 | hashlink | 0.12.0 | MIT OR Apache-2.0 | <https://github.com/djc/hashlink> |
