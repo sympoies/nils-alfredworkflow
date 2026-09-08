@@ -24,7 +24,7 @@ google-apis-common = "=8.0.0"
 google-drive3 = "=7.0.0"
 google-gmail1 = "=7.0.0"
 keyring = "=4.1.6"
-mail-builder = "=0.4.4"
+mail-builder = "=0.5.0"
 mime_guess = "=2.0.5"
 workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["http"] }
 open = "=5.4.0"
