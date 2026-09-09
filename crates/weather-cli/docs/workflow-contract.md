@@ -190,6 +190,10 @@ The `result` payload shape depends on the command.
 ## Provider Policy
 
 - No token is required for all command paths.
+- City geocoding queries the original input first. Only when Open-Meteo returns
+  no location, `台中`, `臺中`, `台中市`, and `臺中市` retry as `Taichung,Taiwan`.
+  Provider errors do not trigger this alias fallback; a second empty result keeps
+  the original city in the error. Geocoding cache keys keep the original input.
 - Forecast order:
   1. Open-Meteo primary
   2. MET Norway fallback
