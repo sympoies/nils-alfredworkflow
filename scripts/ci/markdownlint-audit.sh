@@ -55,6 +55,7 @@ fi
 md_files=()
 while IFS= read -r -d '' path; do
   [[ -f "$path" ]] || continue
+  [[ "$path" == "CLAUDE.md" ]] && continue
   md_files+=("$path")
 done < <(git -C "$repo_root" ls-files -z '*.md')
 
