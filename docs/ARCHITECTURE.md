@@ -33,6 +33,7 @@ For operator standards and command gates, see:
 
 - [ALFRED_WORKFLOW_DEVELOPMENT.md](../ALFRED_WORKFLOW_DEVELOPMENT.md)
 - [DEVELOPMENT.md](../DEVELOPMENT.md)
+- [docs/MAINTENANCE.md](MAINTENANCE.md)
 - [docs/PACKAGING.md](PACKAGING.md)
 
 ## Spec navigation

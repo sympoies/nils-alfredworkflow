@@ -1,0 +1,160 @@
+# Maintenance Reference
+
+Workspace-level command reference for contributors maintaining
+`nils-alfredworkflow`. Start with the principles and routine gate in
+[`DEVELOPMENT.md`](../DEVELOPMENT.md); use this document when a change needs
+specific setup, build, lint, test, or coverage commands.
+
+- Toolchain/bootstrap prerequisites:
+  [`BINARY_DEPENDENCIES.md`](../BINARY_DEPENDENCIES.md)
+- Packaging/install/macOS acceptance: [`PACKAGING.md`](PACKAGING.md)
+- Release and publish flow: [`RELEASE.md`](RELEASE.md)
+- Workflow runtime and troubleshooting standards:
+  [`ALFRED_WORKFLOW_DEVELOPMENT.md`](../ALFRED_WORKFLOW_DEVELOPMENT.md)
+
+## Platform scope
+
+- Alfred runtime checks and install acceptance are macOS-only.
+- Development and CI quality gates are expected to run on Linux as well.
+- CI baseline uses Ubuntu (`.github/workflows/ci.yml`), and tooling bootstrap
+  supports Debian/Ubuntu (`scripts/setup-rust-tooling.sh`).
+
+## Setup
+
+- If Rust/cargo or required cargo tools are not installed, run
+  `scripts/setup-rust-tooling.sh`.
+- For Python helper isolation, `.envrc` creates a repository `.venv` with
+  `uv venv` when direnv loads; run `direnv allow`.
+- For one-off isolated Python helper runs, use
+  `uv run --python python3 --isolated python <script-or-module>`.
+- For workflows that use Node and Playwright tooling, run
+  `scripts/setup-node-playwright.sh`; add `--install-browser` only for live
+  Playwright scraping checks.
+- Manual fallback: install stable Rust, run
+  `rustup component add rustfmt clippy`, install Node.js 24 or newer
+  (`fnm use` reads `.node-version`), and run `npm ci`.
+- For the complete local tool list, use
+  [`BINARY_DEPENDENCIES.md`](../BINARY_DEPENDENCIES.md).
+
+## Build and run
+
+- Build workspace: `cargo build`
+- Run shared workflow CLI: `cargo run -p nils-workflow-cli -- --help`
+- List workflows: `scripts/workflow-pack.sh --list`
+
+## Formatting and linting
+
+- Format check: `cargo fmt --all -- --check`
+- Format fix: `cargo fmt --all`
+- Lint:
+  `cargo clippy --workspace --all-targets -- -D warnings -A clippy::unwrap_used -A clippy::expect_used`
+- CLI standards audit: `scripts/cli-standards-audit.sh`
+- Markdown lint audit: `bash scripts/ci/markdownlint-audit.sh --strict`
+- Full lint entrypoint: `scripts/workflow-lint.sh`
+- Shared foundation audit:
+  `bash scripts/workflow-shared-foundation-audit.sh --check`
+- Script Filter policy check:
+  `bash scripts/workflow-sync-script-filter-policy.sh --check`
+
+`clippy::unwrap_used` and `clippy::expect_used` remain warn-only at workspace
+level while the CI summary tracks their per-target count. A crate may switch
+them to `deny` after production paths route failures through `?` and a
+`NILS_<DOMAIN>_NNN` code from
+[`cli-error-code-registry.md`](specs/cli-error-code-registry.md).
+
+### CLI standards audit
+
+- Hard failures cover required standards docs, crate README presence, crate
+  description metadata, and standards-gate wiring.
+- Warnings track explicit JSON-mode indicators, envelope assertions, and README
+  standards sections.
+- Use `scripts/cli-standards-audit.sh --strict` to enforce warnings.
+
+### Documentation placement
+
+- Canonical policy:
+  [`crate-docs-placement-policy.md`](specs/crate-docs-placement-policy.md)
+- Architecture and runtime ownership: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- Required placement gate: `bash scripts/docs-placement-audit.sh --strict`
+- Crate-owned docs belong in `crates/<crate-name>/docs/`; workspace-level docs
+  belong in the governed root or `docs/` categories.
+
+Before committing a documentation change, confirm that every publishable crate
+has `crates/<crate-name>/README.md` and
+`crates/<crate-name>/docs/README.md`, every new Markdown file has an explicit
+owner and valid path, and the strict placement audit passes.
+
+## Testing
+
+### Required before committing
+
+The default local gate is:
+
+```bash
+scripts/local-pre-commit.sh
+```
+
+It verifies Node.js, installs the locked npm tree, and runs the owned validation
+phases. Its early
+`scripts/ci/third-party-artifacts-change-gate.sh` selects strict freshness
+checks when relevant inputs change. The remaining phases run
+`scripts/workflow-lint.sh --skip-third-party-audit`,
+`scripts/workflow-sync-script-filter-policy.sh --check`,
+`npm run test:cambridge-scraper`, and
+`scripts/workflow-test.sh --skip-third-party-audit`; the workflow test owns
+workspace Rust tests and script-level shell tests.
+
+- CI-parity order: `scripts/local-pre-commit.sh --mode ci`
+- Add release-style package smoke:
+  `scripts/local-pre-commit.sh --with-package-smoke`
+- Run shell tests directly: `bash scripts/script-tests.sh`
+- Workflow-specific checks live in
+  `workflows/<workflow-id>/README.md`.
+
+Do not prepend the old manual test sequence to the default gate:
+`scripts/workflow-test.sh` already runs strict third-party artifact auditing,
+`cargo test --workspace`, and the shell tests.
+
+### Local iteration shortcuts
+
+- One workflow smoke:
+  `scripts/workflow-test.sh --id <workflow-id> --skip-third-party-audit --skip-workspace-tests`
+- Temporarily skip shell tests:
+  `scripts/workflow-test.sh --skip-script-tests`
+- Temporarily skip Node scraper tests:
+  `scripts/local-pre-commit.sh --skip-node-scraper-tests`
+
+The skip modes are iteration aids, not final validation.
+
+### Third-party artifact generation
+
+- Regenerate: `bash scripts/generate-third-party-artifacts.sh --write`
+- Check freshness: `bash scripts/generate-third-party-artifacts.sh --check`
+- Regression tests:
+  `bash tests/third-party-artifacts/generator.test.sh`
+
+The check exits non-zero with `FAIL [check] ... is stale` and a remediation
+command when an artifact drifts. Missing required inputs such as `Cargo.lock`,
+`package-lock.json`, or `scripts/lib/codex_cli_version.sh` fail with
+`required input missing: <path>`.
+
+### CI-style test reporting
+
+If `cargo nextest` is missing, run `scripts/setup-rust-tooling.sh`. Then run:
+
+```bash
+cargo nextest run --profile ci --workspace
+```
+
+Workflow-specific live smoke and probe commands remain optional and are owned
+by each workflow README.
+
+## Coverage
+
+Install the coverage tools with `scripts/setup-rust-tooling.sh`, then run:
+
+```bash
+mkdir -p target/coverage
+cargo llvm-cov nextest --profile ci --workspace --lcov --output-path target/coverage/lcov.info
+cargo llvm-cov report --html --output-dir target/coverage
+```

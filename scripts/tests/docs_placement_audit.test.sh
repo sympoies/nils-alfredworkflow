@@ -65,6 +65,7 @@ EOF
 # Development
 
 - [Binary Dependencies](BINARY_DEPENDENCIES.md)
+- [Maintenance reference](docs/MAINTENANCE.md)
 EOF
 
   cat >"$fixture_repo/ALFRED_WORKFLOW_DEVELOPMENT.md" <<'EOF'
@@ -79,6 +80,10 @@ EOF
 # Packaging
 
 - [Development](../DEVELOPMENT.md)
+EOF
+
+  cat >"$fixture_repo/docs/MAINTENANCE.md" <<'EOF'
+# Maintenance reference
 EOF
 
   cat >"$fixture_repo/TROUBLESHOOTING.md" <<'EOF'
