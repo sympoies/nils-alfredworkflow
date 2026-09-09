@@ -22,6 +22,14 @@ required = false
 when = "always"
 notes = "On-demand packaging, install, and macOS acceptance guide; read only for packaging or release surfaces."
 
+[[document]]
+context = "project-dev"
+scope = "project"
+path = "docs/MAINTENANCE.md"
+required = false
+when = "always"
+notes = "On-demand setup, build, lint, test, and coverage command reference."
+
 # Finish-line validation contract: code edits in this repo must run the local
 # pre-commit gate before a project-dev task is declared done (agent-docs v0.30+).
 [[validation]]

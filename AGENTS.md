@@ -18,7 +18,8 @@ keep this file limited to project-specific boundaries and routing.
 
 Read only the references relevant to the requested change:
 
-- Day-to-day commands and validation: `DEVELOPMENT.md`
+- Maintenance principles and routine finish-line: `DEVELOPMENT.md`
+- Setup, build, lint, test, and coverage commands: `docs/MAINTENANCE.md`
 - External tool setup or degradation: `BINARY_DEPENDENCIES.md`
 - Script Filter, workflow runtime, or troubleshooting conventions:
   `ALFRED_WORKFLOW_DEVELOPMENT.md`

@@ -27,6 +27,8 @@
 ### Allowed `docs/` workspace categories (workspace-level only)
 
 - `docs/ARCHITECTURE.md` and similar repository-wide architecture baselines.
+- `docs/MAINTENANCE.md` and similar repository-wide maintainer command
+  references.
 - `docs/PACKAGING.md` and similar workspace-level packaging/install guides.
 - `docs/specs/*.md` for shared standards that are not owned by a single crate.
 - `docs/plans/*.md` for implementation planning.

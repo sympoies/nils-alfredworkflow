@@ -189,7 +189,7 @@ def main() -> None:
         "THIRD_PARTY_LICENSES.md": {"docs/RELEASE.md"},
         "THIRD_PARTY_NOTICES.md": {"docs/RELEASE.md"},
     }
-    allowed_root_docs = {"ARCHITECTURE.md", "PACKAGING.md", "RELEASE.md"}
+    allowed_root_docs = {"ARCHITECTURE.md", "MAINTENANCE.md", "PACKAGING.md", "RELEASE.md"}
     allowed_docs_categories = {"plans", "reports", "specs"}
 
     for rel_path in (path for path in md_files if "/" not in path):
@@ -414,7 +414,7 @@ if [[ -n "$docs_freshness_findings" ]]; then
       ;;
     orphan_docs_root)
       orphan_docs_detected=1
-      repo_fail "docs/ file path is outside canonical ownership paths: $finding_arg1 (allowed: docs/ARCHITECTURE.md, docs/PACKAGING.md, docs/RELEASE.md, docs/{plans,reports,specs}/*.md)"
+      repo_fail "docs/ file path is outside canonical ownership paths: $finding_arg1 (allowed: docs/ARCHITECTURE.md, docs/MAINTENANCE.md, docs/PACKAGING.md, docs/RELEASE.md, docs/{plans,reports,specs}/*.md)"
       ;;
     orphan_crate)
       orphan_docs_detected=1
