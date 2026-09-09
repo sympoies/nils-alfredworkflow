@@ -111,12 +111,32 @@ pub fn fetch_geocode(
     city: &str,
     retry_policy: RetryPolicy,
 ) -> Result<ResolvedLocation, ProviderError> {
-    execute_with_retry(
-        PROVIDER_NAME,
-        retry_policy,
-        || fetch_geocode_once(client, city),
-        std::thread::sleep,
-    )
+    fetch_geocode_with_lookup(city, |query| {
+        execute_with_retry(
+            PROVIDER_NAME,
+            retry_policy,
+            || fetch_geocode_once(client, query),
+            std::thread::sleep,
+        )
+    })
+}
+
+fn fetch_geocode_with_lookup(
+    city: &str,
+    mut lookup: impl FnMut(&str) -> Result<ResolvedLocation, ProviderError>,
+) -> Result<ResolvedLocation, ProviderError> {
+    let original = lookup(city);
+    if !matches!(&original, Err(ProviderError::NotFound(_)))
+        || !matches!(city, "台中" | "臺中" | "台中市" | "臺中市")
+    {
+        return original;
+    }
+
+    // Open-Meteo can omit these local names; keep provider results authoritative.
+    match lookup("Taichung,Taiwan") {
+        Err(ProviderError::NotFound(_)) => original,
+        result => result,
+    }
 }
 
 pub fn fetch_forecast(
@@ -486,6 +506,104 @@ fn extract_error_message(body: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn geocode_alias_fallback_resolves_each_taichung_alias() {
+        let body = r#"{"results":[{"name":"Taichung","latitude":24.1469,"longitude":120.6839,"timezone":"Asia/Taipei"}]}"#;
+        for city in ["台中", "臺中", "台中市", "臺中市"] {
+            let mut queries = Vec::new();
+            let result = fetch_geocode_with_lookup(city, |query| {
+                queries.push(query.to_string());
+                parse_geocode_response(if query == city { "{}" } else { body }, query)
+            });
+            assert_eq!(result, parse_geocode_response(body, city), "alias {city}");
+            assert_eq!(queries, [city, "Taichung,Taiwan"]);
+        }
+    }
+
+    #[test]
+    fn geocode_alias_fallback_preserves_original_success() {
+        let location = ResolvedLocation {
+            name: "Provider result".into(),
+            latitude: 24.1,
+            longitude: 120.6,
+            timezone: "Asia/Taipei".into(),
+        };
+        let mut queries = Vec::new();
+        let result = fetch_geocode_with_lookup("台中", |query| {
+            queries.push(query.to_string());
+            Ok(location.clone())
+        });
+        assert_eq!(result, Ok(location));
+        assert_eq!(queries, ["台中"]);
+    }
+
+    #[test]
+    fn geocode_alias_fallback_does_not_retry_other_errors() {
+        for error in [
+            ProviderError::Transport("connection failed".into()),
+            ProviderError::Http {
+                status: 429,
+                message: "rate limited".into(),
+            },
+            ProviderError::Http {
+                status: 503,
+                message: "unavailable".into(),
+            },
+            ProviderError::InvalidResponse("malformed payload".into()),
+        ] {
+            let mut queries = Vec::new();
+            let result = fetch_geocode_with_lookup("台中", |query| {
+                queries.push(query.to_string());
+                Err(error.clone())
+            });
+            assert_eq!(result, Err(error));
+            assert_eq!(queries, ["台中"]);
+        }
+    }
+
+    #[test]
+    fn geocode_alias_fallback_leaves_unknown_queries_unchanged() {
+        for city in ["Nowhere", "台中區", "台中,Taiwan", "Taichung"] {
+            let mut queries = Vec::new();
+            let result = fetch_geocode_with_lookup(city, |query| {
+                queries.push(query.to_string());
+                Err(ProviderError::NotFound(query.to_string()))
+            });
+            assert_eq!(result, Err(ProviderError::NotFound(city.to_string())));
+            assert_eq!(queries, [city]);
+        }
+    }
+
+    #[test]
+    fn geocode_alias_fallback_preserves_original_not_found_error() {
+        let mut queries = Vec::new();
+        let result = fetch_geocode_with_lookup("臺中市", |query| {
+            queries.push(query.to_string());
+            Err(ProviderError::NotFound(format!("open_meteo: {query}")))
+        });
+        assert_eq!(
+            result,
+            Err(ProviderError::NotFound("open_meteo: 臺中市".into()))
+        );
+        assert_eq!(queries, ["臺中市", "Taichung,Taiwan"]);
+    }
+
+    #[test]
+    fn geocode_alias_fallback_propagates_fallback_transport_error() {
+        let mut queries = Vec::new();
+        let error = ProviderError::Transport("open_meteo: connection failed".into());
+        let result = fetch_geocode_with_lookup("台中", |query| {
+            queries.push(query.to_string());
+            if query == "台中" {
+                Err(ProviderError::NotFound(query.into()))
+            } else {
+                Err(error.clone())
+            }
+        });
+        assert_eq!(result, Err(error));
+        assert_eq!(queries, ["台中", "Taichung,Taiwan"]);
+    }
 
     #[test]
     fn open_meteo_geocode_parses_first_result() {
