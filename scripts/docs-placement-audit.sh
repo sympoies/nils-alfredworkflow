@@ -174,6 +174,7 @@ def main() -> None:
     allowed_repo_root_docs = {
         "README.md",
         "AGENTS.md",
+        "CLAUDE.md",
         "ALFRED_WORKFLOW_DEVELOPMENT.md",
         "BINARY_DEPENDENCIES.md",
         "DEVELOPMENT.md",

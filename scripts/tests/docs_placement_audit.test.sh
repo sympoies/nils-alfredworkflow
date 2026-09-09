@@ -61,6 +61,14 @@ EOF
 - [Troubleshooting](TROUBLESHOOTING.md)
 EOF
 
+  cat >"$fixture_repo/AGENTS.md" <<'EOF'
+# Fixture policy
+EOF
+
+  cat >"$fixture_repo/CLAUDE.md" <<'EOF'
+@AGENTS.md
+EOF
+
   cat >"$fixture_repo/DEVELOPMENT.md" <<'EOF'
 # Development
 
@@ -120,6 +128,7 @@ EOF
     git config user.name "Docs Audit Test"
     git config user.email "docs-audit@example.com"
     git add .
+    git add -f CLAUDE.md
   )
 }
 
