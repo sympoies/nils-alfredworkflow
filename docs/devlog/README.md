@@ -27,6 +27,9 @@ dependency bumps that changed no behavior.
 ## Conventions
 
 - One file per month: `docs/devlog/YYYY-MM.md`, newest entry first.
+- When a month file is created, add it to the `## Months` index below, newest
+  first. The index is the only advertised discovery path, and no gate detects a
+  month file that is missing from it.
 - Write in English, like the rest of the repository.
 - Keep current docs current. The devlog records history; it does not own the
   current runtime contract, policy, setup, or runbook.

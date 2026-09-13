@@ -9,7 +9,7 @@ tables = false
 # docs/devlog/README.md (Result / Why / context / Evidence / Links) rather than
 # headings, so that every `##` in a month file is an entry and the month index
 # stays scannable.
-"docs/devlog/*.md" = ["MD036"]
+"docs/devlog/[0-9][0-9][0-9][0-9]-[0-9][0-9].md" = ["MD036"]
 "crates/workflow-readme-cli/tests/fixtures/codex-cli-readme.md" = ["MD057"]
 "crates/workflow-readme-cli/tests/fixtures/expected/codex-cli-readme-alfred.md" = ["MD057"]
 "docs/reports/repo-docs-comprehensive-cleanup-plan.md" = ["MD046"]

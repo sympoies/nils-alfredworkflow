@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Search the development log under docs/devlog/.
-set -uo pipefail
+set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
@@ -40,6 +40,10 @@ if [[ -n "$month" ]]; then
   if [[ ! "$month" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]]; then
     usage >&2
     exit 2
+  fi
+  if [[ ! -e "$devlog_dir/$month.md" ]]; then
+    echo "error: no devlog file for $month under $devlog_dir" >&2
+    exit 1
   fi
   files=("$devlog_dir/$month.md")
 else

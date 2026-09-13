@@ -30,19 +30,19 @@ the [`maintenance reference`](docs/MAINTENANCE.md).
    and routing instead.
 4. Make the smallest observable change and keep every generated or packaged
    surface aligned with its source.
-5. Run focused checks, then the routine finish-line command:
+5. When the change leaves a durable outcome worth future lookup, append one
+   entry to the monthly development log under
+   [`docs/devlog/`](docs/devlog/README.md). Update the canonical contract,
+   policy, or runbook first; the devlog records history, not the current
+   contract.
+6. Run focused checks, then the routine finish-line command:
 
    ```bash
    bash scripts/local-pre-commit.sh
    ```
 
-6. Add package smoke, live probes, macOS packaging, install, or Alfred UI
+7. Add package smoke, live probes, macOS packaging, install, or Alfred UI
    acceptance only when the changed surface requires them.
-7. When the change leaves a durable outcome worth future lookup, append one
-   entry to the monthly development log under
-   [`docs/devlog/`](docs/devlog/README.md). Update the canonical contract,
-   policy, or runbook first; the devlog records history, not the current
-   contract.
 
 ## Documentation routing
 

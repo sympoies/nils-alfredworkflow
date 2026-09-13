@@ -243,8 +243,13 @@ EOF
     git add docs/devlog
   )
 
-  local output
-  output="$(run_audit "$fixture_repo")"
+  local output=""
+  set +e
+  output="$(run_audit "$fixture_repo" 2>&1)"
+  local rc=$?
+  set -e
+
+  [[ "$rc" -eq 0 ]] || fail "governed devlog docs should pass audit: $output"
   assert_contains "$output" "PASS [repo] no orphan docs detected in enforced ownership paths" \
     "devlog category accepted"
 

@@ -96,6 +96,20 @@ test_no_match_exits_nonzero() {
   assert_contains "$output" "(no matches for 'absent-term')" "no-match message"
 }
 
+test_absent_month_file_exits_one() {
+  local fixture_repo="$test_root/absent-month"
+  create_fixture_repo "$fixture_repo"
+
+  local output=""
+  set +e
+  output="$(run_search "$fixture_repo" marker 2026-09 2>&1)"
+  local rc=$?
+  set -e
+
+  [[ "$rc" -eq 1 ]] || fail "a well-formed but absent month must exit 1 (got $rc)"
+  assert_contains "$output" "no devlog file for 2026-09" "absent month message"
+}
+
 test_invalid_usage_exits_two() {
   local fixture_repo="$test_root/usage"
   create_fixture_repo "$fixture_repo"
@@ -118,6 +132,7 @@ main() {
   test_search_matches_across_months
   test_search_is_case_insensitive_and_month_scoped
   test_no_match_exits_nonzero
+  test_absent_month_file_exits_one
   test_invalid_usage_exits_two
   printf 'ok: devlog search tests passed\n'
 }
