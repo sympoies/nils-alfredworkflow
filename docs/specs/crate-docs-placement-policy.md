@@ -36,6 +36,9 @@
 - `docs/specs/*.md` for shared standards that are not owned by a single crate.
 - `docs/plans/*.md` for implementation planning.
 - `docs/reports/*.md` for workspace-level reports.
+- `docs/devlog/*.md` for the append-only development log: one `YYYY-MM.md` file
+  per month plus the `README.md` index. The devlog records history and never
+  owns a current contract, policy, setup, or runbook.
 - `docs/RELEASE.md` and other repository-wide release/operations documents.
 
 ### Repository root navigation and ownership

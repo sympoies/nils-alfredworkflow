@@ -30,6 +30,14 @@ required = false
 when = "always"
 notes = "On-demand setup, build, lint, test, and coverage command reference."
 
+[[document]]
+context = "project-dev"
+scope = "project"
+path = "docs/devlog/README.md"
+required = false
+when = "always"
+notes = "On-demand development-log contract; read before appending history or when looking up why a past decision was made."
+
 # Finish-line validation contract: code edits in this repo must run the local
 # pre-commit gate before a project-dev task is declared done (agent-docs v0.30+).
 [[validation]]

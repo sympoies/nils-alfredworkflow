@@ -38,6 +38,11 @@ the [`maintenance reference`](docs/MAINTENANCE.md).
 
 6. Add package smoke, live probes, macOS packaging, install, or Alfred UI
    acceptance only when the changed surface requires them.
+7. When the change leaves a durable outcome worth future lookup, append one
+   entry to the monthly development log under
+   [`docs/devlog/`](docs/devlog/README.md). Update the canonical contract,
+   policy, or runbook first; the devlog records history, not the current
+   contract.
 
 ## Documentation routing
 
@@ -50,6 +55,7 @@ the [`maintenance reference`](docs/MAINTENANCE.md).
 | Packaging, install, and macOS acceptance | [`docs/PACKAGING.md`](docs/PACKAGING.md) |
 | Release and publishing | [`docs/RELEASE.md`](docs/RELEASE.md) |
 | Workflow-specific operation and recovery | `workflows/<workflow-id>/README.md` and `TROUBLESHOOTING.md` |
+| Historical narrative of notable work | [`docs/devlog/README.md`](docs/devlog/README.md) |
 
 `AGENTS.md` owns agent-specific repository rules. Detailed contracts remain in
 `docs/specs/`, and retained plans or reports do not override current source,
