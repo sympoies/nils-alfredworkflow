@@ -1,0 +1,113 @@
+name: Dependabot third-party artifacts
+
+# A Dependabot cargo bump rewrites Cargo.lock, and both THIRD_PARTY_LICENSES.md
+# and THIRD_PARTY_NOTICES.md embed the Cargo.lock SHA256 plus the resolved crate
+# versions. The strict third-party audit inside the `validate` job therefore
+# fails on every bump until someone regenerates the two artifacts by hand.
+#
+# This half of the automation runs unprivileged. It is an ordinary
+# `pull_request` job: no secrets, a read-only token, and it is the only place
+# that executes anything from the pull request. It publishes the regenerated
+# files as an artifact and stops there. `dependabot-third-party-apply.yml`
+# picks the artifact up and does the privileged part without ever checking out
+# pull-request content.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-third-party-generate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: Generate third-party artifacts
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.event.pull_request.head.ref, 'dependabot/cargo/')
+    runs-on: ubuntu-24.04
+    steps:
+      # The refresh commit has to apply to the branch head, not to the
+      # ephemeral merge commit `pull_request` checks out by default.
+      - name: Checkout pull request head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # The generator needs cargo plus jq, curl, python3, and the usual text
+      # utilities, all of which ubuntu-24.04 already provides; it does not need
+      # the full CI bootstrap. GITHUB_TOKEN is required rather than optional:
+      # the generator reads the bundled codex-cli release metadata from the
+      # GitHub Releases API, and `scripts/ci/ci-workflow-audit.sh` enforces that
+      # every generator-bearing step passes the workflow-scoped read token so
+      # anonymous release-metadata fetches cannot come back.
+      - name: Regenerate third-party artifacts
+        id: regenerate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REFRESH_SUBJECT: "fix(ci): refresh third-party artifacts for dependabot bump"
+        run: |
+          set -euo pipefail
+
+          set +e
+          bash scripts/generate-third-party-artifacts.sh --check
+          status=$?
+          set -e
+
+          case "${status}" in
+            0)
+              echo "Third-party artifacts are already up-to-date."
+              echo "drift=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            1) ;;
+            *)
+              echo "::error::generate-third-party-artifacts.sh --check failed with status ${status}; this is not artifact drift." >&2
+              exit "${status}"
+              ;;
+          esac
+
+          # The generator is deterministic, so the commit it produces must clear
+          # the drift. Still drifting on top of our own refresh commit means
+          # generation disagrees with the audit, and refreshing again would
+          # loop. A refresh commit further back is fine: Dependabot rebases onto
+          # a moved main, which legitimately re-drifts the artifacts.
+          if [ "$(git log -1 --format=%s)" = "${REFRESH_SUBJECT}" ]; then
+            echo "::error::HEAD is already a third-party refresh commit and the artifacts still drift. Regeneration is not converging; investigate before refreshing again." >&2
+            exit 1
+          fi
+
+          bash scripts/generate-third-party-artifacts.sh --write
+          bash scripts/generate-third-party-artifacts.sh --check
+
+          mkdir -p "${RUNNER_TEMP}/third-party-refresh"
+          cp THIRD_PARTY_LICENSES.md THIRD_PARTY_NOTICES.md \
+            "${RUNNER_TEMP}/third-party-refresh/"
+          # The applying workflow re-derives everything else from its own event.
+          # It only trusts this file to say which commit the refresh was built
+          # for, and refuses to apply it to any other head.
+          printf '%s\n%s\n' "${HEAD_SHA}" "${PR_NUMBER}" \
+            > "${RUNNER_TEMP}/third-party-refresh/head-sha"
+          echo "drift=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload refreshed artifacts
+        if: steps.regenerate.outputs.drift == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: third-party-refresh
+          path: ${{ runner.temp }}/third-party-refresh
+          if-no-files-found: error
+          retention-days: 1

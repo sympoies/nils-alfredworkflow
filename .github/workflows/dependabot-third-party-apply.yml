@@ -1,0 +1,234 @@
+name: Dependabot third-party apply
+
+# The privileged half of the Dependabot artifact automation. It runs on
+# `workflow_run`, which is the trigger GitHub does not downgrade to a read-only
+# token for Dependabot-authored events, and it never checks out pull-request
+# content: the refreshed files arrive as an artifact from the unprivileged
+# `Dependabot third-party artifacts` run, and the commit is built through the
+# Git Data API.
+#
+# The artifact is still untrusted input, so nothing here executes it. Only the
+# two known artifact paths are committed, only onto the Dependabot branch the
+# run belongs to, and only when that branch head still matches the commit the
+# refresh was generated for. CI then re-runs the strict third-party audit on the
+# resulting commit, and the merge job below requires that run to conclude
+# success — so a bogus artifact fails the audit and never merges.
+#
+# A GitHub App token is required rather than GITHUB_TOKEN: a commit made with
+# GITHUB_TOKEN starts no new workflow run, which would leave the refreshed
+# commit with no CI results and no way to prove it green.
+
+on:
+  workflow_run:
+    workflows:
+      - Dependabot third-party artifacts
+      - CI
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-third-party-apply-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  commit:
+    name: Commit refreshed artifacts
+    if: >-
+      github.event.workflow_run.name == 'Dependabot third-party artifacts'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && startsWith(github.event.workflow_run.head_branch, 'dependabot/cargo/')
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require bot app credentials
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_APP_ID}" ] || [ -z "${BOT_APP_PRIVATE_KEY}" ]; then
+            echo "::error::BOT_APP_ID / BOT_APP_PRIVATE_KEY are not configured. The bot app needs Contents: read and write, Pull requests: read and write, and Actions: read." >&2
+            exit 1
+          fi
+
+      - name: Mint bot token
+        id: bot_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Download refreshed artifacts
+        id: download
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: third-party-refresh
+          path: ${{ runner.temp }}/third-party-refresh
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ steps.bot_token.outputs.token }}
+
+      - name: Commit the refresh
+        # No artifact means the generating run found no drift, which is the
+        # normal outcome once the refresh has already landed.
+        if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REFRESH_DIR: ${{ runner.temp }}/third-party-refresh
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          claimed_sha="$(sed -n 1p "${REFRESH_DIR}/head-sha")"
+          if [ "${claimed_sha}" != "${HEAD_SHA}" ]; then
+            echo "::error::Artifact was generated for ${claimed_sha} but the run head is ${HEAD_SHA}; refusing to apply." >&2
+            exit 1
+          fi
+
+          pr_json="$(
+            gh pr list --repo "${REPO}" --head "${HEAD_BRANCH}" --state open \
+              --json number,author,headRefOid --jq '.[0] // empty'
+          )"
+          if [ -z "${pr_json}" ]; then
+            echo "No open pull request for ${HEAD_BRANCH}; nothing to apply."
+            exit 0
+          fi
+          number="$(printf '%s' "${pr_json}" | jq -r .number)"
+          author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
+          head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
+
+          if [ "${author}" != "dependabot[bot]" ]; then
+            echo "::error::PR #${number} is authored by ${author}, not dependabot[bot]." >&2
+            exit 1
+          fi
+          # The branch moved while this ran, so the refresh no longer describes
+          # its head. The newer commit gets its own generating run.
+          if [ "${head_oid}" != "${HEAD_SHA}" ]; then
+            echo "PR #${number} head is now ${head_oid}, not ${HEAD_SHA}; skipping."
+            exit 0
+          fi
+
+          # Only these two paths are ever written, whatever else the artifact
+          # happens to contain. The accumulator starts as a literal empty array:
+          # jq given empty input emits nothing at all, so seeding this with ""
+          # would silently drop every entry.
+          tree_items='[]'
+          for path in THIRD_PARTY_LICENSES.md THIRD_PARTY_NOTICES.md; do
+            blob_sha="$(
+              jq -Rs --arg encoding utf-8 '{content: ., encoding: $encoding}' \
+                < "${REFRESH_DIR}/${path}" \
+              | gh api "/repos/${REPO}/git/blobs" --input - --jq .sha
+            )"
+            tree_items="$(
+              printf '%s' "${tree_items}" \
+              | jq -c --arg path "${path}" --arg sha "${blob_sha}" \
+                  '. + [{path: $path, mode: "100644", type: "blob", sha: $sha}]'
+            )"
+          done
+
+          base_tree="$(gh api "/repos/${REPO}/git/commits/${HEAD_SHA}" --jq .tree.sha)"
+          tree_sha="$(
+            jq -nc --arg base "${base_tree}" --argjson tree "${tree_items}" \
+              '{base_tree: $base, tree: $tree}' \
+            | gh api "/repos/${REPO}/git/trees" --input - --jq .sha
+          )"
+
+          if [ "${tree_sha}" = "${base_tree}" ]; then
+            echo "Refreshed artifacts match the branch head; nothing to commit."
+            exit 0
+          fi
+
+          message="$(
+            printf '%s\n\n%s\n' \
+              "fix(ci): refresh third-party artifacts for dependabot bump" \
+              "- Regenerate THIRD_PARTY_LICENSES.md and THIRD_PARTY_NOTICES.md for PR #${number}."
+          )"
+          commit_sha="$(
+            jq -nc \
+              --arg message "${message}" \
+              --arg tree "${tree_sha}" \
+              --arg parent "${HEAD_SHA}" \
+              '{message: $message, tree: $tree, parents: [$parent]}' \
+            | gh api "/repos/${REPO}/git/commits" --input - --jq .sha
+          )"
+
+          # No force: if the branch moved after the check above, this fails
+          # rather than discarding the newer commit.
+          jq -nc --arg sha "${commit_sha}" '{sha: $sha, force: false}' \
+            | gh api --method PATCH "/repos/${REPO}/git/refs/heads/${HEAD_BRANCH}" \
+                --input - --jq .object.sha
+
+          echo "Committed ${commit_sha} to ${HEAD_BRANCH}."
+
+  merge:
+    name: Merge green dependabot bump
+    # Gate on the CI workflow's own conclusion rather than `gh pr merge --auto`:
+    # main carries no required status checks, so an auto-merge would land the
+    # bump before CI ever reported.
+    if: >-
+      github.event.workflow_run.name == 'CI'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && startsWith(github.event.workflow_run.head_branch, 'dependabot/cargo/cargo-minor-patch-')
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require bot app credentials
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_APP_ID}" ] || [ -z "${BOT_APP_PRIVATE_KEY}" ]; then
+            echo "::error::BOT_APP_ID / BOT_APP_PRIVATE_KEY are not configured; merge the bump by hand." >&2
+            exit 1
+          fi
+
+      - name: Mint bot token
+        id: bot_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Squash merge the bump
+        env:
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          pr_json="$(
+            gh pr list --repo "${REPO}" --head "${HEAD_BRANCH}" --state open \
+              --json number,author,headRefOid --jq '.[0] // empty'
+          )"
+          if [ -z "${pr_json}" ]; then
+            echo "No open pull request for ${HEAD_BRANCH}; nothing to merge."
+            exit 0
+          fi
+
+          number="$(printf '%s' "${pr_json}" | jq -r .number)"
+          author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
+          head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
+
+          if [ "${author}" != "dependabot[bot]" ]; then
+            echo "PR #${number} is authored by ${author}, not dependabot[bot]; refusing to merge."
+            exit 0
+          fi
+
+          # The green run describes one commit. If the branch moved since, that
+          # newer commit is unverified and its own CI run will call this again.
+          if [ "${head_oid}" != "${HEAD_SHA}" ]; then
+            echo "PR #${number} head is ${head_oid} but CI passed on ${HEAD_SHA}; waiting for the newer run."
+            exit 0
+          fi
+
+          gh pr merge "${number}" --repo "${REPO}" --squash

@@ -19,6 +19,43 @@ printf '%s\n' \
   'Production packaging always downloads the official pinned target archive' \
   >"$fixture_root/docs/PACKAGING.md"
 
+# The Dependabot refresh pair is written separately from the canonical gate
+# workflows so a case can break one of its two invariants without disturbing
+# the rest of the fixture.
+write_dependabot_workflows() {
+  local generate_env="${1:-token}"
+  local apply_checkout="${2:-}"
+
+  {
+    printf '%s\n' \
+      "jobs:" \
+      "  generate:" \
+      "    steps:" \
+      "      - name: Regenerate third-party artifacts"
+    if [[ "$generate_env" == "token" ]]; then
+      # shellcheck disable=SC2016
+      printf '%s\n' \
+        "        env:" \
+        '          GITHUB_TOKEN: ${{ github.token }}'
+    fi
+    printf '%s\n' \
+      "        run: bash scripts/generate-third-party-artifacts.sh --check"
+  } >"$fixture_root/.github/workflows/dependabot-third-party-artifacts.yml"
+
+  {
+    printf '%s\n' \
+      "jobs:" \
+      "  commit:" \
+      "    steps:"
+    if [[ -n "$apply_checkout" ]]; then
+      printf '%s\n' "      - uses: actions/checkout@v7"
+    fi
+    printf '%s\n' \
+      "      - name: Commit the refresh" \
+      "        run: echo commit"
+  } >"$fixture_root/.github/workflows/dependabot-third-party-apply.yml"
+}
+
 write_workflows() {
   local validation_run="$1"
   local extra_run="${2:-}"
@@ -57,6 +94,7 @@ write_workflows() {
     "      - run: bash scripts/ci/ci-bootstrap.sh --context publish-crates" \
     "      - run: bash scripts/ci/ci-run-gates.sh publish-crates" \
     >"$fixture_root/.github/workflows/publish-crates.yml"
+  write_dependabot_workflows
 }
 
 write_workflows \
@@ -75,6 +113,30 @@ write_workflows \
   $'      - run: |\n          echo before\n          bash scripts/ci/ci-run-gates.sh lint'
 if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
   echo "error: multiline duplicate ordinary gate satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+rm "$fixture_root/.github/workflows/dependabot-third-party-artifacts.yml"
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: missing dependabot refresh workflow satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows no-token
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: unauthenticated dependabot refresh step satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token checkout
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: privileged apply workflow checkout satisfied the audit" >&2
   exit 1
 fi
 

@@ -42,10 +42,12 @@ fi
 ci_workflow="$repo_root/.github/workflows/ci.yml"
 release_workflow="$repo_root/.github/workflows/release.yml"
 publish_workflow="$repo_root/.github/workflows/publish-crates.yml"
+dependabot_generate_workflow="$repo_root/.github/workflows/dependabot-third-party-artifacts.yml"
+dependabot_apply_workflow="$repo_root/.github/workflows/dependabot-third-party-apply.yml"
 bootstrap_script="$repo_root/scripts/ci/ci-bootstrap.sh"
 packaging_doc="$repo_root/docs/PACKAGING.md"
 
-for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow"; do
+for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow" "$dependabot_generate_workflow" "$dependabot_apply_workflow"; do
   [[ -f "$workflow_file" ]] || {
     echo "error: missing workflow file: $workflow_file" >&2
     exit 1
@@ -249,6 +251,18 @@ require_step_github_token "$release_workflow" \
 require_step_github_token "$release_workflow" \
   "Regenerate third-party artifacts" \
   "release matrix runtime metadata GitHub token"
+require_step_github_token "$dependabot_generate_workflow" \
+  "Regenerate third-party artifacts" \
+  "dependabot refresh runtime metadata GitHub token"
+# The privileged apply half derives everything from its own `workflow_run`
+# event and commits through the Git Data API. Checking out pull-request content
+# there would hand a Dependabot branch a privileged token, which is exactly the
+# split the two-workflow design exists to prevent.
+reject_regex \
+  "$dependabot_apply_workflow" \
+  'uses:[[:space:]]*actions/checkout' \
+  "checkout in the privileged dependabot apply workflow" \
+  "The apply workflow must never check out pull-request content; commit through the Git Data API."
 require_run_exact \
   "$ci_run_commands" \
   "bash scripts/local-pre-commit.sh --mode ci" \
