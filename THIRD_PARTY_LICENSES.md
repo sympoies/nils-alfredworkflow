@@ -12,23 +12,23 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `b0737620d2dbaf3b4e771610b689c0d017397c55d2baebbb74a09388d6de37fe`
+- Data source fingerprint (SHA256): `1e836fdc71d52217aa03a3d504716b75dcd8fd0d8b83ac5857dea11695010d2e`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `83e1611740099740e005fbfd812363b816a4b0c2e4a41cb8cdcfbd7a55515e5a` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `3faed1c1c9375549b4dc94755c3f2a4229f53187fe729baf5d8bb7c18d299e23` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `aeac8c0fbcdc63032af303651cb6dbd172d28d283cc3d629248b7fa594bfc98b` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
-## Rust License Summary (327 crates)
+## Rust License Summary (328 crates)
 
 | Count | License Expression |
 | ---: | --- |
-| 167 | MIT OR Apache-2.0 |
+| 168 | MIT OR Apache-2.0 |
 | 71 | MIT |
 | 30 | Apache-2.0 OR MIT |
 | 18 | Unicode-3.0 |
@@ -79,6 +79,7 @@ Do not edit manually.
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT | <https://github.com/smol-rs/atomic-waker> |
 | autocfg | 1.5.0 | Apache-2.0 OR MIT | <https://github.com/cuviper/autocfg> |
 | base64 | 0.22.1 | MIT OR Apache-2.0 | <https://github.com/marshallpierce/rust-base64> |
+| base64 | 0.23.1 | MIT OR Apache-2.0 | <https://github.com/marshallpierce/rust-base64> |
 | bitflags | 1.3.2 | MIT/Apache-2.0 | <https://github.com/bitflags/bitflags> |
 | bitflags | 2.11.1 | MIT OR Apache-2.0 | <https://github.com/bitflags/bitflags> |
 | bitvec | 1.0.1 | MIT | <https://github.com/bitvecto-rs/bitvec> |
@@ -100,8 +101,8 @@ Do not edit manually.
 | chrono | 0.4.45 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono> |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono-tz> |
 | cipher | 0.4.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/traits> |
-| clap | 4.6.5 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
-| clap_builder | 4.6.5 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap | 4.6.6 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap_builder | 4.6.6 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_complete | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_derive | 4.6.4 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_lex | 1.1.0 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
@@ -206,7 +207,7 @@ Do not edit manually.
 | jiff | 0.2.35 | Unlicense OR MIT | <https://github.com/BurntSushi/jiff> |
 | jiff-core | 0.1.0 | Unlicense OR MIT | <https://github.com/BurntSushi/jiff> |
 | jiff-static | 0.2.35 | Unlicense OR MIT | <https://github.com/BurntSushi/jiff> |
-| keyring | 4.1.6 | MIT OR Apache-2.0 | <https://github.com/open-source-cooperative/keyring-rs> |
+| keyring | 4.2.0 | MIT OR Apache-2.0 | <https://github.com/open-source-cooperative/keyring-rs> |
 | keyring-core | 1.0.0 | MIT OR Apache-2.0 | <https://github.com/open-source-cooperative/keyring-core.git> |
 | lazy_static | 1.5.0 | MIT OR Apache-2.0 | <https://github.com/rust-lang-nursery/lazy-static.rs> |
 | libc | 0.2.186 | MIT OR Apache-2.0 | <https://github.com/rust-lang/libc> |
@@ -215,7 +216,7 @@ Do not edit manually.
 | litemap | 0.8.2 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | log | 0.4.29 | MIT OR Apache-2.0 | <https://github.com/rust-lang/log> |
 | lru-slab | 0.1.2 | MIT OR Apache-2.0 OR Zlib | <https://github.com/Ralith/lru-slab> |
-| mail-builder | 0.4.4 | Apache-2.0 OR MIT | <https://github.com/stalwartlabs/mail-builder> |
+| mail-builder | 1.0.0 | Apache-2.0 OR MIT | <https://github.com/stalwartlabs/mail-builder> |
 | memchr | 2.8.0 | Unlicense OR MIT | <https://github.com/BurntSushi/memchr> |
 | mime | 0.3.17 | MIT OR Apache-2.0 | <https://github.com/hyperium/mime> |
 | mime_guess | 2.0.5 | MIT | <https://github.com/abonander/mime_guess> |
@@ -235,7 +236,7 @@ Do not edit manually.
 | num_cpus | 1.17.0 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/num_cpus> |
 | num_threads | 0.1.7 | MIT OR Apache-2.0 | <https://github.com/jhpratt/num_threads> |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | <https://github.com/matklad/once_cell> |
-| open | 5.4.0 | MIT | <https://github.com/Byron/open-rs> |
+| open | 5.4.3 | MIT | <https://github.com/Byron/open-rs> |
 | openssl-probe | 0.2.1 | MIT OR Apache-2.0 | <https://github.com/rustls/openssl-probe> |
 | option-ext | 0.2.0 | MPL-2.0 | <https://github.com/soc/option-ext.git> |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/danieldg/ordered-stream> |
