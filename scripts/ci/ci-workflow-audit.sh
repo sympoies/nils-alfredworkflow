@@ -44,10 +44,11 @@ release_workflow="$repo_root/.github/workflows/release.yml"
 publish_workflow="$repo_root/.github/workflows/publish-crates.yml"
 dependabot_generate_workflow="$repo_root/.github/workflows/dependabot-third-party-artifacts.yml"
 dependabot_apply_workflow="$repo_root/.github/workflows/dependabot-third-party-apply.yml"
+cargo_deny_workflow="$repo_root/.github/workflows/cargo-deny.yml"
 bootstrap_script="$repo_root/scripts/ci/ci-bootstrap.sh"
 packaging_doc="$repo_root/docs/PACKAGING.md"
 
-for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow" "$dependabot_generate_workflow" "$dependabot_apply_workflow"; do
+for workflow_file in "$ci_workflow" "$release_workflow" "$publish_workflow" "$dependabot_generate_workflow" "$dependabot_apply_workflow" "$cargo_deny_workflow"; do
   [[ -f "$workflow_file" ]] || {
     echo "error: missing workflow file: $workflow_file" >&2
     exit 1
@@ -263,6 +264,42 @@ reject_regex \
   'uses:[[:space:]]*actions/checkout' \
   "checkout in the privileged dependabot apply workflow" \
   "The apply workflow must never check out pull-request content; commit through the Git Data API."
+# The unprivileged half is the only place that executes pull-request content,
+# so its read-only token is the counterpart to the checkout ban above.
+require_fixed \
+  "$dependabot_generate_workflow" \
+  "  contents: read" \
+  "read-only contents permission on the unprivileged dependabot refresh workflow" \
+  "The generating half executes bump content and must stay read-only."
+reject_regex \
+  "$dependabot_generate_workflow" \
+  '(contents:[[:space:]]*write|permissions:[[:space:]]*write-all)' \
+  "write permission on the unprivileged dependabot refresh workflow" \
+  "The generating half executes bump content and must stay read-only."
+# Auto-merge must wait for every workflow that blocks a bump. cargo-deny runs as
+# its own workflow here rather than as a CI job, so it has to appear in the
+# trigger list, in the merge condition, and in the per-commit conclusion check;
+# `workflows:` matches on display name, so those names are pinned too.
+for needle in \
+  "      - cargo-deny" \
+  "github.event.workflow_run.name == 'cargo-deny'" \
+  "for workflow in ci.yml cargo-deny.yml; do"; do
+  require_fixed \
+    "$dependabot_apply_workflow" \
+    "$needle" \
+    "dependabot auto-merge cargo-deny gate ($needle)" \
+    "Auto-merge must require a completed successful cargo-deny run for the verified commit."
+done
+require_fixed \
+  "$ci_workflow" \
+  "name: CI" \
+  "CI workflow display name" \
+  "The dependabot apply workflow selects this workflow by display name."
+require_fixed \
+  "$cargo_deny_workflow" \
+  "name: cargo-deny" \
+  "cargo-deny workflow display name" \
+  "The dependabot apply workflow selects this workflow by display name."
 require_run_exact \
   "$ci_run_commands" \
   "bash scripts/local-pre-commit.sh --mode ci" \

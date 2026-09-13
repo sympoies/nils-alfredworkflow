@@ -11,6 +11,12 @@ name: Dependabot third-party artifacts
 # files as an artifact and stops there. `dependabot-third-party-apply.yml`
 # picks the artifact up and does the privileged part without ever checking out
 # pull-request content.
+#
+# Ported from sympoies/nils-cli. The local divergence a re-sync must keep is
+# the `GITHUB_TOKEN` on the refresh step: this repository's generator reads
+# bundled runtime release metadata from the GitHub Releases API, and
+# `scripts/ci/ci-workflow-audit.sh` enforces that every generator-bearing step
+# carries the workflow-scoped read token.
 
 on:
   pull_request:
@@ -83,8 +89,10 @@ jobs:
           # The generator is deterministic, so the commit it produces must clear
           # the drift. Still drifting on top of our own refresh commit means
           # generation disagrees with the audit, and refreshing again would
-          # loop. A refresh commit further back is fine: Dependabot rebases onto
-          # a moved main, which legitimately re-drifts the artifacts.
+          # loop. A refresh commit further back is fine: the branch can
+          # legitimately re-drift when `main` moves. Note that Dependabot stops
+          # maintaining a branch once this automation pushes to it, so that
+          # re-drift needs a manual `@dependabot rebase` (see docs/MAINTENANCE.md).
           if [ "$(git log -1 --format=%s)" = "${REFRESH_SUBJECT}" ]; then
             echo "::error::HEAD is already a third-party refresh commit and the artifacts still drift. Regeneration is not converging; investigate before refreshing again." >&2
             exit 1

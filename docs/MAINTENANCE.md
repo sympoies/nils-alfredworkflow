@@ -163,9 +163,11 @@ content:
 - `.github/workflows/dependabot-third-party-apply.yml` runs privileged on
   `workflow_run`. It checks out nothing, commits the two artifact paths onto the
   Dependabot branch through the Git Data API, and squash merges
-  `dependabot/cargo/cargo-minor-patch-*` once the `CI` workflow concludes
-  success on that exact commit. Major-version and single-crate bumps are
-  refreshed but never auto-merged.
+  `dependabot/cargo/cargo-minor-patch-*` once **both** blocking workflows, `CI`
+  and `cargo-deny`, have a completed successful run for that exact commit.
+  Either completion wakes the job and it re-checks both, so whichever finishes
+  last performs the merge. Major-version and single-crate bumps are refreshed
+  but never auto-merged.
 
 The artifact is untrusted input, so the applying workflow never executes it: it
 writes only the two known paths, only onto the branch the run belongs to, and
@@ -182,6 +184,12 @@ refreshed commit would carry no CI results and could never be shown green.
 Without the secrets the applying workflow fails fast with that instruction, and
 refreshing the bump by hand
 (`bash scripts/generate-third-party-artifacts.sh --write`) stays the fallback.
+
+Dependabot stops maintaining a pull request once anything else pushes to its
+branch, so a bump that has received a refresh commit is no longer rebased
+automatically. If `main` later moves `Cargo.lock` and the bump re-drifts,
+recover it by commenting `@dependabot rebase` on the pull request, or close it
+and let Dependabot recreate it.
 
 ### CI-style test reporting
 
