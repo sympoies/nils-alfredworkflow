@@ -3,8 +3,8 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `83e1611740099740e005fbfd812363b816a4b0c2e4a41cb8cdcfbd7a55515e5a`
-- Third-party crates (`source != null`): 327
+- Cargo.lock SHA256: `3faed1c1c9375549b4dc94755c3f2a4229f53187fe729baf5d8bb7c18d299e23`
+- Third-party crates (`source != null`): 328
 
 ## Notice Extraction Policy
 
@@ -231,6 +231,15 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
+### base64 0.23.1
+
+- License: `MIT OR Apache-2.0`
+- Source: `crates.io`
+- Notice files: No explicit NOTICE file discovered.
+- License file references:
+  - `LICENSE-APACHE`
+  - `LICENSE-MIT`
+
 ### bitflags 1.3.2
 
 - License: `MIT/Apache-2.0`
@@ -413,7 +422,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap 4.6.5
+### clap 4.6.6
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -422,7 +431,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap_builder 4.6.5
+### clap_builder 4.6.6
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1341,7 +1350,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `COPYING`
   - `UNLICENSE`
 
-### keyring 4.1.6
+### keyring 4.2.0
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1422,7 +1431,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-MIT`
   - `LICENSE-ZLIB`
 
-### mail-builder 0.4.4
+### mail-builder 1.0.0
 
 - License: `Apache-2.0 OR MIT`
 - Source: `crates.io`
@@ -1591,7 +1600,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### open 5.4.0
+### open 5.4.3
 
 - License: `MIT`
 - Source: `crates.io`
