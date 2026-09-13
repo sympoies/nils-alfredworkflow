@@ -220,11 +220,65 @@ EOF
   assert_contains "$output" "repository-root markdown file is not linked from its canonical entry doc(s): BINARY_DEPENDENCIES.md" "missing maintainer link failure message"
 }
 
+test_devlog_category_is_governed() {
+  local fixture_repo="$test_root/devlog-fixture"
+  create_fixture_repo "$fixture_repo"
+
+  mkdir -p "$fixture_repo/docs/devlog"
+
+  cat >"$fixture_repo/docs/devlog/README.md" <<'EOF'
+# Development log
+
+- [2026-01](2026-01.md)
+EOF
+
+  cat >"$fixture_repo/docs/devlog/2026-01.md" <<'EOF'
+# Development log - 2026-01
+
+## 2026-01-01 - Fixture entry
+EOF
+
+  (
+    cd "$fixture_repo"
+    git add docs/devlog
+  )
+
+  local output=""
+  set +e
+  output="$(run_audit "$fixture_repo" 2>&1)"
+  local rc=$?
+  set -e
+
+  [[ "$rc" -eq 0 ]] || fail "governed devlog docs should pass audit: $output"
+  assert_contains "$output" "PASS [repo] no orphan docs detected in enforced ownership paths" \
+    "devlog category accepted"
+
+  cat >"$fixture_repo/docs/loose-note.md" <<'EOF'
+# Loose note
+EOF
+
+  (
+    cd "$fixture_repo"
+    git add docs/loose-note.md
+  )
+
+  output=""
+  set +e
+  output="$(run_audit "$fixture_repo" 2>&1)"
+  local rc=$?
+  set -e
+
+  [[ "$rc" -ne 0 ]] || fail "ungoverned docs/ markdown should still fail audit"
+  assert_contains "$output" "docs/ file path is outside canonical ownership paths: docs/loose-note.md" \
+    "ungoverned docs failure message"
+}
+
 main() {
   test_repo_root_allowlist_accepts_governed_docs
   test_unexpected_repo_root_markdown_fails
   test_missing_root_doc_entry_link_fails
   test_missing_maintainer_entry_link_fails
+  test_devlog_category_is_governed
   printf 'ok: docs placement audit tests passed\n'
 }
 

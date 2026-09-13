@@ -79,6 +79,14 @@ them to `deny` after production paths route failures through `?` and a
 - Crate-owned docs belong in `crates/<crate-name>/docs/`; workspace-level docs
   belong in the governed root or `docs/` categories.
 
+### Development log
+
+- Canonical contract: [`devlog/README.md`](devlog/README.md)
+- Month files live at `docs/devlog/YYYY-MM.md`, newest entry first.
+- Search past entries: `bash scripts/devlog-search.sh <term> [YYYY-MM]`
+- Add an entry when work produces a durable outcome worth future lookup; keep
+  the canonical contract, policy, or runbook document current first.
+
 Before committing a documentation change, confirm that every publishable crate
 has `crates/<crate-name>/README.md` and
 `crates/<crate-name>/docs/README.md`, every new Markdown file has an explicit

@@ -27,6 +27,7 @@ Read only the references relevant to the requested change:
   `workflows/<workflow-id>/TROUBLESHOOTING.md`
 - Packaging, install, or macOS acceptance: `docs/PACKAGING.md`
 - Release and publish work: `docs/RELEASE.md`
+- Historical narrative and past-decision lookup: `docs/devlog/README.md`
 
 ## Validation
 
