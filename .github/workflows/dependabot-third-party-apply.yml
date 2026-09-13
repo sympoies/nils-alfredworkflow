@@ -1,0 +1,278 @@
+name: Dependabot third-party apply
+
+# The privileged half of the Dependabot artifact automation. It runs on
+# `workflow_run`, which is the trigger GitHub does not downgrade to a read-only
+# token for Dependabot-authored events, and it never checks out pull-request
+# content: the refreshed files arrive as an artifact from the unprivileged
+# `Dependabot third-party artifacts` run, and the commit is built through the
+# Git Data API.
+#
+# The artifact is still untrusted input, so nothing here executes it. Only the
+# two known artifact paths are committed, only onto the Dependabot branch the
+# run belongs to, and only when that branch head still matches the commit the
+# refresh was generated for. CI then re-runs the strict third-party audit on the
+# resulting commit, and the merge job below requires that run to conclude
+# success — so a bogus artifact fails the audit and never merges.
+#
+# A GitHub App token is required rather than GITHUB_TOKEN: a commit made with
+# GITHUB_TOKEN starts no new workflow run, which would leave the refreshed
+# commit with no CI results and no way to prove it green.
+#
+# Ported from sympoies/nils-cli. Local divergences that a re-sync must keep:
+# `cargo-deny` runs as its own workflow here rather than as a CI job, so it
+# appears in the trigger list, in the merge job's condition, and in the
+# per-commit gate check below.
+
+on:
+  workflow_run:
+    workflows:
+      - Dependabot third-party artifacts
+      - CI
+      - cargo-deny
+    types: [completed]
+
+permissions: {}
+
+# Scoped to the verified commit rather than the branch: three event sources now
+# feed this workflow, and GitHub keeps only one *pending* run per group, so a
+# branch-wide group lets a stale event cancel the queued run that would have
+# merged. The commit job's non-force ref update remains the real serialization
+# guard.
+concurrency:
+  group: dependabot-third-party-apply-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  commit:
+    name: Commit refreshed artifacts
+    if: >-
+      github.event.workflow_run.name == 'Dependabot third-party artifacts'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && startsWith(github.event.workflow_run.head_branch, 'dependabot/cargo/')
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require bot app credentials
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_APP_ID}" ] || [ -z "${BOT_APP_PRIVATE_KEY}" ]; then
+            echo "::error::BOT_APP_ID / BOT_APP_PRIVATE_KEY are not configured. The bot app needs Contents: read and write, Pull requests: read and write, and Actions: read." >&2
+            exit 1
+          fi
+
+      - name: Mint bot token
+        id: bot_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Download refreshed artifacts
+        id: download
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: third-party-refresh
+          path: ${{ runner.temp }}/third-party-refresh
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ steps.bot_token.outputs.token }}
+
+      - name: Commit the refresh
+        # No artifact means the generating run found no drift, which is the
+        # normal outcome once the refresh has already landed.
+        if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REFRESH_DIR: ${{ runner.temp }}/third-party-refresh
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          claimed_sha="$(sed -n 1p "${REFRESH_DIR}/head-sha")"
+          if [ "${claimed_sha}" != "${HEAD_SHA}" ]; then
+            echo "::error::Artifact was generated for ${claimed_sha} but the run head is ${HEAD_SHA}; refusing to apply." >&2
+            exit 1
+          fi
+
+          # Qualified with this repository's owner, and cross-repository matches
+          # dropped: `--head <name>` alone matches a fork branch of the same
+          # name, which an outside user can create at will.
+          pr_json="$(
+            gh pr list --repo "${REPO}" \
+              --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open \
+              --json number,author,headRefOid,isCrossRepository \
+              --jq '[.[] | select(.isCrossRepository == false)][0] // empty'
+          )"
+          if [ -z "${pr_json}" ]; then
+            echo "No open pull request for ${HEAD_BRANCH}; nothing to apply."
+            exit 0
+          fi
+          number="$(printf '%s' "${pr_json}" | jq -r .number)"
+          author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
+          head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
+
+          if [ "${author}" != "dependabot[bot]" ]; then
+            echo "::error::PR #${number} is authored by ${author}, not dependabot[bot]." >&2
+            exit 1
+          fi
+          # The branch moved while this ran, so the refresh no longer describes
+          # its head. The newer commit gets its own generating run.
+          if [ "${head_oid}" != "${HEAD_SHA}" ]; then
+            echo "PR #${number} head is now ${head_oid}, not ${HEAD_SHA}; skipping."
+            exit 0
+          fi
+
+          # Only these two paths are ever written, whatever else the artifact
+          # happens to contain. The accumulator starts as a literal empty array:
+          # jq given empty input emits nothing at all, so seeding this with ""
+          # would silently drop every entry.
+          tree_items='[]'
+          for path in THIRD_PARTY_LICENSES.md THIRD_PARTY_NOTICES.md; do
+            blob_sha="$(
+              jq -Rs --arg encoding utf-8 '{content: ., encoding: $encoding}' \
+                < "${REFRESH_DIR}/${path}" \
+              | gh api "/repos/${REPO}/git/blobs" --input - --jq .sha
+            )"
+            tree_items="$(
+              printf '%s' "${tree_items}" \
+              | jq -c --arg path "${path}" --arg sha "${blob_sha}" \
+                  '. + [{path: $path, mode: "100644", type: "blob", sha: $sha}]'
+            )"
+          done
+
+          base_tree="$(gh api "/repos/${REPO}/git/commits/${HEAD_SHA}" --jq .tree.sha)"
+          tree_sha="$(
+            jq -nc --arg base "${base_tree}" --argjson tree "${tree_items}" \
+              '{base_tree: $base, tree: $tree}' \
+            | gh api "/repos/${REPO}/git/trees" --input - --jq .sha
+          )"
+
+          if [ "${tree_sha}" = "${base_tree}" ]; then
+            echo "Refreshed artifacts match the branch head; nothing to commit."
+            exit 0
+          fi
+
+          message="$(
+            printf '%s\n\n%s\n' \
+              "fix(ci): refresh third-party artifacts for dependabot bump" \
+              "- Regenerate THIRD_PARTY_LICENSES.md and THIRD_PARTY_NOTICES.md for PR #${number}."
+          )"
+          commit_sha="$(
+            jq -nc \
+              --arg message "${message}" \
+              --arg tree "${tree_sha}" \
+              --arg parent "${HEAD_SHA}" \
+              '{message: $message, tree: $tree, parents: [$parent]}' \
+            | gh api "/repos/${REPO}/git/commits" --input - --jq .sha
+          )"
+
+          # No force: if the branch moved after the check above, this fails
+          # rather than discarding the newer commit.
+          jq -nc --arg sha "${commit_sha}" '{sha: $sha, force: false}' \
+            | gh api --method PATCH "/repos/${REPO}/git/refs/heads/${HEAD_BRANCH}" \
+                --input - --jq .object.sha
+
+          echo "Committed ${commit_sha} to ${HEAD_BRANCH}."
+
+  merge:
+    name: Merge green dependabot bump
+    # Gate on the blocking workflows' own conclusions rather than
+    # `gh pr merge --auto`: main carries no required status checks, so an
+    # auto-merge would land the bump before they ever reported.
+    #
+    # Both `CI` and `cargo-deny` block a bump here, and unlike the nils-cli
+    # original this repository runs cargo-deny as its own workflow rather than
+    # as a CI job. Either completion wakes this job, and the merge step then
+    # requires a completed successful run of *both* for the exact head, so
+    # whichever finishes last performs the merge.
+    if: >-
+      (github.event.workflow_run.name == 'CI'
+        || github.event.workflow_run.name == 'cargo-deny')
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && startsWith(github.event.workflow_run.head_branch, 'dependabot/cargo/cargo-minor-patch-')
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require bot app credentials
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_APP_ID}" ] || [ -z "${BOT_APP_PRIVATE_KEY}" ]; then
+            echo "::error::BOT_APP_ID / BOT_APP_PRIVATE_KEY are not configured; merge the bump by hand." >&2
+            exit 1
+          fi
+
+      - name: Mint bot token
+        id: bot_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Squash merge the bump
+        env:
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Qualify the branch with this repository's owner and drop any
+          # cross-repository match: `--head <name>` alone filters on the branch
+          # name whatever repository it lives in, so an outside fork branch
+          # named like a Dependabot branch would otherwise be selected here.
+          pr_json="$(
+            gh pr list --repo "${REPO}" \
+              --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open \
+              --json number,author,headRefOid,isCrossRepository \
+              --jq '[.[] | select(.isCrossRepository == false)][0] // empty'
+          )"
+          if [ -z "${pr_json}" ]; then
+            echo "No open pull request for ${HEAD_BRANCH}; nothing to merge."
+            exit 0
+          fi
+
+          number="$(printf '%s' "${pr_json}" | jq -r .number)"
+          author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
+          head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
+
+          if [ "${author}" != "dependabot[bot]" ]; then
+            echo "PR #${number} is authored by ${author}, not dependabot[bot]; refusing to merge."
+            exit 0
+          fi
+
+          # The green run describes one commit. If the branch moved since, that
+          # newer commit is unverified and its own runs will call this again.
+          if [ "${head_oid}" != "${HEAD_SHA}" ]; then
+            echo "PR #${number} head is ${head_oid} but the green run was ${HEAD_SHA}; waiting for the newer run."
+            exit 0
+          fi
+
+          # Every workflow that blocks a bump must have a completed successful
+          # run for this exact commit. A missing or still-running counterpart is
+          # not a failure: its own completion event wakes this job again.
+          for workflow in ci.yml cargo-deny.yml; do
+            conclusion="$(
+              gh api \
+                "/repos/${REPO}/actions/workflows/${workflow}/runs?head_sha=${HEAD_SHA}&event=pull_request&per_page=1" \
+                --jq '.workflow_runs[0] | select(.status == "completed") | .conclusion'
+            )"
+            if [ "${conclusion}" != "success" ]; then
+              echo "${workflow} has no completed successful run for ${HEAD_SHA} (conclusion: ${conclusion:-none}); not merging."
+              exit 0
+            fi
+          done
+
+          gh pr merge "${number}" --repo "${REPO}" --squash

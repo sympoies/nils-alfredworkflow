@@ -19,11 +19,90 @@ printf '%s\n' \
   'Production packaging always downloads the official pinned target archive' \
   >"$fixture_root/docs/PACKAGING.md"
 
+# The Dependabot refresh pair is written separately from the canonical gate
+# workflows so a case can break one of its two invariants without disturbing
+# the rest of the fixture.
+write_dependabot_workflows() {
+  local generate_env="${1:-token}"
+  local apply_checkout="${2:-}"
+  local generate_permissions="${3:-read}"
+  local apply_cargo_deny_gate="${4:-gated}"
+
+  {
+    printf '%s\n' "permissions:"
+    if [[ "$generate_permissions" == "read" ]]; then
+      printf '%s\n' "  contents: read"
+    else
+      printf '%s\n' "  contents: write"
+    fi
+    printf '%s\n' \
+      "jobs:" \
+      "  generate:" \
+      "    steps:" \
+      "      - name: Regenerate third-party artifacts"
+    if [[ "$generate_env" == "token" ]]; then
+      # shellcheck disable=SC2016
+      printf '%s\n' \
+        "        env:" \
+        '          GITHUB_TOKEN: ${{ github.token }}'
+    fi
+    printf '%s\n' \
+      "        run: bash scripts/generate-third-party-artifacts.sh --check"
+  } >"$fixture_root/.github/workflows/dependabot-third-party-artifacts.yml"
+
+  {
+    printf '%s\n' \
+      "on:" \
+      "  workflow_run:" \
+      "    workflows:" \
+      "      - CI"
+    if [[ "$apply_cargo_deny_gate" == "gated" ]]; then
+      printf '%s\n' "      - cargo-deny"
+    fi
+    printf '%s\n' \
+      "jobs:" \
+      "  commit:" \
+      "    steps:"
+    if [[ -n "$apply_checkout" ]]; then
+      printf '%s\n' "      - uses: actions/checkout@v7"
+    fi
+    printf '%s\n' \
+      "      - name: Commit the refresh" \
+      "        run: echo commit" \
+      "  merge:"
+    if [[ "$apply_cargo_deny_gate" == "gated" ]]; then
+      printf '%s\n' \
+        "    if: github.event.workflow_run.name == 'cargo-deny'" \
+        "    steps:" \
+        "      - name: Squash merge the bump" \
+        "        run: |" \
+        "          for workflow in ci.yml cargo-deny.yml; do" \
+        "            echo \"\$workflow\"" \
+        "          done"
+    else
+      printf '%s\n' \
+        "    if: github.event.workflow_run.name == 'CI'" \
+        "    steps:" \
+        "      - name: Squash merge the bump" \
+        "        run: echo merge"
+    fi
+  } >"$fixture_root/.github/workflows/dependabot-third-party-apply.yml"
+
+  printf '%s\n' \
+    "name: cargo-deny" \
+    "jobs:" \
+    "  cargo-deny:" \
+    "    steps:" \
+    "      - run: echo deny" \
+    >"$fixture_root/.github/workflows/cargo-deny.yml"
+}
+
 write_workflows() {
   local validation_run="$1"
   local extra_run="${2:-}"
   # shellcheck disable=SC2016
   printf '%s\n' \
+    "name: CI" \
     "jobs:" \
     "  validate:" \
     "    steps:" \
@@ -57,6 +136,7 @@ write_workflows() {
     "      - run: bash scripts/ci/ci-bootstrap.sh --context publish-crates" \
     "      - run: bash scripts/ci/ci-run-gates.sh publish-crates" \
     >"$fixture_root/.github/workflows/publish-crates.yml"
+  write_dependabot_workflows
 }
 
 write_workflows \
@@ -75,6 +155,62 @@ write_workflows \
   $'      - run: |\n          echo before\n          bash scripts/ci/ci-run-gates.sh lint'
 if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
   echo "error: multiline duplicate ordinary gate satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+rm "$fixture_root/.github/workflows/dependabot-third-party-artifacts.yml"
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: missing dependabot refresh workflow satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows no-token
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: unauthenticated dependabot refresh step satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token checkout
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: privileged apply workflow checkout satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+rm "$fixture_root/.github/workflows/dependabot-third-party-apply.yml"
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: missing dependabot apply workflow satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token "" write
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: write permission on the unprivileged refresh workflow satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token "" read ungated
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: auto-merge without a cargo-deny gate satisfied the audit" >&2
+  exit 1
+fi
+
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+rm "$fixture_root/.github/workflows/cargo-deny.yml"
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: missing cargo-deny workflow satisfied the audit" >&2
   exit 1
 fi
 
