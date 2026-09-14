@@ -48,26 +48,29 @@ dependency bumps that changed no behavior.
 ```md
 ## YYYY-MM-DD - <short title>
 
-**Result**
+### Result
 
 - What shipped or changed.
 
-**Why / context**
+### Why / context
 
 - The non-obvious reasoning or compatibility context.
 
-**Evidence**
+### Evidence
 
 - Commands run and concrete observations.
 
-**Links**
+### Links
 
 - Commits, issues, pull requests, external references, and relevant docs.
 
-**Follow-ups**
+### Follow-ups
 
 - Optional.
 ```
+
+`Result`, `Why / context`, and `Evidence` are required. `Links` and `Follow-ups`
+are optional: omit the whole section rather than leaving a placeholder in it.
 
 ## Backfill note
 
