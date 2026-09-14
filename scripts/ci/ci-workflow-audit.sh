@@ -290,6 +290,20 @@ for needle in \
     "dependabot auto-merge cargo-deny gate ($needle)" \
     "Auto-merge must require a completed successful cargo-deny run for the verified commit."
 done
+# `gh pr list --head` filters on the bare branch name and documents that the
+# `<owner>:<branch>` form is unsupported. Passing a qualified value matches
+# nothing, so the automation silently reports no open pull request and skips
+# every bump; the cross-repository guard belongs in the jq filter instead.
+reject_regex \
+  "$dependabot_apply_workflow" \
+  'head "\$\{GITHUB_REPOSITORY_OWNER\}:' \
+  "owner-qualified gh pr list --head filter" \
+  "gh pr list --head takes a bare branch name; drop fork matches with the isCrossRepository filter."
+require_fixed \
+  "$dependabot_apply_workflow" \
+  'select(.isCrossRepository == false)' \
+  "cross-repository pull request guard" \
+  "Select only same-repository pull requests so a fork branch of the same name cannot be chosen."
 require_fixed \
   "$ci_workflow" \
   "name: CI" \
