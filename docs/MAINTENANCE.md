@@ -179,10 +179,18 @@ The applying workflow requires two repository secrets, `BOT_APP_ID` and
 `BOT_APP_PRIVATE_KEY`, for a GitHub App installed on this repository with
 `Contents: read and write`, `Pull requests: read and write`, and
 `Actions: read`. Both are configured here for the `sympoies-bot` App
-(id `4665910`), which is installed org-wide and already carries exactly those
-permissions. Note that the `sympoies-reviewer` App used to publish review
-outcomes is a different identity and cannot stand in: it holds only
-`Pull requests: write` and `Metadata: read`, so it fails at the commit step.
+(id `4665910`), which is installed org-wide and whose installation already
+includes those three scopes.
+
+The `sympoies-reviewer` App used to publish review outcomes is a different
+identity and cannot stand in: it holds only `Pull requests: write` and
+`Metadata: read`. Substituting it fails quietly rather than loudly — without
+`Actions: read` the artifact download fails, and because that step is
+`continue-on-error` and the commit step is guarded on its outcome, the commit
+job concludes **success** having applied nothing. The merge job fails at the
+same permission, on its workflow-run lookup. When a bump's artifacts are never
+refreshed and no job is red, suspect the App's permissions rather than the
+commit logic.
 The App token is mandatory rather than a convenience: a commit
 made with the default `GITHUB_TOKEN` does not start a new workflow run, so the
 refreshed commit would carry no CI results and could never be shown green.
