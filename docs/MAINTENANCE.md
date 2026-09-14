@@ -178,7 +178,12 @@ gate requires that run to pass.
 The applying workflow requires two repository secrets, `BOT_APP_ID` and
 `BOT_APP_PRIVATE_KEY`, for a GitHub App installed on this repository with
 `Contents: read and write`, `Pull requests: read and write`, and
-`Actions: read`. The App token is mandatory rather than a convenience: a commit
+`Actions: read`. Both are configured here for the `sympoies-bot` App
+(id `4665910`), which is installed org-wide and already carries exactly those
+permissions. Note that the `sympoies-reviewer` App used to publish review
+outcomes is a different identity and cannot stand in: it holds only
+`Pull requests: write` and `Metadata: read`, so it fails at the commit step.
+The App token is mandatory rather than a convenience: a commit
 made with the default `GITHUB_TOKEN` does not start a new workflow run, so the
 refreshed commit would carry no CI results and could never be shown green.
 Without the secrets the applying workflow fails fast with that instruction, and
