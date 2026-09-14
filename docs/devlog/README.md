@@ -39,7 +39,7 @@ dependency bumps that changed no behavior.
 - Prefer inline code spans for repository paths and full URLs for pull
   requests and issues, so the log survives file moves without breaking the
   local-link audit in `scripts/ci/markdownlint-audit.sh`.
-- Search past entries with `bash scripts/devlog-search.sh <term> [YYYY-MM]`.
+- Search past entries with `devlog search <term> [--month YYYY-MM]`.
 - When an entry is committed separately, use
   `docs(devlog): <YYYY-MM> - <subject>`.
 
