@@ -27,6 +27,7 @@ write_dependabot_workflows() {
   local apply_checkout="${2:-}"
   local generate_permissions="${3:-read}"
   local apply_cargo_deny_gate="${4:-gated}"
+  local apply_pr_lookup="${5:-scoped}"
 
   {
     printf '%s\n' "permissions:"
@@ -68,7 +69,18 @@ write_dependabot_workflows() {
     fi
     printf '%s\n' \
       "      - name: Commit the refresh" \
-      "        run: echo commit" \
+      "        run: |"
+    # shellcheck disable=SC2016
+    if [[ "$apply_pr_lookup" == "scoped" ]]; then
+      printf '%s\n' \
+        '          gh pr list --head "${HEAD_BRANCH}" --state open'
+    else
+      printf '%s\n' \
+        '          gh pr list --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open'
+    fi
+    printf '%s\n' \
+      "          # --jq '[.[] | select(.isCrossRepository == false)][0] // empty'"
+    printf '%s\n' \
       "  merge:"
     if [[ "$apply_cargo_deny_gate" == "gated" ]]; then
       printf '%s\n' \
@@ -211,6 +223,16 @@ write_workflows \
 rm "$fixture_root/.github/workflows/cargo-deny.yml"
 if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
   echo "error: missing cargo-deny workflow satisfied the audit" >&2
+  exit 1
+fi
+
+# `gh pr list --head` documents that `<owner>:<branch>` is unsupported: it
+# matches nothing, so the automation would silently skip every bump.
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token "" read gated owner-qualified
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: owner-qualified gh pr list --head satisfied the audit" >&2
   exit 1
 fi
 

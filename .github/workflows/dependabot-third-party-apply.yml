@@ -101,12 +101,13 @@ jobs:
             exit 1
           fi
 
-          # Qualified with this repository's owner, and cross-repository matches
-          # dropped: `--head <name>` alone matches a fork branch of the same
-          # name, which an outside user can create at will.
+          # Cross-repository matches are dropped in the filter, not in --head:
+          # `--head <name>` matches a fork branch of the same name, which an
+          # outside user can create at will, and `gh pr list` explicitly does
+          # not support the `<owner>:<branch>` form (it would match nothing and
+          # silently skip every bump).
           pr_json="$(
-            gh pr list --repo "${REPO}" \
-              --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open \
+            gh pr list --repo "${REPO}" --head "${HEAD_BRANCH}" --state open \
               --json number,author,headRefOid,isCrossRepository \
               --jq '[.[] | select(.isCrossRepository == false)][0] // empty'
           )"
@@ -229,13 +230,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Qualify the branch with this repository's owner and drop any
-          # cross-repository match: `--head <name>` alone filters on the branch
-          # name whatever repository it lives in, so an outside fork branch
-          # named like a Dependabot branch would otherwise be selected here.
+          # Drop any cross-repository match in the filter: `--head <name>`
+          # matches the branch name whatever repository it lives in, so an
+          # outside fork branch named like a Dependabot branch would otherwise
+          # be selected here. `gh pr list` does not support `<owner>:<branch>`,
+          # so the qualification has to happen in the jq filter.
           pr_json="$(
-            gh pr list --repo "${REPO}" \
-              --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open \
+            gh pr list --repo "${REPO}" --head "${HEAD_BRANCH}" --state open \
               --json number,author,headRefOid,isCrossRepository \
               --jq '[.[] | select(.isCrossRepository == false)][0] // empty'
           )"
