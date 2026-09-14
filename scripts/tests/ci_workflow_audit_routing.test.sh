@@ -28,6 +28,7 @@ write_dependabot_workflows() {
   local generate_permissions="${3:-read}"
   local apply_cargo_deny_gate="${4:-gated}"
   local apply_pr_lookup="${5:-scoped}"
+  local apply_fork_guard="${6:-guarded}"
 
   {
     printf '%s\n' "permissions:"
@@ -78,8 +79,13 @@ write_dependabot_workflows() {
       printf '%s\n' \
         '          gh pr list --head "${GITHUB_REPOSITORY_OWNER}:${HEAD_BRANCH}" --state open'
     fi
-    printf '%s\n' \
-      "          # --jq '[.[] | select(.isCrossRepository == false)][0] // empty'"
+    if [[ "$apply_fork_guard" == "guarded" ]]; then
+      printf '%s\n' \
+        "          # --jq '[.[] | select(.isCrossRepository == false)][0] // empty'"
+    else
+      printf '%s\n' \
+        "          # --jq '.[0] // empty'"
+    fi
     printf '%s\n' \
       "  merge:"
     if [[ "$apply_cargo_deny_gate" == "gated" ]]; then
@@ -233,6 +239,16 @@ write_workflows \
 write_dependabot_workflows token "" read gated owner-qualified
 if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
   echo "error: owner-qualified gh pr list --head satisfied the audit" >&2
+  exit 1
+fi
+
+# Without the cross-repository filter a fork branch of the same name can be
+# selected, which is the finding the owner-qualified form was meant to close.
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token "" read gated scoped unguarded
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: missing cross-repository pull request guard satisfied the audit" >&2
   exit 1
 fi
 
