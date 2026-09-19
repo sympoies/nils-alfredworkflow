@@ -84,6 +84,21 @@ require_fixed() {
   fi
 }
 
+require_fixed_count() {
+  local file="$1"
+  local needle="$2"
+  local expected="$3"
+  local label="$4"
+  local hint="$5"
+  local count=0
+
+  count="$(rg --fixed-strings --count-matches "$needle" "$file" || true)"
+  if [[ "$count" -ne "$expected" ]]; then
+    record_failure "$label must appear exactly $expected times in ${file#"$repo_root"/} (found $count)"
+    echo "hint: $hint" >&2
+  fi
+}
+
 reject_fixed() {
   local file="$1"
   local needle="$2"
@@ -304,6 +319,12 @@ require_fixed \
   'select(.isCrossRepository == false)' \
   "cross-repository pull request guard" \
   "Select only same-repository pull requests so a fork branch of the same name cannot be chosen."
+require_fixed_count \
+  "$dependabot_apply_workflow" \
+  '"dependabot[bot]"|"app/dependabot"' \
+  2 \
+  "Dependabot GraphQL author compatibility guard" \
+  "Accept both Dependabot login forms in the artifact commit and auto-merge jobs."
 require_fixed \
   "$ci_workflow" \
   "name: CI" \
