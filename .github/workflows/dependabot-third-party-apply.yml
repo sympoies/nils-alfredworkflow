@@ -67,7 +67,7 @@ jobs:
 
       - name: Mint bot token
         id: bot_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -119,10 +119,13 @@ jobs:
           author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
           head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
 
-          if [ "${author}" != "dependabot[bot]" ]; then
-            echo "::error::PR #${number} is authored by ${author}, not dependabot[bot]." >&2
-            exit 1
-          fi
+          case "${author}" in
+            "dependabot[bot]"|"app/dependabot") ;;
+            *)
+              echo "::error::PR #${number} is authored by unrecognized account ${author}." >&2
+              exit 1
+              ;;
+          esac
           # The branch moved while this ran, so the refresh no longer describes
           # its head. The newer commit gets its own generating run.
           if [ "${head_oid}" != "${HEAD_SHA}" ]; then
@@ -216,7 +219,7 @@ jobs:
 
       - name: Mint bot token
         id: bot_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -249,10 +252,13 @@ jobs:
           author="$(printf '%s' "${pr_json}" | jq -r .author.login)"
           head_oid="$(printf '%s' "${pr_json}" | jq -r .headRefOid)"
 
-          if [ "${author}" != "dependabot[bot]" ]; then
-            echo "PR #${number} is authored by ${author}, not dependabot[bot]; refusing to merge."
-            exit 0
-          fi
+          case "${author}" in
+            "dependabot[bot]"|"app/dependabot") ;;
+            *)
+              echo "PR #${number} is authored by unrecognized account ${author}; refusing to merge."
+              exit 0
+              ;;
+          esac
 
           # The green run describes one commit. If the branch moved since, that
           # newer commit is unverified and its own runs will call this again.

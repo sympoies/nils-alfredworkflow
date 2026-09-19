@@ -29,6 +29,7 @@ write_dependabot_workflows() {
   local apply_cargo_deny_gate="${4:-gated}"
   local apply_pr_lookup="${5:-scoped}"
   local apply_fork_guard="${6:-guarded}"
+  local apply_author_guard="${7:-guarded}"
 
   {
     printf '%s\n' "permissions:"
@@ -86,14 +87,28 @@ write_dependabot_workflows() {
       printf '%s\n' \
         "          # --jq '.[0] // empty'"
     fi
+    if [[ "$apply_author_guard" == "guarded" ]]; then
+      # shellcheck disable=SC2016
+      printf '%s\n' \
+        '          case "${author}" in' \
+        '            "dependabot[bot]"|"app/dependabot") ;;' \
+        '          esac'
+    else
+      # shellcheck disable=SC2016
+      printf '%s\n' '          test "${author}" = "dependabot[bot]"'
+    fi
     printf '%s\n' \
       "  merge:"
     if [[ "$apply_cargo_deny_gate" == "gated" ]]; then
+      # shellcheck disable=SC2016
       printf '%s\n' \
         "    if: github.event.workflow_run.name == 'cargo-deny'" \
         "    steps:" \
         "      - name: Squash merge the bump" \
         "        run: |" \
+        '          case "${author}" in' \
+        '            "dependabot[bot]"|"app/dependabot") ;;' \
+        '          esac' \
         "          for workflow in ci.yml cargo-deny.yml; do" \
         "            echo \"\$workflow\"" \
         "          done"
@@ -249,6 +264,16 @@ write_workflows \
 write_dependabot_workflows token "" read gated scoped unguarded
 if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
   echo "error: missing cross-repository pull request guard satisfied the audit" >&2
+  exit 1
+fi
+
+# GitHub's GraphQL-backed PR response can render Dependabot as app/dependabot,
+# while event payloads use dependabot[bot]. Both privileged jobs must accept it.
+write_workflows \
+  "        run: bash scripts/local-pre-commit.sh --mode ci"
+write_dependabot_workflows token "" read gated scoped guarded unguarded
+if bash "$fixture_root/scripts/ci/ci-workflow-audit.sh" --check >/dev/null 2>&1; then
+  echo "error: single-form Dependabot author guard satisfied the audit" >&2
   exit 1
 fi
 
