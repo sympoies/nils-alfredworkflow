@@ -12,24 +12,24 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `1e836fdc71d52217aa03a3d504716b75dcd8fd0d8b83ac5857dea11695010d2e`
+- Data source fingerprint (SHA256): `e1f085219dcdb71d695bde813af0b9cfe9c3611619562e68a41af80190cad3e4`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `3faed1c1c9375549b4dc94755c3f2a4229f53187fe729baf5d8bb7c18d299e23` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `67467eaee81efee237bf2967e43e67e561a585c819d1c1d65d063a32e54687e1` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `aeac8c0fbcdc63032af303651cb6dbd172d28d283cc3d629248b7fa594bfc98b` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
-## Rust License Summary (328 crates)
+## Rust License Summary (317 crates)
 
 | Count | License Expression |
 | ---: | --- |
-| 168 | MIT OR Apache-2.0 |
-| 71 | MIT |
+| 169 | MIT OR Apache-2.0 |
+| 59 | MIT |
 | 30 | Apache-2.0 OR MIT |
 | 18 | Unicode-3.0 |
 | 10 | MIT/Apache-2.0 |
@@ -56,7 +56,6 @@ Do not edit manually.
 | Crate | Version | License | Repository |
 | --- | --- | --- | --- |
 | aes | 0.8.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/block-ciphers> |
-| ahash | 0.7.8 | MIT OR Apache-2.0 | <https://github.com/tkaitchuck/ahash> |
 | aho-corasick | 1.1.4 | Unlicense OR MIT | <https://github.com/BurntSushi/aho-corasick> |
 | anstream | 1.0.0 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
 | anstyle | 1.0.14 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
@@ -82,7 +81,6 @@ Do not edit manually.
 | base64 | 0.23.1 | MIT OR Apache-2.0 | <https://github.com/marshallpierce/rust-base64> |
 | bitflags | 1.3.2 | MIT/Apache-2.0 | <https://github.com/bitflags/bitflags> |
 | bitflags | 2.11.1 | MIT OR Apache-2.0 | <https://github.com/bitflags/bitflags> |
-| bitvec | 1.0.1 | MIT | <https://github.com/bitvecto-rs/bitvec> |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/utils> |
 | block-buffer | 0.12.1 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/utils> |
 | block-padding | 0.3.3 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/utils> |
@@ -90,8 +88,6 @@ Do not edit manually.
 | borsh | 1.6.1 | MIT OR Apache-2.0 | <https://github.com/near/borsh-rs> |
 | borsh-derive | 1.6.1 | Apache-2.0 | <https://github.com/near/borsh-rs> |
 | bs58 | 0.5.1 | MIT/Apache-2.0 | <https://github.com/Nullus157/bs58-rs> |
-| bytecheck | 0.6.12 | MIT | <https://github.com/djkoloski/bytecheck> |
-| bytecheck_derive | 0.6.12 | MIT | <https://github.com/djkoloski/bytecheck> |
 | bytes | 1.11.1 | MIT | <https://github.com/tokio-rs/bytes> |
 | cbc | 0.1.2 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/block-modes> |
 | cc | 1.2.62 | MIT OR Apache-2.0 | <https://github.com/rust-lang/cc-rs> |
@@ -147,7 +143,6 @@ Do not edit manually.
 | fnv | 1.0.7 | Apache-2.0 / MIT | <https://github.com/servo/rust-fnv> |
 | foldhash | 0.2.0 | Zlib | <https://github.com/orlp/foldhash> |
 | form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
-| funty | 2.0.0 | MIT | <https://github.com/myrrlyn/funty> |
 | futures | 0.3.32 | MIT OR Apache-2.0 | <https://github.com/rust-lang/futures-rs> |
 | futures-channel | 0.3.32 | MIT OR Apache-2.0 | <https://github.com/rust-lang/futures-rs> |
 | futures-core | 0.3.32 | MIT OR Apache-2.0 | <https://github.com/rust-lang/futures-rs> |
@@ -161,6 +156,7 @@ Do not edit manually.
 | generic-array | 0.14.7 | MIT | <https://github.com/fizyk20/generic-array.git> |
 | gethostname | 1.1.0 | Apache-2.0 | <https://codeberg.org/swsnr/gethostname.rs.git> |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
+| getrandom | 0.3.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
 | getrandom | 0.4.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/getrandom> |
 | google-apis-common | 8.0.0 | MIT | <https://github.com/Byron/google-apis-rs> |
 | google-drive3 | 7.0.0+20251218 | MIT | <https://github.com/Byron/google-apis-rs/tree/main/gen/drive3> |
@@ -236,7 +232,7 @@ Do not edit manually.
 | num_cpus | 1.17.0 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/num_cpus> |
 | num_threads | 0.1.7 | MIT OR Apache-2.0 | <https://github.com/jhpratt/num_threads> |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | <https://github.com/matklad/once_cell> |
-| open | 5.4.3 | MIT | <https://github.com/Byron/open-rs> |
+| open | 5.4.4 | MIT | <https://github.com/Byron/open-rs> |
 | openssl-probe | 0.2.1 | MIT OR Apache-2.0 | <https://github.com/rustls/openssl-probe> |
 | option-ext | 0.2.0 | MPL-2.0 | <https://github.com/soc/option-ext.git> |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/danieldg/ordered-stream> |
@@ -256,37 +252,34 @@ Do not edit manually.
 | proc-macro2 | 1.0.106 | MIT OR Apache-2.0 | <https://github.com/dtolnay/proc-macro2> |
 | prost | 0.14.4 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
 | prost-derive | 0.14.4 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
-| ptr_meta | 0.1.4 | MIT | <https://github.com/djkoloski/ptr_meta> |
-| ptr_meta_derive | 0.1.4 | MIT | <https://github.com/djkoloski/ptr_meta> |
 | quinn | 0.11.9 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-udp | 0.5.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quote | 1.0.45 | MIT OR Apache-2.0 | <https://github.com/dtolnay/quote> |
-| radium | 0.7.0 | MIT | <https://github.com/bitvecto-rs/radium> |
 | rand | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.8.6 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| rand | 0.9.5 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| rand_chacha | 0.9.0 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand_core> |
 | rand_core | 0.6.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| rand_core | 0.9.5 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/rngs> |
 | ref-cast | 1.0.25 | MIT OR Apache-2.0 | <https://github.com/dtolnay/ref-cast> |
 | ref-cast-impl | 1.0.25 | MIT OR Apache-2.0 | <https://github.com/dtolnay/ref-cast> |
 | regex | 1.12.3 | MIT OR Apache-2.0 | <https://github.com/rust-lang/regex> |
 | regex-automata | 0.4.14 | MIT OR Apache-2.0 | <https://github.com/rust-lang/regex> |
 | regex-syntax | 0.8.10 | MIT OR Apache-2.0 | <https://github.com/rust-lang/regex> |
-| rend | 0.4.2 | MIT | <https://github.com/djkoloski/rend> |
 | reqwest | 0.12.28 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/reqwest> |
 | ring | 0.17.14 | Apache-2.0 AND ISC | <https://github.com/briansmith/ring> |
-| rkyv | 0.7.46 | MIT | <https://github.com/rkyv/rkyv> |
-| rkyv_derive | 0.7.46 | MIT | <https://github.com/rkyv/rkyv> |
 | rusqlite | 0.40.1 | MIT | <https://github.com/rusqlite/rusqlite> |
-| rust_decimal | 1.42.1 | MIT | <https://github.com/paupino/rust-decimal> |
+| rust_decimal | 1.43.0 | MIT | <https://github.com/paupino/rust-decimal> |
 | rustc-hash | 2.1.2 | Apache-2.0 OR MIT | <https://github.com/rust-lang/rustc-hash> |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | <https://github.com/bytecodealliance/rustix> |
-| rustls | 0.23.40 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
+| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
 | rustls-native-certs | 0.8.3 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls-native-certs> |
 | rustls-pki-types | 1.14.1 | MIT OR Apache-2.0 | <https://github.com/rustls/pki-types> |
-| rustls-webpki | 0.103.13 | ISC | <https://github.com/rustls/webpki> |
+| rustls-webpki | 0.103.15 | ISC | <https://github.com/rustls/webpki> |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 | <https://github.com/dtolnay/ryu> |
 | same-file | 1.0.6 | Unlicense/MIT | <https://github.com/BurntSushi/same-file> |
 | schemars | 0.9.0 | MIT | <https://github.com/GREsau/schemars> |
@@ -295,9 +288,9 @@ Do not edit manually.
 | secret-service | 5.1.0 | MIT OR Apache-2.0 | <https://github.com/hwchen/secret-service-rs.git> |
 | security-framework | 3.7.0 | MIT OR Apache-2.0 | <https://github.com/kornelski/rust-security-framework> |
 | security-framework-sys | 2.17.0 | MIT OR Apache-2.0 | <https://github.com/kornelski/rust-security-framework> |
-| serde | 1.0.228 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
-| serde_core | 1.0.228 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
-| serde_derive | 1.0.228 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
+| serde | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
+| serde_core | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
+| serde_derive | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
 | serde_json | 1.0.151 | MIT OR Apache-2.0 | <https://github.com/serde-rs/json> |
 | serde_repr | 0.1.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/serde-repr> |
 | serde_urlencoded | 0.7.1 | MIT/Apache-2.0 | <https://github.com/nox/serde_urlencoded> |
@@ -308,7 +301,6 @@ Do not edit manually.
 | shlex | 1.3.0 | MIT OR Apache-2.0 | <https://github.com/comex/rust-shlex> |
 | shlex | 2.0.1 | MIT OR Apache-2.0 | <https://github.com/comex/rust-shlex> |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | <https://github.com/vorner/signal-hook> |
-| simdutf8 | 0.1.5 | MIT OR Apache-2.0 | <https://github.com/rusticstuff/simdutf8> |
 | siphasher | 1.0.3 | MIT/Apache-2.0 | <https://github.com/jedisct1/rust-siphash> |
 | slab | 0.4.12 | MIT | <https://github.com/tokio-rs/slab> |
 | smallvec | 1.15.1 | MIT OR Apache-2.0 | <https://github.com/servo/rust-smallvec> |
@@ -316,15 +308,13 @@ Do not edit manually.
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 | <https://github.com/storyyeller/stable_deref_trait> |
 | strsim | 0.11.1 | MIT | <https://github.com/rapidfuzz/strsim-rs> |
 | subtle | 2.6.1 | BSD-3-Clause | <https://github.com/dalek-cryptography/subtle> |
-| syn | 1.0.109 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
 | syn | 2.0.117 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
 | syn | 3.0.3 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
 | sync_wrapper | 1.0.2 | Apache-2.0 | <https://github.com/Actyx/sync_wrapper> |
 | synstructure | 0.13.2 | MIT | <https://github.com/mystor/synstructure> |
-| tap | 1.0.1 | MIT | <https://github.com/myrrlyn/tap> |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | <https://github.com/Stebalien/tempfile> |
-| thiserror | 2.0.19 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
-| thiserror-impl | 2.0.19 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
+| thiserror | 2.0.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
+| thiserror-impl | 2.0.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
 | time | 0.3.47 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
 | time-core | 0.1.8 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
 | time-macros | 0.2.27 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
@@ -355,7 +345,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.24.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.26.1 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | vcpkg | 0.2.15 | MIT/Apache-2.0 | <https://github.com/mcgoo/vcpkg-rs> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
@@ -364,7 +354,6 @@ Do not edit manually.
 | winnow | 1.0.2 | MIT | <https://github.com/winnow-rs/winnow> |
 | wiremock | 0.6.5 | MIT/Apache-2.0 | <https://github.com/LukeMathWalker/wiremock-rs> |
 | writeable | 0.6.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
-| wyz | 0.5.1 | MIT | <https://github.com/myrrlyn/wyz> |
 | yoke | 0.8.2 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | yoke-derive | 0.8.2 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | yup-oauth2 | 12.1.2 | MIT OR Apache-2.0 | <https://github.com/dermesser/yup-oauth2> |
