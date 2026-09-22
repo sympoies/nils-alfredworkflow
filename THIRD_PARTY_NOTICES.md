@@ -3,7 +3,7 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `67467eaee81efee237bf2967e43e67e561a585c819d1c1d65d063a32e54687e1`
+- Cargo.lock SHA256: `91e86b3f14a75d6aeb6eed5d3df21ebb44924892ca6021eb8e184bfb89db0c09`
 - Third-party crates (`source != null`): 317
 
 ## Notice Extraction Policy
@@ -389,7 +389,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap 4.6.6
+### clap 4.6.7
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -398,7 +398,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap_builder 4.6.6
+### clap_builder 4.6.7
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -416,7 +416,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap_derive 4.6.4
+### clap_derive 4.6.7
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`

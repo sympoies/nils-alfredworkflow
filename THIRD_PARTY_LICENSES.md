@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `e1f085219dcdb71d695bde813af0b9cfe9c3611619562e68a41af80190cad3e4`
+- Data source fingerprint (SHA256): `62662ce9a9e969dd9f5882123ad5c2a5340e111a03888013f3e3be5d8f10292b`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `67467eaee81efee237bf2967e43e67e561a585c819d1c1d65d063a32e54687e1` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `91e86b3f14a75d6aeb6eed5d3df21ebb44924892ca6021eb8e184bfb89db0c09` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `aeac8c0fbcdc63032af303651cb6dbd172d28d283cc3d629248b7fa594bfc98b` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -97,10 +97,10 @@ Do not edit manually.
 | chrono | 0.4.45 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono> |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono-tz> |
 | cipher | 0.4.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/traits> |
-| clap | 4.6.6 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
-| clap_builder | 4.6.6 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap_builder | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_complete | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
-| clap_derive | 4.6.4 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap_derive | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_lex | 1.1.0 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | colorchoice | 1.0.5 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/concurrent-queue> |
