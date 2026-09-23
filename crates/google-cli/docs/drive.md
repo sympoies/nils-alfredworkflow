@@ -35,8 +35,12 @@ cargo run -p nils-google-cli -- --json -a you@example.com drive search "name:rep
 non-null token back with `--page <token>` and the same query to continue; a null
 token means the listing is complete. `--all-drives` sets the Drive API corpus to
 `allDrives`, including accessible shared drives. An `incompleteSearch` response
-fails instead of returning a misleading partial listing; narrow that query and
-retry. Without `--all-drives`, the provider's default user corpus is retained.
+fails instead of returning a misleading partial listing. This means the
+account-wide result is unavailable for that response; narrowing the query text
+alone does not guarantee completeness. Google's recommended recovery is to
+search the `user` or a specific `drive` corpus, but this CLI does not yet expose
+per-drive corpus enumeration. Without `--all-drives`, the provider's default
+user corpus is retained.
 
 Get metadata:
 

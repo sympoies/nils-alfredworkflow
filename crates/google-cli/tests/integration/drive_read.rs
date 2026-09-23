@@ -172,6 +172,43 @@ fn drive_search_exposes_a_continuation_for_account_wide_reads() {
     assert_eq!(second_result["count"], 1);
     assert!(second_result["next_page_token"].is_null());
 
+    let ls_first = native_drive::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "drive",
+            "ls",
+            "--all-drives",
+            "--max",
+            "2",
+        ],
+        &borrowed,
+    );
+    assert_eq!(ls_first.status.code(), Some(0));
+    let ls_first_result = native_drive::json(&ls_first)["result"].clone();
+    assert_eq!(ls_first_result["all_drives"], true);
+    assert_eq!(ls_first_result["next_page_token"], "2");
+    let ls_second = native_drive::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "drive",
+            "ls",
+            "--all-drives",
+            "--max",
+            "2",
+            "--page",
+            "2",
+        ],
+        &borrowed,
+    );
+    assert_eq!(ls_second.status.code(), Some(0));
+    let ls_second_result = native_drive::json(&ls_second)["result"].clone();
+    assert_eq!(ls_second_result["count"], 1);
+    assert!(ls_second_result["next_page_token"].is_null());
+
     let invalid = native_drive::run(
         temp.path(),
         &["--output", "json", "drive", "search", "a", "--max", "0"],

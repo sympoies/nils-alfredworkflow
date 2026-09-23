@@ -475,22 +475,7 @@ impl DriveSession {
         page_token: Option<&str>,
         all_drives: bool,
     ) -> Result<DrivePage, AppError> {
-        let mut params = vec![
-            ("q", query.to_string()),
-            ("pageSize", max.to_string()),
-            (
-                "fields",
-                "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents)".to_string(),
-            ),
-            ("supportsAllDrives", "true".to_string()),
-            ("includeItemsFromAllDrives", "true".to_string()),
-        ];
-        if let Some(page_token) = page_token {
-            params.push(("pageToken", page_token.to_string()));
-        }
-        if all_drives {
-            params.push(("corpora", "allDrives".to_string()));
-        }
+        let params = list_params(query, max, page_token, all_drives);
 
         let response = metadata_request(
             self.client
@@ -501,26 +486,7 @@ impl DriveSession {
         .send()
         .map_err(|error| AppError::drive_failure(format!("list files request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "list files", None)?;
-        if payload.get("incompleteSearch").and_then(Value::as_bool) == Some(true) {
-            return Err(AppError::drive_failure(
-                "Drive search was incomplete across shared drives; narrow the query and retry",
-            ));
-        }
-        let files = payload
-            .get("files")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|file| view_from_live_json(&file))
-            .collect();
-        Ok(DrivePage {
-            files,
-            next_page_token: payload
-                .get("nextPageToken")
-                .and_then(Value::as_str)
-                .map(ToOwned::to_owned),
-        })
+        parse_list_payload(&payload)
     }
 
     fn find_existing_by_name(
@@ -727,6 +693,54 @@ fn query_matches(file: &DriveFile, query: &str) -> bool {
                     || contains_ignore_ascii_case(&file.id, token)
             }
         })
+}
+
+fn list_params(
+    query: &str,
+    max: usize,
+    page_token: Option<&str>,
+    all_drives: bool,
+) -> Vec<(&'static str, String)> {
+    let mut params = vec![
+        ("q", query.to_string()),
+        ("pageSize", max.to_string()),
+        (
+            "fields",
+            "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents)".to_string(),
+        ),
+        ("supportsAllDrives", "true".to_string()),
+        ("includeItemsFromAllDrives", "true".to_string()),
+    ];
+    if let Some(token) = page_token {
+        params.push(("pageToken", token.to_string()));
+    }
+    if all_drives {
+        params.push(("corpora", "allDrives".to_string()));
+    }
+    params
+}
+
+fn parse_list_payload(payload: &Value) -> Result<DrivePage, AppError> {
+    if payload.get("incompleteSearch").and_then(Value::as_bool) == Some(true) {
+        return Err(AppError::drive_failure(
+            "Drive search incomplete across shared drives; account-wide completeness unavailable for this response",
+        ));
+    }
+    let files = payload
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|file| view_from_live_json(&file))
+        .collect();
+    Ok(DrivePage {
+        files,
+        next_page_token: payload
+            .get("nextPageToken")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+    })
 }
 
 fn fixture_page(
@@ -937,9 +951,13 @@ fn upload_to_fixture(
 
 #[cfg(test)]
 mod tests {
-    use super::{DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, media_request, metadata_request};
+    use super::{
+        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, list_params, media_request, metadata_request,
+        parse_list_payload,
+    };
 
     use reqwest::blocking::Client;
+    use serde_json::json;
 
     #[test]
     fn drive_media_requests_use_longer_timeout_than_metadata_requests() {
@@ -954,5 +972,36 @@ mod tests {
         assert_eq!(metadata.timeout().copied(), Some(DRIVE_METADATA_TIMEOUT));
         assert_eq!(media.timeout().copied(), Some(DRIVE_MEDIA_TIMEOUT));
         assert!(DRIVE_MEDIA_TIMEOUT > DRIVE_METADATA_TIMEOUT);
+    }
+
+    #[test]
+    fn live_list_parameters_bind_corpus_and_continuation() {
+        let first = list_params("trashed = false", 100, None, true);
+        assert!(first.contains(&("corpora", "allDrives".to_string())));
+        assert!(!first.iter().any(|(key, _)| *key == "pageToken"));
+        let second = list_params("trashed = false", 100, Some("opaque-page"), true);
+        assert!(second.contains(&("pageToken", "opaque-page".to_string())));
+        let default = list_params("trashed = false", 100, None, false);
+        assert!(!default.iter().any(|(key, _)| *key == "corpora"));
+    }
+
+    #[test]
+    fn live_list_payload_preserves_continuation_and_refuses_incomplete_search() {
+        let page = parse_list_payload(&json!({
+            "files": [{"id": "file-1", "name": "note", "mimeType": "text/plain"}],
+            "nextPageToken": "opaque-page",
+        }))
+        .expect("complete first page");
+        assert_eq!(page.files.len(), 1);
+        assert_eq!(page.next_page_token.as_deref(), Some("opaque-page"));
+        let error = parse_list_payload(&json!({
+            "files": [], "incompleteSearch": true,
+        }))
+        .expect_err("incomplete account-wide search must fail");
+        assert!(
+            error
+                .message()
+                .contains("account-wide completeness unavailable")
+        );
     }
 }
