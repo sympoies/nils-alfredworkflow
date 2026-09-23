@@ -12,15 +12,15 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `62662ce9a9e969dd9f5882123ad5c2a5340e111a03888013f3e3be5d8f10292b`
+- Data source fingerprint (SHA256): `b979700e0ac225267fa2eee5069e2b9abe637ba0c627a701721d30ba21d27e70`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `91e86b3f14a75d6aeb6eed5d3df21ebb44924892ca6021eb8e184bfb89db0c09` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
-| Node lockfile | `package-lock.json` | `aeac8c0fbcdc63032af303651cb6dbd172d28d283cc3d629248b7fa594bfc98b` | `jq package-lock extraction` |
+| Cargo lockfile | `Cargo.lock` | `aad9ba3614d265305444b5ff2972554a14cc3d7ab6b26778581c53a91dbb1929` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Node lockfile | `package-lock.json` | `5d25617c12a311a0785bd571806f02d1c89f7dd02d98b451562fdbfdb1906762` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
 
