@@ -9,8 +9,9 @@ pub fn execute_ls(
     session: &DriveSession,
     args: &[String],
 ) -> Result<NativeDriveResponse, AppError> {
-    let request = parse_ls_args(args)?;
-    let files = session.list(&request)?;
+    let (request, all_drives) = parse_ls_args(args)?;
+    let page = session.list_page(&request, all_drives)?;
+    let count = page.files.len();
 
     Ok(response(
         json!({
@@ -20,10 +21,12 @@ pub fn execute_ls(
             "query": request.query,
             "max": request.max,
             "page_token": request.page_token,
-            "count": files.len(),
-            "files": files,
+            "all_drives": all_drives,
+            "count": count,
+            "files": page.files,
+            "next_page_token": page.next_page_token,
         }),
-        format!("Listed {} Drive file(s).", files.len()),
+        format!("Listed {count} Drive file(s)."),
     ))
 }
 
@@ -31,8 +34,9 @@ pub fn execute_search(
     session: &DriveSession,
     args: &[String],
 ) -> Result<NativeDriveResponse, AppError> {
-    let request = parse_search_args(args)?;
-    let files = session.search(&request)?;
+    let (request, all_drives) = parse_search_args(args)?;
+    let page = session.search_page(&request, all_drives)?;
+    let count = page.files.len();
 
     Ok(response(
         json!({
@@ -42,10 +46,12 @@ pub fn execute_search(
             "raw_query": request.raw_query,
             "max": request.max,
             "page_token": request.page_token,
-            "count": files.len(),
-            "files": files,
+            "all_drives": all_drives,
+            "count": count,
+            "files": page.files,
+            "next_page_token": page.next_page_token,
         }),
-        format!("Found {} Drive file(s).", files.len()),
+        format!("Found {count} Drive file(s)."),
     ))
 }
 
@@ -66,11 +72,12 @@ pub fn execute_get(
     ))
 }
 
-fn parse_ls_args(args: &[String]) -> Result<ListRequest, AppError> {
+fn parse_ls_args(args: &[String]) -> Result<(ListRequest, bool), AppError> {
     let mut parent = None;
     let mut query = None;
     let mut max = 100usize;
     let mut page_token = None;
+    let mut all_drives = false;
 
     let mut index = 0;
     while index < args.len() {
@@ -105,6 +112,7 @@ fn parse_ls_args(args: &[String]) -> Result<ListRequest, AppError> {
                     .ok_or_else(|| AppError::invalid_drive_input("missing value for `--page`"))?;
                 page_token = Some(value.clone());
             }
+            "--all-drives" => all_drives = true,
             value if value.starts_with('-') => {
                 return Err(AppError::invalid_drive_input(format!(
                     "unknown drive ls flag `{value}`"
@@ -119,20 +127,29 @@ fn parse_ls_args(args: &[String]) -> Result<ListRequest, AppError> {
         index += 1;
     }
 
-    Ok(ListRequest {
-        parent,
-        query,
-        max,
-        page_token,
-    })
+    if max == 0 {
+        return Err(AppError::invalid_drive_input(
+            "drive ls --max must be positive",
+        ));
+    }
+    Ok((
+        ListRequest {
+            parent,
+            query,
+            max,
+            page_token,
+        },
+        all_drives,
+    ))
 }
 
-fn parse_search_args(args: &[String]) -> Result<SearchRequest, AppError> {
+fn parse_search_args(args: &[String]) -> Result<(SearchRequest, bool), AppError> {
     let mut query_tokens = Vec::new();
     let mut query = None;
     let mut max = 25usize;
     let mut page_token = None;
     let mut raw_query = false;
+    let mut all_drives = false;
 
     let mut index = 0;
     while index < args.len() {
@@ -147,6 +164,7 @@ fn parse_search_args(args: &[String]) -> Result<SearchRequest, AppError> {
             "--raw-query" => {
                 raw_query = true;
             }
+            "--all-drives" => all_drives = true,
             "--max" => {
                 index += 1;
                 let value = args
@@ -188,12 +206,20 @@ fn parse_search_args(args: &[String]) -> Result<SearchRequest, AppError> {
             )
         })?;
 
-    Ok(SearchRequest {
-        query,
-        max,
-        page_token,
-        raw_query,
-    })
+    if max == 0 {
+        return Err(AppError::invalid_drive_input(
+            "drive search --max must be positive",
+        ));
+    }
+    Ok((
+        SearchRequest {
+            query,
+            max,
+            page_token,
+            raw_query,
+        },
+        all_drives,
+    ))
 }
 
 fn parse_get_args(args: &[String]) -> Result<GetRequest, AppError> {

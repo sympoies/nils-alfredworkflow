@@ -60,6 +60,12 @@ pub struct FileView {
     pub parents: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct DrivePage {
+    pub files: Vec<FileView>,
+    pub next_page_token: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DriveSession {
     pub account: String,
@@ -177,16 +183,23 @@ impl DriveSession {
     }
 
     pub fn list(&self, request: &ListRequest) -> Result<Vec<FileView>, AppError> {
+        Ok(self.list_page(request, false)?.files)
+    }
+
+    pub fn list_page(
+        &self,
+        request: &ListRequest,
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
         if let Some(fixture) = &self.fixture {
-            let mut files = fixture
+            let files = fixture
                 .files
                 .iter()
                 .filter(|file| parent_matches(file, request.parent.as_deref()))
                 .filter(|file| query_matches(file, request.query.as_deref().unwrap_or_default()))
                 .map(view_for_file)
                 .collect::<Vec<_>>();
-            files.truncate(request.max);
-            return Ok(files);
+            return fixture_page(files, request.max, request.page_token.as_deref());
         }
 
         let mut clauses = vec!["trashed = false".to_string()];
@@ -200,19 +213,26 @@ impl DriveSession {
         }
         let q = clauses.join(" and ");
 
-        self.list_live(&q, request.max, request.page_token.as_deref())
+        self.list_live(&q, request.max, request.page_token.as_deref(), all_drives)
     }
 
     pub fn search(&self, request: &SearchRequest) -> Result<Vec<FileView>, AppError> {
+        Ok(self.search_page(request, false)?.files)
+    }
+
+    pub fn search_page(
+        &self,
+        request: &SearchRequest,
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
         if let Some(fixture) = &self.fixture {
-            let mut files = fixture
+            let files = fixture
                 .files
                 .iter()
                 .filter(|file| query_matches(file, request.query.as_str()))
                 .map(view_for_file)
                 .collect::<Vec<_>>();
-            files.truncate(request.max);
-            return Ok(files);
+            return fixture_page(files, request.max, request.page_token.as_deref());
         }
 
         let mut q = if request.raw_query {
@@ -226,7 +246,7 @@ impl DriveSession {
             q = format!("({q}) and trashed = false");
         }
 
-        self.list_live(&q, request.max, request.page_token.as_deref())
+        self.list_live(&q, request.max, request.page_token.as_deref(), all_drives)
     }
 
     pub fn get(&self, request: &GetRequest) -> Result<FileView, AppError> {
@@ -453,20 +473,9 @@ impl DriveSession {
         query: &str,
         max: usize,
         page_token: Option<&str>,
-    ) -> Result<Vec<FileView>, AppError> {
-        let mut params = vec![
-            ("q", query.to_string()),
-            ("pageSize", max.to_string()),
-            (
-                "fields",
-                "nextPageToken,files(id,name,mimeType,size,parents)".to_string(),
-            ),
-            ("supportsAllDrives", "true".to_string()),
-            ("includeItemsFromAllDrives", "true".to_string()),
-        ];
-        if let Some(page_token) = page_token {
-            params.push(("pageToken", page_token.to_string()));
-        }
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
+        let params = list_params(query, max, page_token, all_drives);
 
         let response = metadata_request(
             self.client
@@ -477,15 +486,7 @@ impl DriveSession {
         .send()
         .map_err(|error| AppError::drive_failure(format!("list files request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "list files", None)?;
-        let files = payload
-            .get("files")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|file| view_from_live_json(&file))
-            .collect();
-        Ok(files)
+        parse_list_payload(&payload)
     }
 
     fn find_existing_by_name(
@@ -498,8 +499,8 @@ impl DriveSession {
             escape_drive_literal(name),
             escape_drive_literal(parent),
         );
-        let files = self.list_live(&query, 1, None)?;
-        Ok(files.into_iter().next())
+        let page = self.list_live(&query, 1, None, false)?;
+        Ok(page.files.into_iter().next())
     }
 
     fn drive_get_json(
@@ -694,6 +695,79 @@ fn query_matches(file: &DriveFile, query: &str) -> bool {
         })
 }
 
+fn list_params(
+    query: &str,
+    max: usize,
+    page_token: Option<&str>,
+    all_drives: bool,
+) -> Vec<(&'static str, String)> {
+    let mut params = vec![
+        ("q", query.to_string()),
+        ("pageSize", max.to_string()),
+        (
+            "fields",
+            "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents)".to_string(),
+        ),
+        ("supportsAllDrives", "true".to_string()),
+        ("includeItemsFromAllDrives", "true".to_string()),
+    ];
+    if let Some(token) = page_token {
+        params.push(("pageToken", token.to_string()));
+    }
+    if all_drives {
+        params.push(("corpora", "allDrives".to_string()));
+    }
+    params
+}
+
+fn parse_list_payload(payload: &Value) -> Result<DrivePage, AppError> {
+    if payload.get("incompleteSearch").and_then(Value::as_bool) == Some(true) {
+        return Err(AppError::drive_failure(
+            "Drive search incomplete across shared drives; account-wide completeness unavailable for this response",
+        ));
+    }
+    let files = payload
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|file| view_from_live_json(&file))
+        .collect();
+    Ok(DrivePage {
+        files,
+        next_page_token: payload
+            .get("nextPageToken")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+    })
+}
+
+fn fixture_page(
+    files: Vec<FileView>,
+    max: usize,
+    page_token: Option<&str>,
+) -> Result<DrivePage, AppError> {
+    let offset = page_token
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| AppError::invalid_drive_input("invalid Drive fixture page token"))
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if offset > files.len() {
+        return Err(AppError::invalid_drive_input(
+            "invalid Drive fixture page token",
+        ));
+    }
+    let end = offset.saturating_add(max).min(files.len());
+    Ok(DrivePage {
+        files: files[offset..end].to_vec(),
+        next_page_token: (end < files.len()).then(|| end.to_string()),
+    })
+}
+
 fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
     haystack
         .to_ascii_lowercase()
@@ -877,9 +951,13 @@ fn upload_to_fixture(
 
 #[cfg(test)]
 mod tests {
-    use super::{DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, media_request, metadata_request};
+    use super::{
+        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, list_params, media_request, metadata_request,
+        parse_list_payload,
+    };
 
     use reqwest::blocking::Client;
+    use serde_json::json;
 
     #[test]
     fn drive_media_requests_use_longer_timeout_than_metadata_requests() {
@@ -894,5 +972,36 @@ mod tests {
         assert_eq!(metadata.timeout().copied(), Some(DRIVE_METADATA_TIMEOUT));
         assert_eq!(media.timeout().copied(), Some(DRIVE_MEDIA_TIMEOUT));
         assert!(DRIVE_MEDIA_TIMEOUT > DRIVE_METADATA_TIMEOUT);
+    }
+
+    #[test]
+    fn live_list_parameters_bind_corpus_and_continuation() {
+        let first = list_params("trashed = false", 100, None, true);
+        assert!(first.contains(&("corpora", "allDrives".to_string())));
+        assert!(!first.iter().any(|(key, _)| *key == "pageToken"));
+        let second = list_params("trashed = false", 100, Some("opaque-page"), true);
+        assert!(second.contains(&("pageToken", "opaque-page".to_string())));
+        let default = list_params("trashed = false", 100, None, false);
+        assert!(!default.iter().any(|(key, _)| *key == "corpora"));
+    }
+
+    #[test]
+    fn live_list_payload_preserves_continuation_and_refuses_incomplete_search() {
+        let page = parse_list_payload(&json!({
+            "files": [{"id": "file-1", "name": "note", "mimeType": "text/plain"}],
+            "nextPageToken": "opaque-page",
+        }))
+        .expect("complete first page");
+        assert_eq!(page.files.len(), 1);
+        assert_eq!(page.next_page_token.as_deref(), Some("opaque-page"));
+        let error = parse_list_payload(&json!({
+            "files": [], "incompleteSearch": true,
+        }))
+        .expect_err("incomplete account-wide search must fail");
+        assert!(
+            error
+                .message()
+                .contains("account-wide completeness unavailable")
+        );
     }
 }
