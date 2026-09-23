@@ -60,6 +60,12 @@ pub struct FileView {
     pub parents: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct DrivePage {
+    pub files: Vec<FileView>,
+    pub next_page_token: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DriveSession {
     pub account: String,
@@ -177,16 +183,23 @@ impl DriveSession {
     }
 
     pub fn list(&self, request: &ListRequest) -> Result<Vec<FileView>, AppError> {
+        Ok(self.list_page(request, false)?.files)
+    }
+
+    pub fn list_page(
+        &self,
+        request: &ListRequest,
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
         if let Some(fixture) = &self.fixture {
-            let mut files = fixture
+            let files = fixture
                 .files
                 .iter()
                 .filter(|file| parent_matches(file, request.parent.as_deref()))
                 .filter(|file| query_matches(file, request.query.as_deref().unwrap_or_default()))
                 .map(view_for_file)
                 .collect::<Vec<_>>();
-            files.truncate(request.max);
-            return Ok(files);
+            return fixture_page(files, request.max, request.page_token.as_deref());
         }
 
         let mut clauses = vec!["trashed = false".to_string()];
@@ -200,19 +213,26 @@ impl DriveSession {
         }
         let q = clauses.join(" and ");
 
-        self.list_live(&q, request.max, request.page_token.as_deref())
+        self.list_live(&q, request.max, request.page_token.as_deref(), all_drives)
     }
 
     pub fn search(&self, request: &SearchRequest) -> Result<Vec<FileView>, AppError> {
+        Ok(self.search_page(request, false)?.files)
+    }
+
+    pub fn search_page(
+        &self,
+        request: &SearchRequest,
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
         if let Some(fixture) = &self.fixture {
-            let mut files = fixture
+            let files = fixture
                 .files
                 .iter()
                 .filter(|file| query_matches(file, request.query.as_str()))
                 .map(view_for_file)
                 .collect::<Vec<_>>();
-            files.truncate(request.max);
-            return Ok(files);
+            return fixture_page(files, request.max, request.page_token.as_deref());
         }
 
         let mut q = if request.raw_query {
@@ -226,7 +246,7 @@ impl DriveSession {
             q = format!("({q}) and trashed = false");
         }
 
-        self.list_live(&q, request.max, request.page_token.as_deref())
+        self.list_live(&q, request.max, request.page_token.as_deref(), all_drives)
     }
 
     pub fn get(&self, request: &GetRequest) -> Result<FileView, AppError> {
@@ -453,19 +473,23 @@ impl DriveSession {
         query: &str,
         max: usize,
         page_token: Option<&str>,
-    ) -> Result<Vec<FileView>, AppError> {
+        all_drives: bool,
+    ) -> Result<DrivePage, AppError> {
         let mut params = vec![
             ("q", query.to_string()),
             ("pageSize", max.to_string()),
             (
                 "fields",
-                "nextPageToken,files(id,name,mimeType,size,parents)".to_string(),
+                "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents)".to_string(),
             ),
             ("supportsAllDrives", "true".to_string()),
             ("includeItemsFromAllDrives", "true".to_string()),
         ];
         if let Some(page_token) = page_token {
             params.push(("pageToken", page_token.to_string()));
+        }
+        if all_drives {
+            params.push(("corpora", "allDrives".to_string()));
         }
 
         let response = metadata_request(
@@ -477,6 +501,11 @@ impl DriveSession {
         .send()
         .map_err(|error| AppError::drive_failure(format!("list files request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "list files", None)?;
+        if payload.get("incompleteSearch").and_then(Value::as_bool) == Some(true) {
+            return Err(AppError::drive_failure(
+                "Drive search was incomplete across shared drives; narrow the query and retry",
+            ));
+        }
         let files = payload
             .get("files")
             .and_then(Value::as_array)
@@ -485,7 +514,13 @@ impl DriveSession {
             .into_iter()
             .map(|file| view_from_live_json(&file))
             .collect();
-        Ok(files)
+        Ok(DrivePage {
+            files,
+            next_page_token: payload
+                .get("nextPageToken")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned),
+        })
     }
 
     fn find_existing_by_name(
@@ -498,8 +533,8 @@ impl DriveSession {
             escape_drive_literal(name),
             escape_drive_literal(parent),
         );
-        let files = self.list_live(&query, 1, None)?;
-        Ok(files.into_iter().next())
+        let page = self.list_live(&query, 1, None, false)?;
+        Ok(page.files.into_iter().next())
     }
 
     fn drive_get_json(
@@ -692,6 +727,31 @@ fn query_matches(file: &DriveFile, query: &str) -> bool {
                     || contains_ignore_ascii_case(&file.id, token)
             }
         })
+}
+
+fn fixture_page(
+    files: Vec<FileView>,
+    max: usize,
+    page_token: Option<&str>,
+) -> Result<DrivePage, AppError> {
+    let offset = page_token
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| AppError::invalid_drive_input("invalid Drive fixture page token"))
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if offset > files.len() {
+        return Err(AppError::invalid_drive_input(
+            "invalid Drive fixture page token",
+        ));
+    }
+    let end = offset.saturating_add(max).min(files.len());
+    Ok(DrivePage {
+        files: files[offset..end].to_vec(),
+        next_page_token: (end < files.len()).then(|| end.to_string()),
+    })
 }
 
 fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
