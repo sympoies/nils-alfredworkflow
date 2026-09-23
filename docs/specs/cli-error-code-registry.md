@@ -83,6 +83,7 @@ that promote out of these generic buckets without breaking existing consumers.
 | `NILS_GOOGLE_015` | google | Calendar invalid input |
 | `NILS_GOOGLE_016` | google | Calendar resource not found |
 | `NILS_GOOGLE_017` | google | Calendar runtime failure |
+| `NILS_GOOGLE_018` | google | Drive download exceeds requested byte limit |
 | `NILS_MARKET_001` | market | invalid symbol/amount expression |
 | `NILS_MARKET_002` | market | provider unavailable/rate-limited |
 | `NILS_MEMO_001` | memo-workflow | invalid user input (parse/validation, missing config) |

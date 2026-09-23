@@ -62,6 +62,11 @@ cargo run -p nils-google-cli -- --json -a you@example.com \
   drive download <file_id> --format pdf --out ./downloads/file.pdf --overwrite
 ```
 
+Add `--max-bytes <positive integer>` to either download form to stop reading
+after at most the limit plus one byte. An oversized response returns
+`NILS_GOOGLE_018` and does not create the output artifact; without the flag,
+existing unrestricted downloads remain available.
+
 Upload:
 
 ```bash

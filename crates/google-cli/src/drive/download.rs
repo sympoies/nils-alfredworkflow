@@ -14,6 +14,7 @@ struct DownloadRequest {
     out: Option<PathBuf>,
     format: Option<String>,
     overwrite: bool,
+    max_bytes: Option<usize>,
 }
 
 pub fn execute_download(
@@ -21,7 +22,11 @@ pub fn execute_download(
     args: &[String],
 ) -> Result<NativeDriveResponse, AppError> {
     let request = parse_download_args(args)?;
-    let payload = session.resolve_download(&request.file_id, request.format.as_deref())?;
+    let payload = session.resolve_download(
+        &request.file_id,
+        request.format.as_deref(),
+        request.max_bytes,
+    )?;
     let output_path = resolve_output_path(&payload.file_name, &request)?;
 
     if output_path.exists() && !request.overwrite {
@@ -96,6 +101,7 @@ fn parse_download_args(args: &[String]) -> Result<DownloadRequest, AppError> {
     let mut out = None;
     let mut format = None;
     let mut overwrite = false;
+    let mut max_bytes = None;
     let mut index = 1;
     while index < args.len() {
         match args[index].as_str() {
@@ -119,6 +125,21 @@ fn parse_download_args(args: &[String]) -> Result<DownloadRequest, AppError> {
                 format = Some(value.clone());
             }
             "--overwrite" => overwrite = true,
+            "--max-bytes" => {
+                index += 1;
+                let value = args.get(index).ok_or_else(|| {
+                    AppError::invalid_drive_input("missing value for `--max-bytes`")
+                })?;
+                let parsed = value.parse::<usize>().map_err(|_| {
+                    AppError::invalid_drive_input("`--max-bytes` must be a positive integer")
+                })?;
+                if parsed == 0 || parsed == usize::MAX {
+                    return Err(AppError::invalid_drive_input(
+                        "`--max-bytes` must be a positive integer below usize::MAX",
+                    ));
+                }
+                max_bytes = Some(parsed);
+            }
             value if value.starts_with('-') => {
                 return Err(AppError::invalid_drive_input(format!(
                     "unknown drive download flag `{value}`"
@@ -138,6 +159,7 @@ fn parse_download_args(args: &[String]) -> Result<DownloadRequest, AppError> {
         out,
         format,
         overwrite,
+        max_bytes,
     })
 }
 
@@ -217,6 +239,7 @@ mod tests {
             out: None,
             format: None,
             overwrite: false,
+            max_bytes: None,
         }
     }
 
