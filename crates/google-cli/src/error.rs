@@ -22,6 +22,7 @@ pub const ERROR_CODE_RUNTIME_DRIVE_FAILED: &str = "NILS_GOOGLE_014";
 pub const ERROR_CODE_USER_CALENDAR_INVALID_INPUT: &str = "NILS_GOOGLE_015";
 pub const ERROR_CODE_RUNTIME_CALENDAR_NOT_FOUND: &str = "NILS_GOOGLE_016";
 pub const ERROR_CODE_RUNTIME_CALENDAR_FAILED: &str = "NILS_GOOGLE_017";
+pub const ERROR_CODE_USER_DRIVE_SIZE_LIMIT: &str = "NILS_GOOGLE_018";
 
 #[derive(Debug, Clone)]
 pub struct AppError {
@@ -174,6 +175,14 @@ impl AppError {
             ERROR_CODE_RUNTIME_DRIVE_FAILED,
             message,
             Some(json!({ "kind": "drive_runtime_failure" })),
+        )
+    }
+
+    pub fn drive_size_limit(max_bytes: usize) -> Self {
+        Self::user(
+            ERROR_CODE_USER_DRIVE_SIZE_LIMIT,
+            format!("Drive download exceeds --max-bytes {max_bytes}"),
+            Some(json!({ "kind": "drive_size_limit", "max_bytes": max_bytes })),
         )
     }
 

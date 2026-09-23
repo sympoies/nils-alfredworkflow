@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, hash_map::DefaultHasher};
 use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
+use std::io::Read;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -274,6 +275,7 @@ impl DriveSession {
         &self,
         file_id: &str,
         format: Option<&str>,
+        max_bytes: Option<usize>,
     ) -> Result<DownloadPayload, AppError> {
         if let Some(fixture) = &self.fixture {
             let file = fixture
@@ -289,23 +291,27 @@ impl DriveSession {
                     )));
                 };
 
+                let bytes = content.as_bytes();
+                check_download_size(bytes.len(), max_bytes)?;
                 return Ok(DownloadPayload {
                     file_id: file.id.clone(),
                     file_name: file.name.clone(),
                     mime_type: file.mime_type.clone(),
                     format: Some(format.to_string()),
                     source: "export",
-                    bytes: content.as_bytes().to_vec(),
+                    bytes: bytes.to_vec(),
                 });
             }
 
+            let bytes = file.content.as_bytes();
+            check_download_size(bytes.len(), max_bytes)?;
             return Ok(DownloadPayload {
                 file_id: file.id.clone(),
                 file_name: file.name.clone(),
                 mime_type: file.mime_type.clone(),
                 format: None,
                 source: "download",
-                bytes: file.content.as_bytes().to_vec(),
+                bytes: bytes.to_vec(),
             });
         }
 
@@ -346,6 +352,7 @@ impl DriveSession {
                 response,
                 format!("GET files/{file_id}/export").as_str(),
                 Some(("file", file_id)),
+                max_bytes,
             )?;
             return Ok(DownloadPayload {
                 file_id: file_id.to_string(),
@@ -360,6 +367,7 @@ impl DriveSession {
         let bytes = self.drive_get_bytes(
             format!("files/{file_id}?alt=media&supportsAllDrives=true").as_str(),
             Some(("file", file_id)),
+            max_bytes,
         )?;
         Ok(DownloadPayload {
             file_id: file_id.to_string(),
@@ -523,6 +531,7 @@ impl DriveSession {
         &self,
         path_and_query: &str,
         not_found: Option<(&str, &str)>,
+        max_bytes: Option<usize>,
     ) -> Result<Vec<u8>, AppError> {
         let url = format!("{DRIVE_API_BASE}/{path_and_query}");
         let response = media_request(self.client.get(&url).bearer_auth(&self.access_token))
@@ -532,6 +541,7 @@ impl DriveSession {
             response,
             format!("GET {path_and_query}").as_str(),
             not_found,
+            max_bytes,
         )
     }
 }
@@ -575,9 +585,10 @@ fn parse_drive_json_response(
 }
 
 fn parse_drive_bytes_response(
-    response: Response,
+    mut response: Response,
     context: &str,
     not_found: Option<(&str, &str)>,
+    max_bytes: Option<usize>,
 ) -> Result<Vec<u8>, AppError> {
     let status = response.status();
     if status.as_u16() == 404
@@ -587,7 +598,9 @@ fn parse_drive_bytes_response(
     }
 
     if !status.is_success() {
-        let body = response.text().unwrap_or_default();
+        let mut body_bytes = Vec::new();
+        let _ = response.take(16_384).read_to_end(&mut body_bytes);
+        let body = String::from_utf8_lossy(&body_bytes).into_owned();
         let detail = extract_error_message(&body).unwrap_or(body);
         return Err(AppError::drive_failure(format!(
             "{context} failed with HTTP {}: {}",
@@ -596,6 +609,15 @@ fn parse_drive_bytes_response(
         )));
     }
 
+    if let Some(max) = max_bytes {
+        if response
+            .content_length()
+            .is_some_and(|length| length > max as u64)
+        {
+            return Err(AppError::drive_size_limit(max));
+        }
+        return read_bounded_bytes(&mut response, max, context);
+    }
     response
         .bytes()
         .map(|value| value.to_vec())
@@ -604,6 +626,65 @@ fn parse_drive_bytes_response(
                 "{context} succeeded but failed reading bytes: {error}"
             ))
         })
+}
+
+fn check_download_size(length: usize, max_bytes: Option<usize>) -> Result<(), AppError> {
+    if let Some(max) = max_bytes
+        && length > max
+    {
+        return Err(AppError::drive_size_limit(max));
+    }
+    Ok(())
+}
+
+fn read_bounded_bytes(
+    reader: &mut impl Read,
+    max: usize,
+    context: &str,
+) -> Result<Vec<u8>, AppError> {
+    let mut bytes = Vec::new();
+    reader
+        .take((max as u64) + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| {
+            AppError::drive_failure(format!(
+                "{context} succeeded but failed reading bytes: {error}"
+            ))
+        })?;
+    check_download_size(bytes.len(), Some(max))?;
+    Ok(bytes)
+}
+
+#[cfg(test)]
+mod bounded_download_tests {
+    use std::io::{self, Read};
+
+    use super::read_bounded_bytes;
+
+    struct CountingReader {
+        remaining: usize,
+        consumed: usize,
+    }
+
+    impl Read for CountingReader {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let count = buf.len().min(self.remaining);
+            buf[..count].fill(b'x');
+            self.remaining -= count;
+            self.consumed += count;
+            Ok(count)
+        }
+    }
+
+    #[test]
+    fn bounded_reader_never_consumes_more_than_limit_plus_one() {
+        let mut reader = CountingReader {
+            remaining: 10_000_000,
+            consumed: 0,
+        };
+        assert!(read_bounded_bytes(&mut reader, 120_000, "fixture").is_err());
+        assert_eq!(reader.consumed, 120_001);
+    }
 }
 
 fn extract_error_message(body: &str) -> Option<String> {

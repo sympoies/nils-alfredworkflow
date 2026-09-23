@@ -165,6 +165,76 @@ fn drive_download_supports_export_format() {
 }
 
 #[test]
+fn drive_download_max_bytes_rejects_oversized_content_without_creating_artifact() {
+    let temp = tempdir().expect("tempdir");
+    seed_auth(temp.path());
+    let fixture = write_drive_fixture(temp.path());
+    let out_path = temp.path().join("oversized.txt");
+
+    let output = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "drive",
+            "download",
+            "file-123",
+            "--max-bytes",
+            "4",
+            "--out",
+            out_path.to_string_lossy().as_ref(),
+        ],
+        &[(
+            "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+            fixture.to_string_lossy().as_ref(),
+        )],
+    );
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        json_output(&output)
+            .get("error")
+            .and_then(|error| error.get("code"))
+            .and_then(Value::as_str),
+        Some("NILS_GOOGLE_018")
+    );
+    assert!(!out_path.exists());
+}
+
+#[test]
+fn drive_export_max_bytes_accepts_exact_bound() {
+    let temp = tempdir().expect("tempdir");
+    seed_auth(temp.path());
+    let fixture = write_drive_fixture(temp.path());
+    let out_path = temp.path().join("exact.pdf");
+
+    let output = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "drive",
+            "download",
+            "file-123",
+            "--format",
+            "pdf",
+            "--max-bytes",
+            "%PDF-1.7 fixture".len().to_string().as_str(),
+            "--out",
+            out_path.to_string_lossy().as_ref(),
+        ],
+        &[(
+            "GOOGLE_CLI_DRIVE_FIXTURE_PATH",
+            fixture.to_string_lossy().as_ref(),
+        )],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        std::fs::read(&out_path).expect("read output").len(),
+        "%PDF-1.7 fixture".len()
+    );
+}
+
+#[test]
 fn drive_download_rejects_existing_path_without_overwrite() {
     let temp = tempdir().expect("tempdir");
     seed_auth(temp.path());
