@@ -9,6 +9,8 @@ use std::time::Duration;
 use reqwest::blocking::{Client, RequestBuilder, Response, multipart};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_json::json;
+use sha2::{Digest, Sha256};
 use workflow_common::http::build_blocking_client;
 
 use crate::auth::account::resolve_account;
@@ -41,6 +43,16 @@ pub struct DriveFile {
     #[serde(default)]
     pub parents: Vec<String>,
     #[serde(default)]
+    pub md5_checksum: Option<String>,
+    #[serde(default)]
+    pub sha256_checksum: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub modified_time: Option<String>,
+    #[serde(default)]
+    pub trashed: bool,
+    #[serde(default)]
     pub content: String,
     #[serde(default)]
     pub export_formats: BTreeMap<String, String>,
@@ -59,6 +71,11 @@ pub struct FileView {
     pub mime_type: String,
     pub size_bytes: u64,
     pub parents: Vec<String>,
+    pub md5_checksum: Option<String>,
+    pub sha256_checksum: Option<String>,
+    pub version: Option<String>,
+    pub modified_time: Option<String>,
+    pub trashed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -74,6 +91,8 @@ pub struct DriveSession {
     pub access_token: String,
     client: Client,
     fixture: Option<DriveFixtureStore>,
+    api_base: String,
+    upload_base: String,
 }
 
 #[derive(Debug, Clone)]
@@ -180,6 +199,8 @@ impl DriveSession {
             access_token: active_token.access_token,
             client,
             fixture,
+            api_base: DRIVE_API_BASE.to_string(),
+            upload_base: DRIVE_UPLOAD_BASE.to_string(),
         })
     }
 
@@ -196,6 +217,7 @@ impl DriveSession {
             let files = fixture
                 .files
                 .iter()
+                .filter(|file| !file.trashed)
                 .filter(|file| parent_matches(file, request.parent.as_deref()))
                 .filter(|file| query_matches(file, request.query.as_deref().unwrap_or_default()))
                 .map(view_for_file)
@@ -230,6 +252,7 @@ impl DriveSession {
             let files = fixture
                 .files
                 .iter()
+                .filter(|file| !file.trashed)
                 .filter(|file| query_matches(file, request.query.as_str()))
                 .map(view_for_file)
                 .collect::<Vec<_>>();
@@ -262,7 +285,7 @@ impl DriveSession {
 
         let response = self.drive_get_json(
             format!(
-                "files/{}?fields=id,name,mimeType,size,parents&supportsAllDrives=true",
+                "files/{}?fields=id,name,mimeType,size,parents,md5Checksum,sha256Checksum,version,modifiedTime,trashed&supportsAllDrives=true",
                 request.file_id
             )
             .as_str(),
@@ -337,7 +360,7 @@ impl DriveSession {
             })?;
             let response = media_request(
                 self.client
-                    .get(format!("{DRIVE_API_BASE}/files/{file_id}/export"))
+                    .get(format!("{}/files/{file_id}/export", self.api_base))
                     .bearer_auth(&self.access_token)
                     .query(&[
                         ("mimeType", export_mime.as_str()),
@@ -415,11 +438,14 @@ impl DriveSession {
 
         let endpoint = if let Some(existing) = &replaced {
             format!(
-                "{DRIVE_UPLOAD_BASE}/files/{}?uploadType=multipart&supportsAllDrives=true",
-                existing.id
+                "{}/files/{}?uploadType=multipart&supportsAllDrives=true",
+                self.upload_base, existing.id
             )
         } else {
-            format!("{DRIVE_UPLOAD_BASE}/files?uploadType=multipart&supportsAllDrives=true")
+            format!(
+                "{}/files?uploadType=multipart&supportsAllDrives=true",
+                self.upload_base
+            )
         };
 
         let mut metadata = serde_json::Map::new();
@@ -464,7 +490,12 @@ impl DriveSession {
         .send()
         .map_err(|error| AppError::drive_failure(format!("upload request failed: {error}")))?;
         let payload = parse_drive_json_response(response, "upload file", None)?;
-        let file = view_from_live_json(&payload);
+        let file_id = payload.get("id").and_then(Value::as_str).ok_or_else(|| {
+            AppError::drive_failure("upload succeeded without a file ID; read-back is unavailable")
+        })?;
+        let file = self.get(&GetRequest {
+            file_id: file_id.to_string(),
+        })?;
 
         Ok(UploadResult {
             replaced: replaced.is_some(),
@@ -473,6 +504,218 @@ impl DriveSession {
             source_path: source_path.display().to_string(),
             convert_requested: request.convert,
             file,
+        })
+    }
+
+    pub fn create_folder(&self, name: &str, parent: &str) -> Result<FileView, AppError> {
+        if self.fixture.is_some() {
+            return Ok(FileView {
+                id: synthetic_file_id(
+                    &self.account,
+                    name,
+                    parent,
+                    "application/vnd.google-apps.folder",
+                ),
+                name: name.to_string(),
+                mime_type: "application/vnd.google-apps.folder".to_string(),
+                size_bytes: 0,
+                parents: vec![parent.to_string()],
+                md5_checksum: None,
+                sha256_checksum: None,
+                version: Some("1".to_string()),
+                modified_time: None,
+                trashed: Some(false),
+            });
+        }
+        let response = metadata_request(
+            self.client.post(format!("{}/files", self.api_base))
+                .bearer_auth(&self.access_token)
+                .query(&[("supportsAllDrives", "true")])
+                .json(&json!({"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent]})),
+        ).send().map_err(|error| AppError::drive_failure(format!("create folder request failed: {error}")))?;
+        self.write_and_read(response, "create folder", None, None)
+    }
+
+    pub fn update_content(
+        &self,
+        file_id: &str,
+        local_path: PathBuf,
+        mime_type: Option<&str>,
+    ) -> Result<FileView, AppError> {
+        if !local_path.is_file() {
+            return Err(AppError::invalid_drive_input("update source is not a file"));
+        }
+        let bytes = fs::read(&local_path).map_err(|error| {
+            AppError::drive_failure(format!("failed to read update source: {error}"))
+        })?;
+        let mime_type = resolve_mime_type(&local_path, mime_type)?;
+        if self.fixture.is_some() {
+            let mut file = self.get(&GetRequest {
+                file_id: file_id.to_string(),
+            })?;
+            file.size_bytes = bytes.len() as u64;
+            file.mime_type = mime_type;
+            file.sha256_checksum = Some(hex::encode(Sha256::digest(&bytes)));
+            file.version = Some(next_fixture_version(file.version.as_deref()));
+            return Ok(file);
+        }
+        let file_part = multipart::Part::bytes(bytes)
+            .mime_str(&mime_type)
+            .map_err(|error| {
+                AppError::invalid_drive_input(format!("invalid update MIME type: {error}"))
+            })?;
+        let metadata_part = multipart::Part::text("{}")
+            .mime_str("application/json; charset=utf-8")
+            .map_err(|error| {
+                AppError::drive_failure(format!("invalid update metadata: {error}"))
+            })?;
+        let response = media_request(
+            self.client
+                .patch(format!("{}/files/{file_id}", self.upload_base))
+                .bearer_auth(&self.access_token)
+                .query(&[("uploadType", "multipart"), ("supportsAllDrives", "true")])
+                .multipart(
+                    multipart::Form::new()
+                        .part("metadata", metadata_part)
+                        .part("file", file_part),
+                ),
+        )
+        .send()
+        .map_err(|error| {
+            AppError::drive_failure(format!("update content request failed: {error}"))
+        })?;
+        self.write_and_read(response, "update content", Some(file_id), Some(file_id))
+    }
+
+    pub fn rename(&self, file_id: &str, name: &str) -> Result<FileView, AppError> {
+        if self.fixture.is_some() {
+            let mut file = self.get(&GetRequest {
+                file_id: file_id.to_string(),
+            })?;
+            file.name = name.to_string();
+            file.version = Some(next_fixture_version(file.version.as_deref()));
+            return Ok(file);
+        }
+        self.patch_metadata(file_id, json!({"name": name}), &[], "rename file")
+    }
+
+    pub fn move_file(&self, file_id: &str, parent: &str, from: &str) -> Result<FileView, AppError> {
+        let current = self.get(&GetRequest {
+            file_id: file_id.to_string(),
+        })?;
+        if !current.parents.iter().any(|existing| existing == from) {
+            return Err(AppError::invalid_drive_input(
+                "--from is not a current parent",
+            ));
+        }
+        if self.fixture.is_some() {
+            let mut file = current;
+            file.parents = vec![parent.to_string()];
+            file.version = Some(next_fixture_version(file.version.as_deref()));
+            return Ok(file);
+        }
+        self.patch_metadata(
+            file_id,
+            json!({}),
+            &[("addParents", parent), ("removeParents", from)],
+            "move file",
+        )
+    }
+
+    pub fn copy_file(
+        &self,
+        file_id: &str,
+        parent: &str,
+        name: Option<&str>,
+    ) -> Result<FileView, AppError> {
+        if self.fixture.is_some() {
+            let mut file = self.get(&GetRequest {
+                file_id: file_id.to_string(),
+            })?;
+            file.name = name.unwrap_or(&file.name).to_string();
+            file.id = synthetic_file_id(&self.account, &file.name, parent, &file.mime_type);
+            file.parents = vec![parent.to_string()];
+            file.version = Some("1".to_string());
+            return Ok(file);
+        }
+        let mut body = json!({"parents": [parent]});
+        if let Some(name) = name {
+            body["name"] = Value::String(name.to_string());
+        }
+        let response = metadata_request(
+            self.client
+                .post(format!("{}/files/{file_id}/copy", self.api_base))
+                .bearer_auth(&self.access_token)
+                .query(&[("supportsAllDrives", "true")])
+                .json(&body),
+        )
+        .send()
+        .map_err(|error| AppError::drive_failure(format!("copy file request failed: {error}")))?;
+        self.write_and_read(response, "copy file", None, Some(file_id))
+    }
+
+    pub fn set_trashed(&self, file_id: &str, trashed: bool) -> Result<FileView, AppError> {
+        if self.fixture.is_some() {
+            let mut file = self.get(&GetRequest {
+                file_id: file_id.to_string(),
+            })?;
+            file.trashed = Some(trashed);
+            file.version = Some(next_fixture_version(file.version.as_deref()));
+            return Ok(file);
+        }
+        self.patch_metadata(
+            file_id,
+            json!({"trashed": trashed}),
+            &[],
+            if trashed {
+                "trash file"
+            } else {
+                "untrash file"
+            },
+        )
+    }
+
+    fn patch_metadata(
+        &self,
+        file_id: &str,
+        body: Value,
+        extra_query: &[(&str, &str)],
+        context: &str,
+    ) -> Result<FileView, AppError> {
+        let mut query = vec![("supportsAllDrives", "true")];
+        query.extend_from_slice(extra_query);
+        let response = metadata_request(
+            self.client
+                .patch(format!("{}/files/{file_id}", self.api_base))
+                .bearer_auth(&self.access_token)
+                .query(&query)
+                .json(&body),
+        )
+        .send()
+        .map_err(|error| AppError::drive_failure(format!("{context} request failed: {error}")))?;
+        self.write_and_read(response, context, Some(file_id), Some(file_id))
+    }
+
+    fn write_and_read(
+        &self,
+        response: Response,
+        context: &str,
+        fallback_id: Option<&str>,
+        not_found_id: Option<&str>,
+    ) -> Result<FileView, AppError> {
+        let payload =
+            parse_drive_json_response(response, context, not_found_id.map(|id| ("file", id)))?;
+        let file_id = payload
+            .get("id")
+            .and_then(Value::as_str)
+            .or(fallback_id)
+            .ok_or_else(|| {
+                AppError::drive_failure(format!(
+                    "{context} succeeded without a file ID; read-back is unavailable"
+                ))
+            })?;
+        self.get(&GetRequest {
+            file_id: file_id.to_string(),
         })
     }
 
@@ -487,7 +730,7 @@ impl DriveSession {
 
         let response = metadata_request(
             self.client
-                .get(format!("{DRIVE_API_BASE}/files"))
+                .get(format!("{}/files", self.api_base))
                 .bearer_auth(&self.access_token)
                 .query(&params),
         )
@@ -516,7 +759,7 @@ impl DriveSession {
         path_and_query: &str,
         not_found: Option<(&str, &str)>,
     ) -> Result<Value, AppError> {
-        let url = format!("{DRIVE_API_BASE}/{path_and_query}");
+        let url = format!("{}/{path_and_query}", self.api_base);
         let response = metadata_request(self.client.get(&url).bearer_auth(&self.access_token))
             .send()
             .map_err(|error| AppError::drive_failure(format!("GET {url} failed: {error}")))?;
@@ -533,7 +776,7 @@ impl DriveSession {
         not_found: Option<(&str, &str)>,
         max_bytes: Option<usize>,
     ) -> Result<Vec<u8>, AppError> {
-        let url = format!("{DRIVE_API_BASE}/{path_and_query}");
+        let url = format!("{}/{path_and_query}", self.api_base);
         let response = media_request(self.client.get(&url).bearer_auth(&self.access_token))
             .send()
             .map_err(|error| AppError::drive_failure(format!("GET {url} failed: {error}")))?;
@@ -544,6 +787,14 @@ impl DriveSession {
             max_bytes,
         )
     }
+}
+
+fn next_fixture_version(current: Option<&str>) -> String {
+    current
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0)
+        .saturating_add(1)
+        .to_string()
 }
 
 fn metadata_request(request: RequestBuilder) -> RequestBuilder {
@@ -706,6 +957,11 @@ fn view_for_file(file: &DriveFile) -> FileView {
         mime_type: file.mime_type.clone(),
         size_bytes: file.size_bytes,
         parents: file.parents.clone(),
+        md5_checksum: file.md5_checksum.clone(),
+        sha256_checksum: file.sha256_checksum.clone(),
+        version: file.version.clone(),
+        modified_time: file.modified_time.clone(),
+        trashed: Some(file.trashed),
     }
 }
 
@@ -742,6 +998,23 @@ fn view_from_live_json(file: &Value) -> FileView {
                     .collect()
             })
             .unwrap_or_default(),
+        md5_checksum: file
+            .get("md5Checksum")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        sha256_checksum: file
+            .get("sha256Checksum")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        version: file
+            .get("version")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        modified_time: file
+            .get("modifiedTime")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        trashed: file.get("trashed").and_then(Value::as_bool),
     }
 }
 
@@ -787,7 +1060,7 @@ fn list_params(
         ("pageSize", max.to_string()),
         (
             "fields",
-            "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents)".to_string(),
+            "nextPageToken,incompleteSearch,files(id,name,mimeType,size,parents,md5Checksum,sha256Checksum,version,modifiedTime,trashed)".to_string(),
         ),
         ("supportsAllDrives", "true".to_string()),
         ("includeItemsFromAllDrives", "true".to_string()),
@@ -1018,6 +1291,17 @@ fn upload_to_fixture(
         mime_type: inferred_mime_type.clone(),
         size_bytes,
         parents: vec![parent],
+        md5_checksum: None,
+        sha256_checksum: Some(hex::encode(Sha256::digest(
+            fs::read(&source_path).map_err(|error| {
+                AppError::drive_failure(format!("failed to read upload source: {error}"))
+            })?,
+        ))),
+        version: Some(next_fixture_version(
+            replaced.and_then(|file| file.version.as_deref()),
+        )),
+        modified_time: None,
+        trashed: Some(false),
     };
 
     Ok(UploadResult {
@@ -1033,12 +1317,355 @@ fn upload_to_fixture(
 #[cfg(test)]
 mod tests {
     use super::{
-        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, list_params, media_request, metadata_request,
-        parse_list_payload,
+        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, DriveSession, UploadRequest, list_params,
+        media_request, metadata_request, parse_list_payload, view_from_live_json,
     };
 
     use reqwest::blocking::Client;
     use serde_json::json;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    fn mock_session(base: String) -> DriveSession {
+        DriveSession {
+            account: "test@example.com".to_string(),
+            account_source: "explicit".to_string(),
+            access_token: "test-token".to_string(),
+            client: Client::new(),
+            fixture: None,
+            api_base: base.clone(),
+            upload_base: base,
+        }
+    }
+
+    #[tokio::test]
+    async fn live_mkdir_returns_get_metadata_not_create_echo() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/files"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"id": "new-id", "parents": []})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/files/new-id"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "new-id", "name": "new", "mimeType": "application/vnd.google-apps.folder",
+                "parents": ["parent-id"], "version": "7", "trashed": false
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let base = server.uri();
+        let file = tokio::task::spawn_blocking(move || {
+            mock_session(base).create_folder("new", "parent-id")
+        })
+        .await
+        .expect("join")
+        .expect("create folder");
+        assert_eq!(file.parents, ["parent-id"]);
+        assert_eq!(file.version.as_deref(), Some("7"));
+        let requests = server.received_requests().await.expect("recorded requests");
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method.as_str(), "POST");
+        assert_eq!(requests[0].url.path(), "/files");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&requests[0].body).expect("body"),
+            json!({"name": "new", "mimeType": "application/vnd.google-apps.folder", "parents": ["parent-id"]})
+        );
+        assert_eq!(requests[1].method.as_str(), "GET");
+    }
+
+    #[tokio::test]
+    async fn live_upload_rechecks_file_metadata() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/files"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"id": "uploaded-id", "parents": [], "size": "0"})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/files/uploaded-id"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "uploaded-id", "name": "report.txt", "mimeType": "text/plain",
+                "parents": ["parent-id"], "size": "9", "version": "3", "trashed": false
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("report.txt");
+        std::fs::write(&source, b"new bytes").expect("source");
+        let base = server.uri();
+        let result = tokio::task::spawn_blocking(move || {
+            mock_session(base).upload(&UploadRequest {
+                local_path: source,
+                parent: Some("parent-id".to_string()),
+                name: None,
+                mime_type: Some("text/plain".to_string()),
+                replace: false,
+                convert: false,
+            })
+        })
+        .await
+        .expect("join")
+        .expect("upload");
+        assert_eq!(result.file.parents, ["parent-id"]);
+        assert_eq!(result.file.size_bytes, 9);
+        let requests = server.received_requests().await.expect("recorded requests");
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method.as_str(), "POST");
+        assert_eq!(
+            requests[0]
+                .url
+                .query_pairs()
+                .find(|(key, _)| key == "uploadType")
+                .map(|(_, value)| value.into_owned())
+                .as_deref(),
+            Some("multipart")
+        );
+        assert_eq!(requests[1].method.as_str(), "GET");
+    }
+
+    #[tokio::test]
+    async fn live_write_methods_recheck_server_metadata() {
+        for action in ["rename", "copy", "trash", "untrash", "update"] {
+            let server = MockServer::start().await;
+            let copied = action == "copy";
+            let target = if copied { "copied-id" } else { "file-1" };
+            let method_name = if copied { "POST" } else { "PATCH" };
+            let mutation_path = if copied {
+                "/files/file-1/copy"
+            } else {
+                "/files/file-1"
+            };
+            Mock::given(method(method_name))
+                .and(path(mutation_path))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(json!({"id": target, "name": "stale"})),
+                )
+                .expect(1)
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path(format!("/files/{target}")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "id": target, "name": "authoritative", "mimeType": "text/plain",
+                    "parents": ["parent-id"], "size": "9", "version": "77", "trashed": action == "trash"
+                })))
+                .expect(1)
+                .mount(&server).await;
+            let temp = tempfile::tempdir().expect("tempdir");
+            let source = temp.path().join("replacement.txt");
+            std::fs::write(&source, b"new bytes").expect("source");
+            let base = server.uri();
+            let file = tokio::task::spawn_blocking(move || {
+                let session = mock_session(base);
+                match action {
+                    "rename" => session.rename("file-1", "new-name"),
+                    "copy" => session.copy_file("file-1", "parent-id", Some("new-copy")),
+                    "trash" => session.set_trashed("file-1", true),
+                    "untrash" => session.set_trashed("file-1", false),
+                    "update" => session.update_content("file-1", source, Some("text/plain")),
+                    _ => unreachable!(),
+                }
+            })
+            .await
+            .expect("join")
+            .expect("write");
+            assert_eq!(file.name, "authoritative", "{action}");
+            assert_eq!(file.version.as_deref(), Some("77"), "{action}");
+            let requests = server.received_requests().await.expect("recorded requests");
+            assert_eq!(requests.len(), 2, "{action}");
+            assert_eq!(requests[0].method.as_str(), method_name, "{action}");
+            assert_eq!(requests[0].url.path(), mutation_path, "{action}");
+            assert_eq!(requests[1].method.as_str(), "GET", "{action}");
+            if action == "update" {
+                assert_eq!(
+                    requests[0]
+                        .url
+                        .query_pairs()
+                        .find(|(key, _)| key == "uploadType")
+                        .map(|(_, value)| value.into_owned())
+                        .as_deref(),
+                    Some("multipart")
+                );
+                assert!(String::from_utf8_lossy(&requests[0].body).contains("new bytes"));
+            } else {
+                let body = serde_json::from_slice::<serde_json::Value>(&requests[0].body)
+                    .expect("JSON body");
+                match action {
+                    "rename" => assert_eq!(body, json!({"name": "new-name"})),
+                    "copy" => {
+                        assert_eq!(body, json!({"name": "new-copy", "parents": ["parent-id"]}))
+                    }
+                    "trash" => assert_eq!(body, json!({"trashed": true})),
+                    "untrash" => assert_eq!(body, json!({"trashed": false})),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn live_move_checks_old_parent_and_uses_paired_parent_update() {
+        let server = MockServer::start().await;
+        let reads = Arc::new(AtomicUsize::new(0));
+        let counts = reads.clone();
+        Mock::given(method("GET"))
+            .and(path("/files/file-1"))
+            .respond_with(move |_: &wiremock::Request| {
+                let first = counts.fetch_add(1, Ordering::SeqCst) == 0;
+                ResponseTemplate::new(200).set_body_json(json!({
+                    "id": "file-1", "name": "file.txt", "mimeType": "text/plain",
+                    "parents": [if first { "old-id" } else { "new-id" }],
+                    "version": if first { "10" } else { "11" }, "trashed": false
+                }))
+            })
+            .expect(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("PATCH"))
+            .and(path("/files/file-1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id": "file-1"})))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let base = server.uri();
+        let file = tokio::task::spawn_blocking(move || {
+            mock_session(base).move_file("file-1", "new-id", "old-id")
+        })
+        .await
+        .expect("join")
+        .expect("move");
+        assert_eq!(file.parents, ["new-id"]);
+        assert_eq!(file.version.as_deref(), Some("11"));
+        let requests = server.received_requests().await.expect("recorded requests");
+        assert_eq!(requests.len(), 3);
+        assert_eq!(
+            requests
+                .iter()
+                .map(|request| request.method.as_str())
+                .collect::<Vec<_>>(),
+            ["GET", "PATCH", "GET"]
+        );
+        let query = requests[1]
+            .url
+            .query_pairs()
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert_eq!(
+            query.get("addParents").map(|value| value.as_ref()),
+            Some("new-id")
+        );
+        assert_eq!(
+            query.get("removeParents").map(|value| value.as_ref()),
+            Some("old-id")
+        );
+    }
+
+    #[tokio::test]
+    async fn live_write_failures_preserve_missing_target_and_readback_uncertainty() {
+        let missing = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/files/file-1"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({"error": {"message": "not found"}})),
+            )
+            .expect(1)
+            .mount(&missing)
+            .await;
+        let base = missing.uri();
+        let error = tokio::task::spawn_blocking(move || mock_session(base).rename("file-1", "new"))
+            .await
+            .expect("join")
+            .expect_err("missing target");
+        assert_eq!(error.code(), "NILS_GOOGLE_013");
+
+        let absent_id = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/files"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"name": "stale"})))
+            .expect(1)
+            .mount(&absent_id)
+            .await;
+        let base = absent_id.uri();
+        let error = tokio::task::spawn_blocking(move || {
+            mock_session(base).create_folder("new", "parent-id")
+        })
+        .await
+        .expect("join")
+        .expect_err("missing created ID");
+        assert_eq!(error.code(), "NILS_GOOGLE_014");
+        assert_eq!(
+            absent_id.received_requests().await.expect("requests").len(),
+            1
+        );
+
+        let failed_readback = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/files/file-1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id": "file-1"})))
+            .expect(1)
+            .mount(&failed_readback)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/files/file-1"))
+            .respond_with(ResponseTemplate::new(503))
+            .expect(1)
+            .mount(&failed_readback)
+            .await;
+        let base = failed_readback.uri();
+        let error = tokio::task::spawn_blocking(move || mock_session(base).rename("file-1", "new"))
+            .await
+            .expect("join")
+            .expect_err("readback failed");
+        assert_eq!(error.code(), "NILS_GOOGLE_014");
+        assert_eq!(
+            failed_readback
+                .received_requests()
+                .await
+                .expect("requests")
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn get_metadata_preserves_write_verification_fields() {
+        let view = view_from_live_json(&json!({
+            "id": "file-1",
+            "name": "result.txt",
+            "mimeType": "text/plain",
+            "size": "7",
+            "parents": ["folder-1"],
+            "md5Checksum": "md5-value",
+            "sha256Checksum": "sha256-value",
+            "version": "42",
+            "modifiedTime": "2026-09-24T00:00:00Z",
+            "trashed": false
+        }));
+        let value = serde_json::to_value(view).expect("view JSON");
+        assert_eq!(value["md5_checksum"], "md5-value");
+        assert_eq!(value["sha256_checksum"], "sha256-value");
+        assert_eq!(value["version"], "42");
+        assert_eq!(value["modified_time"], "2026-09-24T00:00:00Z");
+        assert_eq!(value["trashed"], false);
+    }
 
     #[test]
     fn drive_media_requests_use_longer_timeout_than_metadata_requests() {

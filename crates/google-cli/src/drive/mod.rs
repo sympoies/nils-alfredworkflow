@@ -3,6 +3,7 @@ pub mod download;
 pub mod mime;
 pub mod read;
 pub mod upload;
+pub mod write;
 
 use std::ffi::OsString;
 
@@ -31,11 +32,20 @@ pub fn execute_native(
 ) -> Result<NativeDriveResponse, AppError> {
     let Some(subcommand) = invocation.path.get(1) else {
         return Err(AppError::invalid_drive_input(
-            "missing drive subcommand; expected one of ls|search|get|download|upload",
+            "missing drive subcommand; expected one of ls|search|get|download|upload|mkdir|update|rename|move|copy|trash|untrash",
         ));
     };
 
     let subcommand = subcommand.to_string_lossy().to_string();
+    let is_write = matches!(
+        subcommand.as_str(),
+        "mkdir" | "update" | "rename" | "move" | "copy" | "trash" | "untrash"
+    );
+    if is_write && global.account.is_none() {
+        return Err(AppError::invalid_drive_input(
+            "Drive writes require explicit --account",
+        ));
+    }
     let session = DriveSession::from_global(global)?;
     let args = os_strings_to_strings(&invocation.args);
 
@@ -45,6 +55,9 @@ pub fn execute_native(
         "get" => read::execute_get(&session, &args),
         "download" => download::execute_download(&session, &args),
         "upload" => upload::execute_upload(&session, &args),
+        "mkdir" | "update" | "rename" | "move" | "copy" | "trash" | "untrash" => {
+            write::execute_write(&session, subcommand.as_str(), &args)
+        }
         unknown => Err(AppError::invalid_drive_input(format!(
             "unknown drive subcommand `{unknown}`"
         ))),

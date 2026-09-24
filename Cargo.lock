@@ -1860,6 +1860,7 @@ dependencies = [
  "google-apis-common",
  "google-drive3",
  "google-gmail1",
+ "hex",
  "keyring",
  "mail-builder",
  "mime_guess",
@@ -1868,7 +1869,9 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
+ "tokio",
  "wiremock",
  "yup-oauth2",
 ]

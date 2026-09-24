@@ -26,6 +26,8 @@ google-gmail1 = "=7.0.0"
 keyring = "=4.2.0"
 mail-builder = "=1.0.0"
 mime_guess = "=2.0.5"
+sha2 = "=0.10.9"
+hex = "=0.4.3"
 workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["http"] }
 open = "=5.4.4"
 reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
@@ -34,6 +36,7 @@ yup-oauth2 = "=12.1.2"
 [dev-dependencies]
 tempfile.workspace = true
 wiremock = "=0.6.5"
+tokio = { version = "=1.52.3", features = ["rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true
