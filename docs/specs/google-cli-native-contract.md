@@ -16,7 +16,7 @@ Define the native Rust command contract for `google-cli` over the repo-scoped Go
   - `auth credentials set|list`
   - `auth add|list|status|remove|alias|manage`
   - `gmail search|get|send|thread get|thread modify`
-  - `drive ls|search|get|download|upload`
+  - `drive ls|search|get|download|upload|mkdir|update|rename|move|copy|trash|untrash`
   - `calendar calendars list`, `calendar events list|get|create`
 - Out of scope:
   - browser account-manager UI rebuild
@@ -81,6 +81,18 @@ Native account targeting order for auth-adjacent commands:
 `auth add` requests `gmail.modify`, `drive`, and `calendar`. Google returns the union of scopes already granted to this
 client for the account, so an account with an older grant can carry more than this list while a fresh grant carries
 exactly this list. Callers must not infer a scope boundary from this list alone.
+
+## Drive write contract
+
+`drive mkdir <name> --parent <folderId>`, `update <fileId> <localPath> [--mime <type>]`,
+`rename <fileId> --name <name>`, `move <fileId> --parent <newFolderId> --from <oldFolderId>`,
+`copy <fileId> --parent <folderId> [--name <name>]`, `trash <fileId>`, and
+`untrash <fileId>` require an explicit `-a <account>` / `--account <account>`.
+They return the standard JSON envelope with `result.file` read back from Drive
+after the mutation; callers must not infer success from the mutation response
+alone. `move` checks that `--from` is a current parent before changing it.
+`trash` is reversible; there is no permanent-delete command. These general
+purpose CLI verbs do not enforce a caller's folder or audience boundary.
 
 ## Calendar service contract
 

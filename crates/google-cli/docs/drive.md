@@ -9,6 +9,12 @@ Authoritative Drive documentation for `google-cli`.
 - `drive get <fileId>`
 - `drive download <fileId>`
 - `drive upload <localPath>`
+- `drive mkdir <name> --parent <folderId>`
+- `drive update <fileId> <localPath> [--mime <type>]`
+- `drive rename <fileId> --name <name>`
+- `drive move <fileId> --parent <newFolderId> --from <oldFolderId>`
+- `drive copy <fileId> --parent <folderId> [--name <name>]`
+- `drive trash <fileId>` / `drive untrash <fileId>`
 
 ## Runtime model
 
@@ -79,3 +85,24 @@ cargo run -p nils-google-cli -- --json -a you@example.com \
 - MIME type is inferred by default; `--mime` can override.
 - `--replace` updates an existing same-name file in the target parent when found.
 - `--convert` requests conversion to Google Docs/Sheets/Slides where supported.
+- The result re-reads the created or replaced file from Drive rather than
+  trusting the upload response's partial metadata.
+
+## Write behavior
+
+Every new write command requires an explicit `-a <account>`. They return a
+`result.file` read back from Drive after the mutation. `get`, list, and write
+results include `md5_checksum`, `sha256_checksum`, `version`,
+`modified_time`, and `trashed` when Drive supplies them; checksums are absent
+for Google Docs editors files. The caller must treat a missing checksum as
+unverified and compare downloaded content when necessary.
+
+`drive update` replaces bytes by file ID. It does not use upload's
+same-name `--replace` search. The live update streams source bytes from the
+local file into its multipart request instead of buffering the whole file in
+memory. `drive move` requires the current parent in
+`--from`, checked before the provider call, and uses Drive's paired
+`addParents`/`removeParents` update. `drive trash` is a soft delete;
+`drive untrash` exists for operator recovery. No permanent-delete command is
+exposed. A higher-level caller must still enforce its own audience and folder
+scope before invoking any of these general-purpose CLI commands.

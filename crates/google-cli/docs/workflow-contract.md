@@ -58,6 +58,17 @@ Authoritative help: `cargo run -p nils-google-cli -- <namespace> <subcommand> --
 | `drive get` | file id | Fetch file metadata. |
 | `drive download <target>` | file id / share link | Download a file. |
 | `drive upload` | upload inputs | Upload a file. |
+| `drive mkdir <name>` | `--parent <folderId>`, `-a <account>` | Create a folder. |
+| `drive update <fileId> <localPath>` | `--mime <type>` (optional), `-a <account>` | Replace file bytes by ID. |
+| `drive rename <fileId>` | `--name <name>`, `-a <account>` | Rename a file. |
+| `drive move <fileId>` | `--parent <newFolderId>`, `--from <oldFolderId>`, `-a <account>` | Move from the checked current parent. |
+| `drive copy <fileId>` | `--parent <folderId>`, `--name <name>` (optional), `-a <account>` | Copy a file. |
+| `drive trash <fileId>` | `-a <account>` | Move a file to trash. |
+| `drive untrash <fileId>` | `-a <account>` | Restore a trashed file. |
+
+Each write command requires explicit account selection and returns
+`result.file` from an authoritative post-mutation `get`. The caller must still
+enforce its own write scope; these native commands have no folder allowlist.
 
 ### `calendar`
 
