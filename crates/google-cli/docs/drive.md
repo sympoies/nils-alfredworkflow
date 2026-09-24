@@ -98,7 +98,9 @@ for Google Docs editors files. The caller must treat a missing checksum as
 unverified and compare downloaded content when necessary.
 
 `drive update` replaces bytes by file ID. It does not use upload's
-same-name `--replace` search. `drive move` requires the current parent in
+same-name `--replace` search. The live update streams source bytes from the
+local file into its multipart request instead of buffering the whole file in
+memory. `drive move` requires the current parent in
 `--from`, checked before the provider call, and uses Drive's paired
 `addParents`/`removeParents` update. `drive trash` is a soft delete;
 `drive untrash` exists for operator recovery. No permanent-delete command is

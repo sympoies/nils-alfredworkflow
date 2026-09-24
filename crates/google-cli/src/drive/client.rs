@@ -545,11 +545,11 @@ impl DriveSession {
         if !local_path.is_file() {
             return Err(AppError::invalid_drive_input("update source is not a file"));
         }
-        let bytes = fs::read(&local_path).map_err(|error| {
-            AppError::drive_failure(format!("failed to read update source: {error}"))
-        })?;
         let mime_type = resolve_mime_type(&local_path, mime_type)?;
         if self.fixture.is_some() {
+            let bytes = fs::read(&local_path).map_err(|error| {
+                AppError::drive_failure(format!("failed to read update source: {error}"))
+            })?;
             let mut file = self.get(&GetRequest {
                 file_id: file_id.to_string(),
             })?;
@@ -559,7 +559,16 @@ impl DriveSession {
             file.version = Some(next_fixture_version(file.version.as_deref()));
             return Ok(file);
         }
-        let file_part = multipart::Part::bytes(bytes)
+        let source = fs::File::open(&local_path).map_err(|error| {
+            AppError::drive_failure(format!("failed to open update source: {error}"))
+        })?;
+        let source_len = source
+            .metadata()
+            .map_err(|error| {
+                AppError::drive_failure(format!("failed to inspect update source: {error}"))
+            })?
+            .len();
+        let file_part = multipart::Part::reader_with_length(source, source_len)
             .mime_str(&mime_type)
             .map_err(|error| {
                 AppError::invalid_drive_input(format!("invalid update MIME type: {error}"))
@@ -596,7 +605,13 @@ impl DriveSession {
             file.version = Some(next_fixture_version(file.version.as_deref()));
             return Ok(file);
         }
-        self.patch_metadata(file_id, json!({"name": name}), &[], "rename file")
+        self.patch_metadata(
+            file_id,
+            json!({"name": name}),
+            &[],
+            "rename file",
+            Some(file_id),
+        )
     }
 
     pub fn move_file(&self, file_id: &str, parent: &str, from: &str) -> Result<FileView, AppError> {
@@ -619,6 +634,7 @@ impl DriveSession {
             json!({}),
             &[("addParents", parent), ("removeParents", from)],
             "move file",
+            None,
         )
     }
 
@@ -651,7 +667,7 @@ impl DriveSession {
         )
         .send()
         .map_err(|error| AppError::drive_failure(format!("copy file request failed: {error}")))?;
-        self.write_and_read(response, "copy file", None, Some(file_id))
+        self.write_and_read(response, "copy file", None, None)
     }
 
     pub fn set_trashed(&self, file_id: &str, trashed: bool) -> Result<FileView, AppError> {
@@ -672,6 +688,7 @@ impl DriveSession {
             } else {
                 "untrash file"
             },
+            Some(file_id),
         )
     }
 
@@ -681,6 +698,7 @@ impl DriveSession {
         body: Value,
         extra_query: &[(&str, &str)],
         context: &str,
+        not_found_id: Option<&str>,
     ) -> Result<FileView, AppError> {
         let mut query = vec![("supportsAllDrives", "true")];
         query.extend_from_slice(extra_query);
@@ -693,7 +711,7 @@ impl DriveSession {
         )
         .send()
         .map_err(|error| AppError::drive_failure(format!("{context} request failed: {error}")))?;
-        self.write_and_read(response, context, Some(file_id), Some(file_id))
+        self.write_and_read(response, context, Some(file_id), not_found_id)
     }
 
     fn write_and_read(
@@ -1643,6 +1661,54 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[tokio::test]
+    async fn live_move_and_copy_do_not_attribute_ambiguous_404_to_source() {
+        let move_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/files/file-1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "file-1", "name": "source.txt", "mimeType": "text/plain",
+                "parents": ["old-id"]
+            })))
+            .expect(1)
+            .mount(&move_server)
+            .await;
+        Mock::given(method("PATCH"))
+            .and(path("/files/file-1"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+                "error": {"message": "destination parent not found"}
+            })))
+            .expect(1)
+            .mount(&move_server)
+            .await;
+        let base = move_server.uri();
+        let error = tokio::task::spawn_blocking(move || {
+            mock_session(base).move_file("file-1", "missing-id", "old-id")
+        })
+        .await
+        .expect("join")
+        .expect_err("missing destination");
+        assert_eq!(error.code(), "NILS_GOOGLE_014");
+
+        let copy_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/files/file-1/copy"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+                "error": {"message": "destination parent not found"}
+            })))
+            .expect(1)
+            .mount(&copy_server)
+            .await;
+        let base = copy_server.uri();
+        let error = tokio::task::spawn_blocking(move || {
+            mock_session(base).copy_file("file-1", "missing-id", None)
+        })
+        .await
+        .expect("join")
+        .expect_err("missing destination");
+        assert_eq!(error.code(), "NILS_GOOGLE_014");
     }
 
     #[test]
