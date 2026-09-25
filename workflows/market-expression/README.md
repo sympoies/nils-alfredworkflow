@@ -13,7 +13,8 @@ Evaluate market expressions and show favorite market symbols when the query is e
   When favorites are enabled, it then shows favorite symbols or explicit FX pairs as non-selectable rows.
 - Favorite quote rows and expression asset rows may show cached local symbol icons resolved by `market-cli`.
 - Calls `market-cli expr --query <query> --default-fiat <MARKET_DEFAULT_FIAT>`.
-- Calls `market-cli favorites --list <MARKET_FAVORITE_LIST> --default-fiat <MARKET_DEFAULT_FIAT>` for empty query only when favorites are enabled.
+- Calls `market-cli favorites --list <MARKET_FAVORITE_LIST> --default-fiat <MARKET_DEFAULT_FIAT>` for empty query only when favorites are enabled,
+  adding `--preference-projection-file <path>` when `PREFERENCE_PROJECTION_FILE` is set.
 - Supports `+ - * /` for numeric-only expressions and `+ -` for asset expressions, with target fiat syntax `to <FIAT>`
   (default `USD`).
 - Accepts compact asset terms like `1btc` and `3eth` (auto-normalized).
@@ -33,9 +34,31 @@ Set these via Alfred's "Configure Workflow..." UI:
 | `MARKET_CRYPTO_CACHE_TTL` | No | (empty) | Optional crypto cache TTL. Supports `1s`, `1m`, `1h`, `1d`; empty keeps the built-in `5m` default. |
 | `MARKET_FAVORITES_ENABLED` | No | `1` | Toggle empty-query favorite quote rows. Use `0`/`false`/`off` to keep only the prompt row. |
 | `MARKET_FAVORITE_LIST` | No | `BTC,ETH,EUR,JPY` | Ordered comma/newline favorites list used for empty query. Tokens may be symbols like `BTC`/`JPY` or explicit FX pairs like `JPY/TWD`. |
+| `PREFERENCE_PROJECTION_FILE` | No | (empty) | Optional path to an external preference projection JSON file (`~/` supported). When valid and fresh, its market watchlist replaces `MARKET_FAVORITE_LIST` for empty-query favorites. Empty keeps workflow settings. |
 
 Empty or delimiter-only `MARKET_FAVORITE_LIST` input falls back to
 `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
+
+### External preference projection
+
+`PREFERENCE_PROJECTION_FILE` lets another preference owner supply the
+empty-query favorites. The workflow only reads the file; queries never write
+anything. Empty-query precedence is: valid fresh projection, then
+`MARKET_FAVORITE_LIST`, then the built-in default. A non-empty query never uses
+favorites.
+
+- A watchlist entry that is an ISO 4217 fiat code becomes the pair
+  `SYM/<projection quote currency>`; a fiat equal to that currency is omitted.
+- Any other supported symbol stays a bare symbol quoted in `MARKET_DEFAULT_FIAT`.
+- Unsupported entries are dropped and counted in the status row. If nothing
+  usable remains, the workflow settings apply.
+- When the variable is set, the empty query adds one non-selectable status row,
+  such as `Preferences: projection revision 2 · synced 12m ago` or
+  `Preferences: projection stale — using workflow settings`. It never shows the
+  path or preference values.
+
+The file format, validation, and freshness rules are defined in the
+[preference projection contract](../../crates/workflow-common/docs/preference-projection-contract.md).
 
 ## Query Behavior
 

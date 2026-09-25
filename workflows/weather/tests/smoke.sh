@@ -121,6 +121,10 @@ if ! rg -n '^WEATHER_CACHE_TTL_SECS[[:space:]]*=[[:space:]]*"900"' "$manifest" >
   fail "WEATHER_CACHE_TTL_SECS default must be 900"
 fi
 
+if ! rg -n '^PREFERENCE_PROJECTION_FILE[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "PREFERENCE_PROJECTION_FILE default must be empty"
+fi
+
 tmp_dir="$(mktemp -d)"
 artifact_id="$(toml_string "$manifest" id)"
 artifact_version="$(toml_string "$manifest" version)"
@@ -946,6 +950,122 @@ assert_jq_json "$runtime_json" '.items[0].title == "Weather provider unavailable
 malformed_json="$({ WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-malformed" "$workflow_dir/scripts/script_filter_today.sh" "city::Taipei"; })"
 assert_jq_json "$malformed_json" '.items[0].title == "Weather output format error"' "malformed output title mapping mismatch"
 
+# External preference projection. The projection stub delegates preference
+# subcommands to the real weather-cli (local file reads only) and forecasts to
+# the offline stub.
+(cd "$repo_root" && cargo build -q -p nils-weather-cli)
+real_weather_cli="$repo_root/target/debug/weather-cli"
+assert_exec "$real_weather_cli"
+
+cat >"$tmp_dir/stubs/weather-cli-projection" <<EOS
+#!/usr/bin/env bash
+set -euo pipefail
+case "\${1:-}" in
+default-locations | preference-status)
+  exec "$real_weather_cli" "\$@"
+  ;;
+esac
+exec "$tmp_dir/stubs/weather-cli-ok" "\$@"
+EOS
+chmod +x "$tmp_dir/stubs/weather-cli-projection"
+
+write_weather_projection() {
+  local target="$1"
+  local generated_at="$2"
+  jq -n --arg generated_at "$generated_at" '{
+    schema: "sympoies.alfred-preference-projection/v1",
+    generatedAt: $generated_at,
+    revision: 2,
+    digest: ("sha256:" + ("0" * 64)),
+    market: {default_quote_currency: "EUR", watchlist: ["BTC"]},
+    weather: {
+      default_location: "Springfield, Oregon",
+      saved_locations: ["東京", "springfield, oregon", "Kyoto"]
+    },
+    sources: {
+      "market.default_quote_currency": "profile",
+      "market.watchlist": "profile",
+      "weather.default_location": "owner_override",
+      "weather.saved_locations": "profile"
+    }
+  }' >"$target"
+}
+
+projection_home="$tmp_dir/home"
+mkdir -p "$projection_home/prefs"
+fresh_projection="$projection_home/prefs/projection.json"
+write_weather_projection "$fresh_projection" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+stale_projection="$tmp_dir/projection-stale.json"
+write_weather_projection "$stale_projection" "2020-01-01T00:00:00Z"
+printf '[1,2' >"$tmp_dir/projection-malformed.json"
+# Literal tilde: the adapter must expand it through wfcr_expand_home_path.
+# shellcheck disable=SC2088
+projection_tilde_path="~/prefs/projection.json"
+
+run_projection_today() {
+  local projection_file="$1"
+  local query="$2"
+  HOME="$projection_home" WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-projection" \
+    WEATHER_DEFAULT_CITIES="Tokyo,Osaka" PREFERENCE_PROJECTION_FILE="$projection_file" \
+    "$workflow_dir/scripts/script_filter_today.sh" "$query"
+}
+
+run_projection_week() {
+  local projection_file="$1"
+  local query="$2"
+  HOME="$projection_home" WEATHER_CLI_BIN="$tmp_dir/stubs/weather-cli-projection" \
+    WEATHER_DEFAULT_CITIES="Tokyo,Osaka" PREFERENCE_PROJECTION_FILE="$projection_file" \
+    "$workflow_dir/scripts/script_filter_week.sh" "$query"
+}
+
+projection_today_json="$(run_projection_today "$projection_tilde_path" "")"
+assert_jq_json "$projection_today_json" '.items | length == 4' "projection today should show status row plus three deduplicated locations"
+assert_jq_json "$projection_today_json" '.items[0].title | startswith("Preferences: projection revision 2 · synced ")' "projection today status row wording mismatch"
+assert_jq_json "$projection_today_json" '.items[0].valid == false and (.items[0] | has("arg") | not)' "projection status row must be non-selectable"
+assert_jq_json "$projection_today_json" '(.items[1:] | map(.title)) == ["Springfield, Oregon 12.0~18.0°C cloudy 10%","東京 12.0~18.0°C cloudy 10%","Kyoto 12.0~18.0°C mainly clear 10%"]' "projection today must keep comma/Unicode labels in order without splitting"
+assert_jq_json "$projection_today_json" '.items[1].autocomplete == "city::Springfield, Oregon"' "projection today row should emit the whole location as city token"
+if [[ "$projection_today_json" == *"$projection_home"* || "$projection_today_json" == *"projection.json"* ]]; then
+  fail "projection status must not expose the configured path"
+fi
+
+projection_hourly_json="$(run_projection_today "$projection_tilde_path" "city::Springfield, Oregon")"
+assert_jq_json "$projection_hourly_json" '.items[0].title | startswith("Springfield, Oregon 00:00")' "city token with comma must dispatch as one hourly location"
+
+projection_query_json="$(run_projection_today "$projection_tilde_path" "Taipei")"
+assert_jq_json "$projection_query_json" '.items | length == 1' "explicit today query must override projection defaults"
+assert_jq_json "$projection_query_json" '.items[0].title == "Taipei 12.0~18.0°C cloudy 10%"' "explicit today query must not add a status row"
+
+projection_latlon_json="$(run_projection_today "$projection_tilde_path" "25.03,121.56")"
+assert_jq_json "$projection_latlon_json" 'all(.items[]; (.title | startswith("Preferences:")) | not)' "lat,lon query must keep priority without a status row"
+
+for projection_case in \
+  "$stale_projection|stale" \
+  "$tmp_dir/projection-malformed.json|invalid" \
+  "$tmp_dir/does-not-exist.json|unavailable"; do
+  projection_file="${projection_case%%|*}"
+  projection_state="${projection_case##*|}"
+  fallback_json="$(run_projection_today "$projection_file" "")"
+  assert_jq_json "$fallback_json" ".items[0].title == \"Preferences: projection ${projection_state} — using workflow settings\"" "projection ${projection_state} status row wording mismatch"
+  assert_jq_json "$fallback_json" '(.items[1:] | map(.title)) == ["Tokyo 12.0~18.0°C cloudy 10%","Osaka 12.0~18.0°C cloudy 10%"]' "projection ${projection_state} must fall back to WEATHER_DEFAULT_CITIES"
+done
+
+no_projection_json="$(run_projection_today "" "")"
+assert_jq_json "$no_projection_json" '(.items | map(.title)) == ["Tokyo 12.0~18.0°C cloudy 10%","Osaka 12.0~18.0°C cloudy 10%"]' "empty PREFERENCE_PROJECTION_FILE must keep existing defaults without a status row"
+
+projection_week_picker_json="$(run_projection_week "$projection_tilde_path" "")"
+assert_jq_json "$projection_week_picker_json" '(.items[0].title | startswith("Preferences: projection revision 2 · synced ")) and ((.items[1:] | map(.title)) == ["Springfield, Oregon","東京","Kyoto"])' "projection week picker must list status row and projection locations"
+assert_jq_json "$projection_week_picker_json" '.items[1].autocomplete == "city::Springfield, Oregon"' "projection week picker must keep comma-containing labels whole"
+
+projection_week_filter_json="$(run_projection_week "$projection_tilde_path" "spring")"
+assert_jq_json "$projection_week_filter_json" '(.items | map(.title)) == ["spring","Springfield, Oregon"]' "week query must filter projection defaults without a status row"
+
+projection_week_stage_two_json="$(run_projection_week "$projection_tilde_path" "city::Springfield, Oregon")"
+assert_jq_json "$projection_week_stage_two_json" '.items | length == 7' "week city token with comma should return 7 rows"
+assert_jq_json "$projection_week_stage_two_json" '.items[0].title == "Springfield, Oregon 12.0~18.0°C cloudy 10%"' "week city token with comma must stay one location"
+
+no_projection_week_json="$(run_projection_week "" "")"
+assert_jq_json "$no_projection_week_json" '(.items | map(.title)) == ["Tokyo","Osaka"]' "empty PREFERENCE_PROJECTION_FILE must keep week picker defaults"
+
 missing_layout="$tmp_dir/layout-missing"
 mkdir -p "$missing_layout/workflows/weather/scripts"
 cp "$workflow_dir/scripts/script_filter_common.sh" "$missing_layout/workflows/weather/scripts/script_filter_common.sh"
@@ -1068,7 +1188,8 @@ assert_jq_file "$packaged_json_file" ".objects[] | select(.uid==\"$ACTION_UID\")
 assert_jq_file "$packaged_json_file" ".connections[\"$TODAY_UID\"] | any(.destinationuid == \"$ACTION_UID\" and .modifiers == 0)" "missing today->copy enter connection"
 assert_jq_file "$packaged_json_file" ".connections[\"$WEEK_UID\"] | any(.destinationuid == \"$ACTION_UID\" and .modifiers == 0)" "missing week->copy enter connection"
 
-assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["WEATHER_CACHE_TTL_SECS", "WEATHER_CLI_BIN", "WEATHER_DEFAULT_CITIES", "WEATHER_LOCALE"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["PREFERENCE_PROJECTION_FILE", "WEATHER_CACHE_TTL_SECS", "WEATHER_CLI_BIN", "WEATHER_DEFAULT_CITIES", "WEATHER_LOCALE"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="PREFERENCE_PROJECTION_FILE") | .config.default == ""' "PREFERENCE_PROJECTION_FILE default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="WEATHER_CLI_BIN") | .config.required == false' "WEATHER_CLI_BIN must be optional"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="WEATHER_LOCALE") | .config.default == "en"' "WEATHER_LOCALE default mismatch"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="WEATHER_DEFAULT_CITIES") | .config.default == "Tokyo"' "WEATHER_DEFAULT_CITIES default mismatch"

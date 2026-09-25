@@ -129,6 +129,75 @@ split_city_csv() {
   printf '%s' "$value" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d'
 }
 
+default_cities_csv() {
+  local csv
+  csv="$(trim_query "${WEATHER_DEFAULT_CITIES:-$DEFAULT_CITY_FALLBACK}")"
+  [[ -n "$csv" ]] || csv="$DEFAULT_CITY_FALLBACK"
+  printf '%s' "$csv"
+}
+
+# Optional external preference projection file; empty keeps workflow settings.
+preference_projection_file() {
+  local raw_value
+  raw_value="$(trim_query "${PREFERENCE_PROJECTION_FILE:-}")"
+  [[ -n "$raw_value" ]] || return 0
+  wfcr_expand_home_path "$raw_value"
+}
+
+# Print empty-query default locations, one per line. Projection labels come
+# from weather-cli verbatim (never comma-split); WEATHER_DEFAULT_CITIES keeps
+# its comma-separated semantics.
+print_default_locations() {
+  local weather_cli="${1-}"
+  local csv
+  local projection_file
+  local resolved=""
+
+  csv="$(default_cities_csv)"
+  projection_file="$(preference_projection_file)"
+  if [[ -n "$projection_file" && -n "$weather_cli" ]] &&
+    resolved="$("$weather_cli" default-locations --fallback "$csv" --preference-projection-file "$projection_file" 2>/dev/null)" &&
+    [[ -n "$resolved" ]]; then
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+
+  split_city_csv "$csv"
+}
+
+# Print the non-selectable preference status row as one JSON object, or
+# nothing when no projection is configured.
+print_preference_status_item() {
+  local weather_cli="${1-}"
+  local projection_file
+  local status_json=""
+
+  projection_file="$(preference_projection_file)"
+  [[ -n "$projection_file" && -n "$weather_cli" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  status_json="$("$weather_cli" preference-status --preference-projection-file "$projection_file" --output alfred-json 2>/dev/null)" || return 0
+  jq -ce '.items[0] // empty' <<<"$status_json" 2>/dev/null || true
+}
+
+# Print feedback JSON with the preference status row prepended when a
+# projection is configured; otherwise print it unchanged.
+print_with_preference_status() {
+  local weather_cli="${1-}"
+  local json_output="${2-}"
+  local status_item=""
+  local merged=""
+
+  status_item="$(print_preference_status_item "$weather_cli")"
+  if [[ -n "$status_item" ]] &&
+    merged="$(jq -ce --argjson status "$status_item" 'if (.items | type) == "array" then .items = [$status] + .items else . end' <<<"$json_output" 2>/dev/null)"; then
+    printf '%s\n' "$merged"
+    return 0
+  fi
+
+  printf '%s\n' "$json_output"
+}
+
 resolve_locale() {
   local raw="${1-}"
   local lowered
@@ -303,6 +372,19 @@ normalize_alfred_items() {
 period="${1:-}"
 query="${2:-}"
 
+# Internal helper modes used by the today/week Script Filters.
+case "$period" in
+default-locations | with-preference-status)
+  mode_weather_cli="$(resolve_weather_cli 2>/dev/null || true)"
+  if [[ "$period" == "default-locations" ]]; then
+    print_default_locations "$mode_weather_cli"
+  else
+    print_with_preference_status "$mode_weather_cli" "$query"
+  fi
+  exit 0
+  ;;
+esac
+
 case "$period" in
 today | week | hourly) ;;
 *)
@@ -348,13 +430,14 @@ if [[ -n "$trimmed_query" ]] && lat_lon="$(parse_lat_lon "$trimmed_query")"; the
   exit 0
 fi
 
-city_csv="$trimmed_query"
-if [[ -z "$city_csv" ]]; then
-  city_csv="$(trim_query "${WEATHER_DEFAULT_CITIES:-$DEFAULT_CITY_FALLBACK}")"
-  [[ -n "$city_csv" ]] || city_csv="$DEFAULT_CITY_FALLBACK"
+if [[ -z "$trimmed_query" ]]; then
+  mapfile -t city_targets < <(print_default_locations "$weather_cli")
+elif [[ "${WEATHER_QUERY_SINGLE_LOCATION:-}" == "1" ]]; then
+  # A selected city token names one location, even when it contains commas.
+  city_targets=("$trimmed_query")
+else
+  mapfile -t city_targets < <(split_city_csv "$trimmed_query")
 fi
-
-mapfile -t city_targets < <(split_city_csv "$city_csv")
 if [[ ${#city_targets[@]} -eq 0 ]]; then
   city_targets=("$DEFAULT_CITY_FALLBACK")
 fi

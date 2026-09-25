@@ -60,6 +60,9 @@ fi
 if ! rg -n '^MARKET_FAVORITE_LIST[[:space:]]*=[[:space:]]*"BTC,ETH,EUR,JPY"' "$manifest" >/dev/null; then
   fail "MARKET_FAVORITE_LIST default must be BTC,ETH,EUR,JPY"
 fi
+if ! rg -n '^PREFERENCE_PROJECTION_FILE[[:space:]]*=[[:space:]]*""' "$manifest" >/dev/null; then
+  fail "PREFERENCE_PROJECTION_FILE default must be empty"
+fi
 
 tmp_dir="$(mktemp -d)"
 artifact_id="$(toml_string "$manifest" id)"
@@ -330,6 +333,96 @@ assert_jq_json "$favorites_disabled_json" '.items[0].title == "Enter a market ex
 assert_jq_json "$favorites_disabled_json" '.items[0].subtitle == "Example: 1 BTC + 3 ETH to JPY (default fiat: EUR)"' "disabled favorites toggle must preserve prompt subtitle"
 assert_jq_json "$favorites_disabled_json" '.items[0].valid == false' "disabled favorites toggle prompt row must be non-actionable"
 
+# External preference projection: argument forwarding through the adapter.
+cat >"$tmp_dir/stubs/market-cli-record-args" <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${MARKET_ARGS_OUT:?MARKET_ARGS_OUT must be set}"
+printf '%s\n' "$@" >"$MARKET_ARGS_OUT"
+printf '{"items":[{"title":"recorded","valid":false}]}\n'
+EOS
+chmod +x "$tmp_dir/stubs/market-cli-record-args"
+
+projection_home="$tmp_dir/home"
+mkdir -p "$projection_home/prefs"
+args_out="$tmp_dir/market-args.txt"
+# Literal tilde: the adapter must expand it through wfcr_expand_home_path.
+# shellcheck disable=SC2088
+projection_tilde_path="~/prefs/projection.json"
+
+MARKET_ARGS_OUT="$args_out" MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-record-args" \
+  MARKET_FAVORITE_LIST="ETH" PREFERENCE_PROJECTION_FILE="" \
+  "$workflow_dir/scripts/script_filter.sh" "" >/dev/null
+if rg -n -- '--preference-projection-file' "$args_out" >/dev/null; then
+  fail "empty PREFERENCE_PROJECTION_FILE must not forward a projection flag"
+fi
+[[ "$(sed -n '1p;3p' "$args_out" | paste -sd' ' -)" == "favorites ETH" ]] || fail "empty PREFERENCE_PROJECTION_FILE must keep favorites invocation unchanged"
+
+HOME="$projection_home" MARKET_ARGS_OUT="$args_out" MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-record-args" \
+  MARKET_FAVORITE_LIST="ETH" PREFERENCE_PROJECTION_FILE=" $projection_tilde_path " \
+  "$workflow_dir/scripts/script_filter.sh" "" >/dev/null
+[[ "$(tail -n 2 "$args_out" | paste -sd'|' -)" == "--preference-projection-file|$projection_home/prefs/projection.json" ]] ||
+  fail "PREFERENCE_PROJECTION_FILE must be trimmed, home-expanded, and forwarded to favorites"
+
+HOME="$projection_home" MARKET_ARGS_OUT="$args_out" MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-record-args" \
+  PREFERENCE_PROJECTION_FILE="$projection_tilde_path" \
+  "$workflow_dir/scripts/script_filter.sh" "1 BTC to TWD" >/dev/null
+[[ "$(sed -n '1p' "$args_out")" == "expr" ]] || fail "non-empty query must run expr"
+if rg -n -- '--preference-projection-file' "$args_out" >/dev/null; then
+  fail "explicit query must not consult the preference projection"
+fi
+
+# External preference projection: real market-cli mapping and fallback wording
+# (human output resolves no quotes, so no network access is needed).
+(cd "$repo_root" && cargo build -q -p nils-market-cli)
+real_market_cli="$repo_root/target/debug/market-cli"
+assert_exec "$real_market_cli"
+
+write_market_projection() {
+  local target="$1"
+  local generated_at="$2"
+  local watchlist_json="$3"
+  jq -n --arg generated_at "$generated_at" --argjson watchlist "$watchlist_json" '{
+    schema: "sympoies.alfred-preference-projection/v1",
+    generatedAt: $generated_at,
+    revision: 2,
+    digest: ("sha256:" + ("0" * 64)),
+    market: {default_quote_currency: "TWD", watchlist: $watchlist},
+    weather: {default_location: "Synthetic City", saved_locations: []},
+    sources: {
+      "market.default_quote_currency": "profile",
+      "market.watchlist": "owner_override",
+      "weather.default_location": "profile",
+      "weather.saved_locations": "profile"
+    }
+  }' >"$target"
+}
+
+now_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+fresh_projection="$tmp_dir/projection-fresh.json"
+write_market_projection "$fresh_projection" "$now_utc" '["USD","JPY","BTC","ETH","ADA","DOT"]'
+mapped_output="$("$real_market_cli" favorites --list "ETH" --default-fiat "USD" --preference-projection-file "$fresh_projection" --output human)"
+[[ "$mapped_output" == $'favorites: USD/TWD, JPY/TWD, BTC, ETH, ADA, DOT\nPreferences: projection revision 2 · synced just now' ]] ||
+  fail "projection watchlist must map fiat to quote pairs and keep crypto bare (got: $mapped_output)"
+
+stale_projection="$tmp_dir/projection-stale.json"
+write_market_projection "$stale_projection" "2020-01-01T00:00:00Z" '["BTC"]'
+stale_output="$("$real_market_cli" favorites --list "ETH" --default-fiat "USD" --preference-projection-file "$stale_projection" --output human)"
+[[ "$stale_output" == $'favorites: ETH\nPreferences: projection stale — using workflow settings' ]] ||
+  fail "stale projection must fall back to MARKET_FAVORITE_LIST with a stale status"
+
+printf '{"schema":' >"$tmp_dir/projection-malformed.json"
+malformed_output="$("$real_market_cli" favorites --list "" --default-fiat "USD" --preference-projection-file "$tmp_dir/projection-malformed.json" --output human)"
+[[ "$malformed_output" == $'favorites: BTC, ETH, USD, JPY\nPreferences: projection invalid — using workflow settings' ]] ||
+  fail "malformed projection must fall back to built-in favorites with an invalid status"
+
+missing_output="$("$real_market_cli" favorites --list "ETH" --default-fiat "USD" --preference-projection-file "$tmp_dir/does-not-exist.json" --output human)"
+[[ "$missing_output" == $'favorites: ETH\nPreferences: projection unavailable — using workflow settings' ]] ||
+  fail "missing projection must fall back with an unavailable status"
+if [[ "$missing_output" == *"does-not-exist"* ]]; then
+  fail "projection status must not expose the configured path"
+fi
+
 unsupported_json="$({ MARKET_CLI_BIN="$tmp_dir/stubs/market-cli-unsupported-op" "$workflow_dir/scripts/script_filter.sh" "1 BTC * 2"; })"
 assert_jq_json "$unsupported_json" '.items[0].title == "Unsupported operator"' "unsupported operator title mapping mismatch"
 assert_jq_json "$unsupported_json" '.items[0].valid == false' "unsupported operator fallback item must be invalid"
@@ -515,7 +608,8 @@ assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4
 assert_jq_file "$packaged_json_file" '.objects[] | select(.uid=="D7E624DB-D4AB-4D53-8C03-D051A1A97A4A") | .config.type == 8' "action node must be external script type=8"
 assert_jq_file "$packaged_json_file" '.connections["96AC3342-84A9-449E-B0AB-114E2068FC34"] | any(.destinationuid == "70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10" and .modifiers == 0)' "missing hotkey to script-filter connection"
 assert_jq_file "$packaged_json_file" '.connections["70EEA820-E77B-42F3-A8D2-1A4D9E8E4A10"] | any(.destinationuid == "D7E624DB-D4AB-4D53-8C03-D051A1A97A4A" and .modifiers == 0)' "missing script-filter to action connection"
-assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_CRYPTO_CACHE_TTL","MARKET_DEFAULT_FIAT","MARKET_FAVORITES_ENABLED","MARKET_FAVORITE_LIST","MARKET_FX_CACHE_TTL"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '[.userconfigurationconfig[] | .variable] | sort == ["MARKET_CLI_BIN","MARKET_CRYPTO_CACHE_TTL","MARKET_DEFAULT_FIAT","MARKET_FAVORITES_ENABLED","MARKET_FAVORITE_LIST","MARKET_FX_CACHE_TTL","PREFERENCE_PROJECTION_FILE"]' "user configuration variables mismatch"
+assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="PREFERENCE_PROJECTION_FILE") | .config.default == ""' "PREFERENCE_PROJECTION_FILE default must be empty string"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_CLI_BIN") | .config.default == ""' "MARKET_CLI_BIN default must be empty string"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_DEFAULT_FIAT") | .config.default == "USD"' "MARKET_DEFAULT_FIAT default must be USD"
 assert_jq_file "$packaged_json_file" '.userconfigurationconfig[] | select(.variable=="MARKET_FX_CACHE_TTL") | .config.default == ""' "MARKET_FX_CACHE_TTL default must be empty string"

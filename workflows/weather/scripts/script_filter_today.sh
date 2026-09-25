@@ -130,7 +130,9 @@ dispatch_hourly_city_token() {
     return 0
   fi
 
-  "$script_dir/script_filter_common.sh" hourly "$selected_city"
+  # A selected city token names one location, even when it contains commas.
+  WEATHER_QUERY_SINGLE_LOCATION=1 \
+    "$script_dir/script_filter_common.sh" hourly "$selected_city"
 }
 
 query="$(sfqp_resolve_query_input "${1:-}")"
@@ -169,4 +171,12 @@ if [[ "$trimmed_query" == "${COORD_TOKEN_PREFIX}"* ]]; then
 fi
 
 today_json="$("$script_dir/script_filter_common.sh" today "$trimmed_query")"
-present_today_with_hourly_token "$today_json"
+today_output="$(present_today_with_hourly_token "$today_json")"
+
+# Empty query with a configured preference projection: add the status row.
+if [[ -z "$trimmed_query" && -n "$(sfqp_trim "${PREFERENCE_PROJECTION_FILE:-}")" ]]; then
+  "$script_dir/script_filter_common.sh" with-preference-status "$today_output"
+  exit 0
+fi
+
+printf '%s\n' "$today_output"

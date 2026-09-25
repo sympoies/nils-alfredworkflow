@@ -101,13 +101,28 @@ execute_market_expression() {
 execute_market_favorites() {
   local favorite_list="$1"
   local default_fiat="$2"
+  local projection_file="${3:-}"
   local market_cli=""
 
   if ! market_cli="$(resolve_market_cli)"; then
     return 1
   fi
 
+  if [[ -n "$projection_file" ]]; then
+    "$market_cli" favorites --list "$favorite_list" --default-fiat "$default_fiat" \
+      --preference-projection-file "$projection_file"
+    return
+  fi
+
   "$market_cli" favorites --list "$favorite_list" --default-fiat "$default_fiat"
+}
+
+# Optional external preference projection file; empty keeps workflow settings.
+resolve_preference_projection_file() {
+  local raw_value="${PREFERENCE_PROJECTION_FILE:-}"
+  raw_value="$(printf '%s' "$raw_value" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  [[ -n "$raw_value" ]] || return 0
+  wfcr_expand_home_path "$raw_value"
 }
 
 favorites_enabled() {
@@ -153,7 +168,8 @@ if [[ -z "$(printf '%s' "$query" | sed 's/[[:space:]]//g')" ]]; then
     "market-cli favorites returned empty response" \
     "market-cli favorites returned malformed Alfred JSON" \
     "$favorite_list" \
-    "$default_fiat"
+    "$default_fiat" \
+    "$(resolve_preference_projection_file)"
   exit 0
 fi
 

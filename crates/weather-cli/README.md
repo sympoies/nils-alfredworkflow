@@ -22,6 +22,16 @@ No-token weather CLI for the Alfred weather workflow.
   - Labels: `--lang <en|zh>`
   - Extras: `--hours <1..48>`
   - Description: hourly forecast from the current local hour (24h default)
+- `weather-cli default-locations`
+  - Input: `--fallback <LIST>` (comma/newline, e.g. `WEATHER_DEFAULT_CITIES`) and optional
+    `--preference-projection-file <PATH>`
+  - Output: `--output <human|json|alfred-json>` (human prints one location per line)
+  - Description: resolve empty-query default locations; projection labels are never comma-split
+- `weather-cli preference-status`
+  - Input: optional `--preference-projection-file <PATH>`
+  - Output: `--output <human|json|alfred-json>` (Alfred JSON default)
+  - Description: non-selectable external preference projection status row; see
+    [`preference-projection-contract.md`](../workflow-common/docs/preference-projection-contract.md)
 
 ## Batch Behavior
 

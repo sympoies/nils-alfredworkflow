@@ -18,9 +18,11 @@ use weather_cli::{
         ForecastBatchOutput, ForecastOutput, ForecastPeriod, ForecastRequest, HourlyForecastOutput,
         LocationQuery, OutputMode as RequestOutputMode,
     },
+    preferences::{self, DefaultLocations},
     providers::{HttpProviders, ProviderApi},
     service,
 };
+use workflow_common::preference_projection::{ProjectionStatus, load_preference_projection};
 
 #[cfg(test)]
 use weather_cli::{
@@ -81,6 +83,25 @@ enum Commands {
         #[arg(long, default_value_t = DEFAULT_HOURLY_COUNT)]
         hours: usize,
     },
+    /// Resolve empty-query default locations (human mode prints one per line).
+    DefaultLocations {
+        /// Fallback comma/newline list, for example WEATHER_DEFAULT_CITIES.
+        #[arg(long, default_value = "", allow_hyphen_values = true)]
+        fallback: String,
+        /// Optional external preference projection file. Read-only.
+        #[arg(long, value_name = "PATH", allow_hyphen_values = true)]
+        preference_projection_file: Option<String>,
+        #[arg(long, value_enum, default_value_t = OutputMode::Human)]
+        output: OutputMode,
+    },
+    /// Render the external preference projection status row.
+    PreferenceStatus {
+        /// Optional external preference projection file. Read-only.
+        #[arg(long, value_name = "PATH", allow_hyphen_values = true)]
+        preference_projection_file: Option<String>,
+        #[arg(long, value_enum, default_value_t = OutputMode::AlfredJson)]
+        output: OutputMode,
+    },
 }
 
 const ERROR_CODE_USER_INVALID_INPUT: &str = "NILS_WEATHER_001";
@@ -115,6 +136,8 @@ impl Cli {
             Commands::Today { .. } => "weather.today",
             Commands::Week { .. } => "weather.week",
             Commands::Hourly { .. } => "weather.hourly",
+            Commands::DefaultLocations { .. } => "weather.default-locations",
+            Commands::PreferenceStatus { .. } => "weather.preference-status",
         }
     }
 
@@ -122,7 +145,9 @@ impl Cli {
         match &self.command {
             Commands::Today { output, .. }
             | Commands::Week { output, .. }
-            | Commands::Hourly { output, .. } => *output,
+            | Commands::Hourly { output, .. }
+            | Commands::DefaultLocations { output, .. }
+            | Commands::PreferenceStatus { output, .. } => *output,
         }
     }
 }
@@ -141,10 +166,146 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<String, CliError> {
+    // Preference commands are local file reads; skip provider initialization.
+    if matches!(
+        cli.command,
+        Commands::DefaultLocations { .. } | Commands::PreferenceStatus { .. }
+    ) {
+        return run_preference_command(cli.command, Utc::now());
+    }
+
     let config = RuntimeConfig::from_env();
     let providers = HttpProviders::new()
         .map_err(|error| runtime_error(ERROR_CODE_RUNTIME_PROVIDER_INIT, error.to_string()))?;
     run_with(cli, &config, &providers, Utc::now)
+}
+
+fn non_empty_path(raw: Option<&str>) -> Option<&std::path::Path> {
+    raw.filter(|path| !path.is_empty())
+        .map(std::path::Path::new)
+}
+
+fn run_preference_command(command: Commands, now: DateTime<Utc>) -> Result<String, CliError> {
+    match command {
+        Commands::DefaultLocations {
+            fallback,
+            preference_projection_file,
+            output,
+        } => {
+            let resolved = preferences::resolve_default_locations(
+                &fallback,
+                non_empty_path(preference_projection_file.as_deref()),
+                now,
+            );
+            render_default_locations(&resolved, output, now)
+        }
+        Commands::PreferenceStatus {
+            preference_projection_file,
+            output,
+        } => {
+            let status = non_empty_path(preference_projection_file.as_deref()).map(|path| {
+                match load_preference_projection(path, now) {
+                    Ok(projection) if projection.weather_default_locations().is_empty() => {
+                        ProjectionStatus::Empty {
+                            revision: projection.revision,
+                            skipped: 0,
+                        }
+                    }
+                    Ok(projection) => ProjectionStatus::Used {
+                        revision: projection.revision,
+                        generated_at: projection.generated_at,
+                        skipped: 0,
+                    },
+                    Err(error) => ProjectionStatus::Failed(error),
+                }
+            });
+            render_preference_status(status.as_ref(), output, now)
+        }
+        _ => Err(runtime_error(
+            ERROR_CODE_RUNTIME_SERIALIZE,
+            "unsupported preference command",
+        )),
+    }
+}
+
+fn preference_status_json(status: &ProjectionStatus, now: DateTime<Utc>) -> serde_json::Value {
+    json!({
+        "state": status.state(),
+        "title": status.title(now),
+        "subtitle": status.subtitle(preferences::PROJECTION_USED_HINT),
+    })
+}
+
+fn render_default_locations(
+    resolved: &DefaultLocations,
+    output: OutputMode,
+    now: DateTime<Utc>,
+) -> Result<String, CliError> {
+    match output {
+        OutputMode::Human => Ok(resolved.locations.join("\n")),
+        OutputMode::Json => {
+            let result = json!({
+                "source": resolved.source(),
+                "locations": resolved.locations,
+                "preference_status": resolved
+                    .status
+                    .as_ref()
+                    .map(|status| preference_status_json(status, now)),
+            });
+            Ok(build_success_envelope(
+                "weather.default-locations",
+                EnvelopePayloadKind::Result,
+                &result.to_string(),
+            ))
+        }
+        OutputMode::AlfredJson => {
+            let mut items = Vec::with_capacity(resolved.locations.len() + 1);
+            if let Some(status) = resolved.status.as_ref() {
+                items.push(status.to_item(now, preferences::PROJECTION_USED_HINT));
+            }
+            items.extend(resolved.locations.iter().map(|location| {
+                alfred_core::Item::new(location.clone())
+                    .with_subtitle("Default location")
+                    .with_valid(false)
+            }));
+            serialize_feedback(items)
+        }
+    }
+}
+
+fn render_preference_status(
+    status: Option<&ProjectionStatus>,
+    output: OutputMode,
+    now: DateTime<Utc>,
+) -> Result<String, CliError> {
+    match output {
+        OutputMode::Human => Ok(status.map(|status| status.title(now)).unwrap_or_default()),
+        OutputMode::Json => {
+            let result = status.map(|status| preference_status_json(status, now));
+            Ok(build_success_envelope(
+                "weather.preference-status",
+                EnvelopePayloadKind::Result,
+                &json!(result).to_string(),
+            ))
+        }
+        OutputMode::AlfredJson => serialize_feedback(
+            status
+                .map(|status| status.to_item(now, preferences::PROJECTION_USED_HINT))
+                .into_iter()
+                .collect(),
+        ),
+    }
+}
+
+fn serialize_feedback(items: Vec<alfred_core::Item>) -> Result<String, CliError> {
+    alfred_core::Feedback::new(items)
+        .to_json()
+        .map_err(|error| {
+            runtime_error(
+                ERROR_CODE_RUNTIME_SERIALIZE,
+                format!("failed to serialize Alfred output: {error}"),
+            )
+        })
 }
 
 fn run_with<P, N>(
@@ -158,6 +319,9 @@ where
     N: Fn() -> DateTime<Utc> + Copy,
 {
     match cli.command {
+        command @ (Commands::DefaultLocations { .. } | Commands::PreferenceStatus { .. }) => {
+            run_preference_command(command, now_fn())
+        }
         Commands::Today {
             city,
             lat,
@@ -1702,5 +1866,139 @@ mod tests {
     fn main_help_flag_is_supported() {
         let help = Cli::try_parse_from(["weather-cli", "--help"]).expect_err("help");
         assert_eq!(help.kind(), clap::error::ErrorKind::DisplayHelp);
+    }
+
+    fn write_projection(dir: &tempfile::TempDir, generated_at: &str) -> std::path::PathBuf {
+        let path = dir.path().join("preference-projection.json");
+        let document = json!({
+            "schema": "sympoies.alfred-preference-projection/v1",
+            "generatedAt": generated_at,
+            "revision": 2,
+            "digest": format!("sha256:{}", "c".repeat(64)),
+            "market": {"default_quote_currency": "EUR", "watchlist": ["BTC"]},
+            "weather": {
+                "default_location": "Springfield, Oregon",
+                "saved_locations": ["東京", "springfield, oregon", "Zürich"]
+            },
+            "sources": {
+                "market.default_quote_currency": "profile",
+                "market.watchlist": "profile",
+                "weather.default_location": "profile",
+                "weather.saved_locations": "owner_override"
+            }
+        });
+        std::fs::write(&path, document.to_string()).expect("write projection");
+        path
+    }
+
+    fn run_preference_cli(args: &[&str]) -> String {
+        let mut argv = vec!["weather-cli"];
+        argv.extend_from_slice(args);
+        run_with(
+            Cli::parse_from(argv),
+            &config_in_tempdir(),
+            &FakeProviders::ok(),
+            fixed_now,
+        )
+        .expect("preference command should pass")
+    }
+
+    #[test]
+    fn default_locations_prints_projection_lines_without_comma_split() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(&dir, "2026-02-10T23:53:00Z");
+        let path = path.to_string_lossy();
+
+        let output = run_preference_cli(&[
+            "default-locations",
+            "--fallback",
+            "Tokyo,Osaka",
+            "--preference-projection-file",
+            &path,
+        ]);
+        assert_eq!(output, "Springfield, Oregon\n東京\nZürich");
+    }
+
+    #[test]
+    fn default_locations_falls_back_to_split_list() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("missing.json");
+        let missing = missing.to_string_lossy();
+
+        for args in [
+            vec!["default-locations", "--fallback", "Tokyo, Osaka"],
+            vec![
+                "default-locations",
+                "--fallback",
+                "Tokyo, Osaka",
+                "--preference-projection-file",
+                "",
+            ],
+            vec![
+                "default-locations",
+                "--fallback",
+                "Tokyo, Osaka",
+                "--preference-projection-file",
+                &missing,
+            ],
+        ] {
+            assert_eq!(run_preference_cli(&args), "Tokyo\nOsaka");
+        }
+    }
+
+    #[test]
+    fn default_locations_json_envelope_reports_source_and_status() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(&dir, "2026-02-10T23:53:00Z");
+        let path = path.to_string_lossy();
+
+        let output = run_preference_cli(&[
+            "default-locations",
+            "--fallback",
+            "Tokyo",
+            "--preference-projection-file",
+            &path,
+            "--output",
+            "json",
+        ]);
+        let json: Value = serde_json::from_str(&output).expect("json");
+        assert_eq!(json["command"], "weather.default-locations");
+        assert_eq!(json["result"]["source"], "projection");
+        assert_eq!(
+            json["result"]["locations"],
+            json!(["Springfield, Oregon", "東京", "Zürich"])
+        );
+        assert_eq!(json["result"]["preference_status"]["state"], "used");
+        assert!(!output.contains(path.as_ref()));
+    }
+
+    #[test]
+    fn preference_status_rows_match_wording_and_hide_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let fresh = write_projection(&dir, "2026-02-10T23:53:00Z");
+        let fresh = fresh.to_string_lossy().into_owned();
+        let output =
+            run_preference_cli(&["preference-status", "--preference-projection-file", &fresh]);
+        let json: Value = serde_json::from_str(&output).expect("json");
+        assert_eq!(
+            json["items"][0]["title"],
+            "Preferences: projection revision 2 · synced 12m ago"
+        );
+        assert_eq!(json["items"][0]["valid"], false);
+        assert!(!output.contains(&fresh));
+        assert!(!output.contains("Springfield"));
+
+        let stale = write_projection(&dir, "2026-01-01T00:00:00Z");
+        let stale = stale.to_string_lossy().into_owned();
+        let output =
+            run_preference_cli(&["preference-status", "--preference-projection-file", &stale]);
+        let json: Value = serde_json::from_str(&output).expect("json");
+        assert_eq!(
+            json["items"][0]["title"],
+            "Preferences: projection stale — using workflow settings"
+        );
+
+        let output = run_preference_cli(&["preference-status"]);
+        assert_eq!(output, r#"{"items":[]}"#);
     }
 }

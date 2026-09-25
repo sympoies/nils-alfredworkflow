@@ -12,10 +12,13 @@ Shared open-project domain and output-contract utilities reused by workflow crat
 - Output contract: `OutputMode` (including opt-in `clap` value-enum support), `select_output_mode`, envelope builders, and `redact_sensitive`.
 - HTTP: opt-in `http` feature with `build_blocking_client` for shared blocking reqwest builder setup.
 - Usage log: `record_usage` and `parse_usage_timestamp`.
+- Preference projection: `preference_projection::load_preference_projection` (bounded, strictly validated,
+  freshness-checked read of an external preference projection) and `ProjectionStatus` for the status row.
 
 ## Contract References
 
 - Shared runtime contract: [`docs/specs/cli-shared-runtime-contract.md`](../../docs/specs/cli-shared-runtime-contract.md)
+- External preference projection: [`docs/preference-projection-contract.md`](docs/preference-projection-contract.md)
 - Compliance gate: `scripts/cli-standards-audit.sh`
 
 ## Documentation

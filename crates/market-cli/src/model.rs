@@ -140,6 +140,34 @@ pub fn normalize_fx_symbol(raw: &str, field: &'static str) -> Result<String, Val
     Ok(value)
 }
 
+/// Active ISO 4217 national/regional currency codes treated as fiat.
+///
+/// Precious-metal, fund, and testing codes (`XAU`, `XDR`, `XTS`, ...) are not
+/// fiat for favorites classification. A code listed here wins over a crypto
+/// asset that happens to share the same ticker.
+const ISO_4217_FIAT_CODES: [&str; 158] = [
+    "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD", "BDT",
+    "BGN", "BHD", "BIF", "BMD", "BND", "BOB", "BRL", "BSD", "BTN", "BWP", "BYN", "BZD", "CAD",
+    "CDF", "CHF", "CLP", "CNY", "COP", "CRC", "CUP", "CVE", "CZK", "DJF", "DKK", "DOP", "DZD",
+    "EGP", "ERN", "ETB", "EUR", "FJD", "FKP", "GBP", "GEL", "GHS", "GIP", "GMD", "GNF", "GTQ",
+    "GYD", "HKD", "HNL", "HTG", "HUF", "IDR", "ILS", "INR", "IQD", "IRR", "ISK", "JMD", "JOD",
+    "JPY", "KES", "KGS", "KHR", "KMF", "KPW", "KRW", "KWD", "KYD", "KZT", "LAK", "LBP", "LKR",
+    "LRD", "LSL", "LYD", "MAD", "MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MRU", "MUR", "MVR",
+    "MWK", "MXN", "MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR", "NZD", "OMR", "PAB", "PEN",
+    "PGK", "PHP", "PKR", "PLN", "PYG", "QAR", "RON", "RSD", "RUB", "RWF", "SAR", "SBD", "SCR",
+    "SDG", "SEK", "SGD", "SHP", "SLE", "SLL", "SOS", "SRD", "SSP", "STN", "SVC", "SYP", "SZL",
+    "THB", "TJS", "TMT", "TND", "TOP", "TRY", "TTD", "TWD", "TZS", "UAH", "UGX", "USD", "UYU",
+    "UZS", "VED", "VES", "VND", "VUV", "WST", "XAF", "XCD", "XCG", "XOF", "XPF", "YER", "ZAR",
+    "ZMW", "ZWG",
+];
+
+/// Whether `raw` is an active ISO 4217 fiat currency code (case-insensitive).
+pub fn is_fiat_currency(raw: &str) -> bool {
+    normalize_fx_symbol(raw, "currency")
+        .map(|code| ISO_4217_FIAT_CODES.contains(&code.as_str()))
+        .unwrap_or(false)
+}
+
 pub fn normalize_crypto_symbol(raw: &str, field: &'static str) -> Result<String, ValidationError> {
     let value = raw.trim().to_ascii_uppercase();
     if value.len() < 2
@@ -242,6 +270,20 @@ mod tests {
                 expected: "3-letter ISO currency code",
             }
         );
+    }
+
+    #[test]
+    fn model_is_fiat_currency_uses_iso_catalog_not_symbol_shape() {
+        for code in ["USD", "jpy", " TWD ", "EUR", "CHF"] {
+            assert!(is_fiat_currency(code), "{code} should be fiat");
+        }
+        for symbol in ["BTC", "ETH", "ADA", "DOT", "SOL", "XAU", "USDT", "", "US"] {
+            assert!(!is_fiat_currency(symbol), "{symbol} should not be fiat");
+        }
+        let mut sorted = ISO_4217_FIAT_CODES.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), ISO_4217_FIAT_CODES.len());
     }
 
     #[test]

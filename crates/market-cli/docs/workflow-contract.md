@@ -53,8 +53,11 @@ It also includes favorites-list output for the `market-expression` workflow empt
 
 - Command:
   - `market-cli favorites [--list "<comma/newline symbols>"] [--default-fiat <ISO4217>] [--output <human|json|alfred-json> | --json]`
+  - `market-cli favorites ... --preference-projection-file <PATH>` (optional external preference projection)
 - Optional flags:
   - `--list`: ordered favorites list, typically sourced from Alfred workflow variable `MARKET_FAVORITE_LIST`
+  - `--preference-projection-file`: optional external preference projection file, typically sourced from workflow
+    variable `PREFERENCE_PROJECTION_FILE`; an empty value is ignored
   - `--default-fiat`: fallback fiat symbol used when the list is missing or empty (default `USD`)
   - `--output`: explicit output mode override (`human`, `json`, `alfred-json`)
   - `--json`: shorthand for service-envelope JSON output
@@ -74,6 +77,19 @@ It also includes favorites-list output for the `market-expression` workflow empt
     the effective base/quote pair
   - Empty or delimiter-only list input falls back to `BTC,ETH,<DEFAULT_FIAT>,JPY`
   - Invalid non-empty tokens surface a user error rather than being silently skipped
+- Preference projection behavior (see
+  [`preference-projection-contract.md`](../../workflow-common/docs/preference-projection-contract.md)):
+  - Precedence: valid fresh projection watchlist > `--list` > built-in default set
+  - ISO 4217 fiat watchlist entries become explicit pairs `SYM/<projection default_quote_currency>`; a fiat equal
+    to that currency is omitted
+  - Other entries that pass crypto symbol validation stay bare symbols quoted in `--default-fiat`; the projection
+    quote currency never replaces `--default-fiat`
+  - Rejected entries are dropped and counted in the status row subtitle; if nothing usable remains, `--list`
+    applies
+  - When the flag is set, one non-selectable status row (no `uid`, no `arg`) follows the prompt row, for example
+    `Preferences: projection revision 2 · synced 12m ago` or
+    `Preferences: projection stale — using workflow settings`; `human` output appends the same title as a second line
+  - Status rows and errors never include the projection path or preference values
 
 ### Exit Behavior
 
@@ -236,6 +252,8 @@ Favorites row requirements:
   plain symbol tokens use `MARKET_DEFAULT_FIAT`, explicit FX pair tokens keep
   their configured quote, and empty or delimiter-only config falls back to
   `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`.
+- Workflow variable `PREFERENCE_PROJECTION_FILE` is trimmed, home-expanded, and passed to
+  `--preference-projection-file` only when non-empty; `mx <expression>` never passes it.
 - For non-zero exits, script filter should render one fallback item with `valid: false`.
 
 Minimal shell examples:

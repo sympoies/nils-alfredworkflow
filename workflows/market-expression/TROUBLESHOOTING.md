@@ -34,7 +34,11 @@ MARKET_FAVORITE_LIST="BTC,ETH,JPY/USD,JPY/TWD" \
   | jq -e '.items | length == 5 and .[0].title == "Enter a market expression" and all(.[]; .valid == false)'
 
 # Confirm defaults in workflow manifest
-rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACHE_TTL|MARKET_FAVORITES_ENABLED|MARKET_FAVORITE_LIST" workflows/market-expression/workflow.toml
+rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACHE_TTL|MARKET_FAVORITES_ENABLED|MARKET_FAVORITE_LIST|PREFERENCE_PROJECTION_FILE" workflows/market-expression/workflow.toml
+
+# External preference projection: resolved favorites and status without quote lookups
+./target/debug/market-cli favorites --list "BTC,ETH" --default-fiat USD \
+  --preference-projection-file "$HOME/path/to/preference-projection.json" --output human
 ```
 
 ## Common failures and actions
@@ -47,6 +51,11 @@ rg -n "MARKET_CLI_BIN|MARKET_DEFAULT_FIAT|MARKET_FX_CACHE_TTL|MARKET_CRYPTO_CACH
 | Empty query shows unexpected order or missing favorites | `MARKET_FAVORITE_LIST` contains duplicates, different order, or custom separators | `MARKET_FAVORITE_LIST` preserves first-occurrence order after trimming comma/newline tokens. Duplicates are evaluated by effective base/quote pair, so `USD` and `USD/TWD` collapse when `MARKET_DEFAULT_FIAT=TWD`. |
 | Empty query falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY` | `MARKET_FAVORITE_LIST` is empty or delimiter-only | This is expected fallback behavior. Set a non-empty comma/newline list to override it. |
 | Empty query shows a generic `Market Expression error` row | `MARKET_FAVORITE_LIST` contains an invalid symbol/pair token or `MARKET_DEFAULT_FIAT` is invalid | Use uppercase symbol tokens like `BTC`, `JPY` or uppercase FX pairs like `JPY/USD`. Empty or delimiter-only input falls back automatically; malformed non-empty tokens do not. |
+| Status row `Preferences: projection unavailable — using workflow settings` | `PREFERENCE_PROJECTION_FILE` points to a missing or unreadable file | Check the path (`~/` is expanded) and that the preference owner has published the file. Clear the variable to hide the row. |
+| Status row `Preferences: projection stale — using workflow settings` | The projection `generatedAt` is older than 7 days | Refresh the projection from its owner. Until then `MARKET_FAVORITE_LIST` applies. |
+| Status row `Preferences: projection invalid — using workflow settings` | The file is oversize, not JSON, has a wrong schema, extra or missing fields, a bad label, or a future timestamp | Validate the file against `crates/workflow-common/docs/preference-projection-contract.md`. `market-cli` names only the failing field, never values. |
+| Status row reports `has no usable entries` or `entries skipped` | Watchlist entries failed market-cli symbol validation, or every fiat entry equals the projection quote currency | Fix the owner's watchlist; unsupported entries are dropped rather than failing the whole list. |
+| Fiat favorites quote in an unexpected currency | Projection fiat entries use the projection quote currency; crypto entries use `MARKET_DEFAULT_FIAT` | This is expected. Change `MARKET_DEFAULT_FIAT` for crypto quotes or the owner's quote currency for fiat pairs. |
 | Empty query shows a raw symbol/pair instead of `1 BASE = ... QUOTE` | Quote lookup for that favorite failed and the row degraded to hint mode | Retry after provider recovery, or inspect cache/provider connectivity if it persists for the same symbol/pair. |
 | Quote rows show no icon | Cold icon cache, icon CDN issue, or symbol has no dedicated icon and generic fallback was unavailable | Retry once to allow cold-cache fill, then inspect the market cache tree under `market-cli/icons/cryptocurrency-icons/0.18.1/32/color/`. Rows should still work without icons. |
 | First render feels slower than later renders | Cold icon cache download happened during row rendering | Re-run the same query once. Warm-cache renders should reuse the same cached icon path. |
@@ -87,7 +96,8 @@ scripts/workflow-pack.sh --id market-expression
 2. Restore workflow variables to defaults
    (`MARKET_CLI_BIN=""`, `MARKET_DEFAULT_FIAT="USD"`,
    `MARKET_FX_CACHE_TTL=""`, `MARKET_CRYPTO_CACHE_TTL=""`,
-   `MARKET_FAVORITES_ENABLED="1"`, `MARKET_FAVORITE_LIST="BTC,ETH,EUR,JPY"`)
+   `MARKET_FAVORITES_ENABLED="1"`, `MARKET_FAVORITE_LIST="BTC,ETH,EUR,JPY"`,
+   `PREFERENCE_PROJECTION_FILE=""`)
    and retest.
 3. If issue persists, roll back only `workflows/market-expression/` on a branch, then run all Validation commands before
    release.
