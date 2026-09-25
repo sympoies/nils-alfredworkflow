@@ -49,6 +49,9 @@ the built-in `Tokyo`.
 
 - Locations are the projection default location followed by its saved
   locations, deduplicated case-insensitively in first-seen order.
+- Two labels that geocode to the same coordinates, such as `Taipei, Taiwan`
+  and `Taipei`, show one forecast at the first label's position. The city
+  picker collapses them once both labels are in the geocode cache.
 - Projection locations are never split on commas, so labels like
   `Springfield, Oregon` or `東京` stay whole; `weather-cli default-locations`
   returns them one per line.

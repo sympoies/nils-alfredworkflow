@@ -30,6 +30,8 @@ Preference commands (local file reads only, no provider calls; see
 - `default-locations` resolves empty-query locations: a valid fresh projection
   (`default_location` then `saved_locations`, deduplicated case-insensitively,
   never comma-split) wins; otherwise `--fallback` is split on commas/newlines.
+  A label whose cached geocode has the same coordinates as an earlier label is
+  dropped; a label without a cached geocode is kept. No geocoding call is made.
   `human` output (default) prints one location per line for the shell adapter;
   `json` returns `{source, locations, preference_status}`; `alfred-json` returns
   the status row (when configured) followed by one non-actionable row per
@@ -47,6 +49,7 @@ Location input rules:
 - `--city` cannot be empty.
 - Repeating `--city` enables multi-city batch mode for `today` and `week` only.
 - Repeated `--city` input is trimmed, deduped case-insensitively, and preserves first-seen order.
+- After geocoding, batch mode drops a city whose coordinates (rounded to four decimals) match an earlier city.
 - `hourly` supports only a single city or one coordinate pair.
 - `--lang` affects human-readable and Alfred labels only; machine JSON fields stay stable.
 - `--json` is shorthand for JSON envelope output and conflicts with an explicit non-JSON `--output`.
