@@ -8,11 +8,13 @@ Authoritative Calendar documentation for `google-cli`.
 - `calendar events list`
 - `calendar events get <eventId>`
 - `calendar events create`
+- `calendar events update <eventId>`
 - `calendar events delete <eventId>`
+- `calendar events respond <eventId>`
 
-Editing an existing event (`events update`), calendar creation/deletion, and ACL changes are deliberately out of
-scope. Delete is in scope because an event a consumer created is an event it must be able to retract; without it the
-only way back is the Calendar UI.
+Calendar creation/deletion and ACL changes are deliberately out of scope. Update and delete are in scope because an
+event a consumer created is an event it must be able to correct or retract. Respond is in scope because an invitation
+is only answered by the attendee: it changes the account's own attendee status and nothing else.
 
 ## Runtime model
 
@@ -23,8 +25,9 @@ only way back is the Calendar UI.
 - Fixture mode is enabled only when one of these env vars is set:
   - `GOOGLE_CLI_CALENDAR_FIXTURE_PATH`
   - `GOOGLE_CLI_CALENDAR_FIXTURE_JSON`
-- Fixture mode never mutates remote state. `events create` echoes the request it built and `events delete` resolves
-  the id then reports success without removing anything, so command wiring stays testable without network access.
+- Fixture mode never mutates remote state. `events create` echoes the request it built, `events delete` resolves
+  the id then reports success without removing anything, and `events respond` applies its attendee checks and echoes
+  the answered event, so command wiring stays testable without network access.
 
 ## Calendar selection
 
@@ -131,6 +134,26 @@ cargo run -p nils-google-cli -- --output json -a you@example.com \
 
 `deleted: true` means that id is gone. An id that was never there, or was already deleted, is
 `NILS_GOOGLE_016` — the command never reports success for an event it did not remove.
+
+Answer an invitation:
+
+```bash
+cargo run -p nils-google-cli -- --output json -a you@example.com \
+  calendar events respond <event_id> --calendar-id "<calendar_id>" \
+  --response accepted --send-updates all
+```
+
+- `--response` is `accepted`, `declined`, or `tentative`. `--send-updates` is `all` (the default, which notifies the
+  organizer), `externalOnly`, or `none`.
+- Calendar marks one attendee `self`: the owner of the calendar named by `--calendar-id`. On the account's own
+  calendar that is the account; on a delegated or shared calendar it is that calendar's owner.
+- The command reads the event, finds the `self` attendee, and PATCHes only that entry with `attendeesOmitted: true`,
+  which Calendar documents as the way to update just the participant's response. The rest of the guest list is never
+  sent, so a hidden guest list cannot be overwritten.
+- An event whose calendar is not invited, or whose calendar organizes it, is refused with `NILS_GOOGLE_015`; an
+  organizer changes its own event with `events update`.
+- Every event view carries `self_attendee` (`response_status`, `organizer`) when that calendar is an attendee, so a
+  consumer can find unanswered invitations (`needsAction`) with `events list`.
 
 ## Error codes
 

@@ -17,12 +17,12 @@ Define the native Rust command contract for `google-cli` over the repo-scoped Go
   - `auth add|list|status|remove|alias|manage`
   - `gmail search|get|send|thread get|thread modify`
   - `drive ls|search|get|download|upload|mkdir|update|rename|move|copy|trash|untrash`
-  - `calendar calendars list`, `calendar events list|get|create`
+  - `calendar calendars list`, `calendar events list|get|create|update|delete|respond`
 - Out of scope:
   - browser account-manager UI rebuild
   - non-scoped domains (`chat`, `docs`, `forms`, `people`, and similar)
-  - calendar mutation beyond event creation (`events update|delete`, calendar
-    creation/deletion, ACL changes)
+  - calendar creation/deletion, ACL changes, and changing another attendee's
+    response
   - service-account flows in this phase unless explicitly added later
 
 ## Output and error envelope
@@ -128,6 +128,11 @@ Command IDs are `google.calendar.calendars.list` and `google.calendar.events.{li
 - `events delete <eventId>` removes one event and answers `deleted: true`. Calendar returns 410 Gone for an event that
   was already deleted, which maps to the same not-found error as 404 so a repeated delete says so plainly instead of
   surfacing a raw HTTP failure. It never reports success for an id that is not there.
+- `events respond <eventId> --response accepted|declined|tentative` answers an invitation for the calendar named by
+  `--calendar-id`. It reads the event and PATCHes only the attendee marked `self`, with `attendeesOmitted: true` and
+  `sendUpdates` (`all` by default), so no other guest is ever sent. A calendar that is not invited, or that organizes
+  the event, is refused as invalid input. Event views carry `self_attendee` so unanswered invitations (`needsAction`)
+  are visible.
 - `GOOGLE_CLI_CALENDAR_FIXTURE_PATH` / `GOOGLE_CLI_CALENDAR_FIXTURE_JSON` serve a local fixture store so command wiring
   is testable without network access. Fixture mode never mutates remote state: `events create` echoes the built request
   and `events delete` resolves the id, then reports success without removing anything.

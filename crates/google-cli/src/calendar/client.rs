@@ -189,9 +189,28 @@ pub struct EventView {
     pub meet_link: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attendees: Vec<String>,
+    /// The attendee entry Calendar marks `self`: the owner of the calendar the
+    /// event was read from, when that calendar is invited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub self_attendee: Option<SelfAttendee>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub private_properties: BTreeMap<String, String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SelfAttendee {
+    /// `needsAction`, `accepted`, `declined`, or `tentative`.
+    pub response_status: String,
+    #[serde(default)]
+    pub organizer: bool,
+}
+
+/// The responses an attendee may give; Google's fourth status, `needsAction`,
+/// is the unanswered state and cannot be sent.
+pub const EVENT_RESPONSES: [&str; 3] = ["accepted", "declined", "tentative"];
+
+/// The Calendar API `sendUpdates` modes.
+pub const SEND_UPDATES: [&str; 3] = ["all", "externalOnly", "none"];
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct CalendarFixtureStore {
@@ -242,6 +261,14 @@ pub struct EventUpdateRequest {
     pub location: Option<String>,
     pub description: Option<String>,
     pub google_meet: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct EventRespondRequest {
+    pub calendar_id: String,
+    pub event_id: String,
+    pub response: String,
+    pub send_updates: String,
 }
 
 #[derive(Debug, Clone)]
@@ -451,6 +478,41 @@ impl CalendarSession {
             encode_path(&request.event_id)
         );
         let query = conference_query(request.google_meet);
+        let response = self.patch_json(
+            &path,
+            &query,
+            payload,
+            Some(("event", request.event_id.as_str())),
+        )?;
+        Ok(event_view_from_json(&response))
+    }
+
+    pub fn respond_event(&self, request: &EventRespondRequest) -> Result<EventView, AppError> {
+        if let Some(fixture) = &self.fixture {
+            // Fixture mode never mutates remote state; it applies the same
+            // attendee checks and echoes the answered event back.
+            let mut event = fixture
+                .events
+                .iter()
+                .find(|event| event.id == request.event_id)
+                .cloned()
+                .ok_or_else(|| AppError::calendar_not_found("event", &request.event_id))?;
+            let attendee = answerable_attendee(event.self_attendee.as_ref(), &request.event_id)?;
+            event.self_attendee = Some(SelfAttendee {
+                response_status: request.response.clone(),
+                organizer: attendee.organizer,
+            });
+            return Ok(event);
+        }
+
+        let path = format!(
+            "calendars/{}/events/{}",
+            encode_path(&request.calendar_id),
+            encode_path(&request.event_id)
+        );
+        let current = self.get_json(&path, &[], Some(("event", request.event_id.as_str())))?;
+        let payload = build_response_patch(&current, &request.event_id, &request.response)?;
+        let query = [("sendUpdates", request.send_updates.clone())];
         let response = self.patch_json(
             &path,
             &query,
@@ -723,6 +785,62 @@ fn update_time_slot(time: &TimeSpec, time_zone: Option<&str>) -> Result<Value, A
     }
 }
 
+fn answerable_attendee<'a>(
+    attendee: Option<&'a SelfAttendee>,
+    event_id: &str,
+) -> Result<&'a SelfAttendee, AppError> {
+    let attendee = attendee.ok_or_else(|| {
+        AppError::invalid_calendar_input(format!(
+            "the account is not an attendee of event `{event_id}`, so it has no invitation to answer"
+        ))
+    })?;
+    if attendee.organizer {
+        return Err(AppError::invalid_calendar_input(format!(
+            "the account organizes event `{event_id}`; change it with `events update` instead of responding"
+        )));
+    }
+    Ok(attendee)
+}
+
+/// Build the PATCH body that answers an invitation. It sends only the `self`
+/// attendee with `attendeesOmitted: true`, which Calendar documents as the way
+/// to update just the participant's response. Sending the array as read would
+/// be unsafe: with the guest list hidden, Calendar returns only the caller's
+/// entry, and a PATCH without `attendeesOmitted` treats that as the whole list.
+pub fn build_response_patch(
+    event: &Value,
+    event_id: &str,
+    response: &str,
+) -> Result<Value, AppError> {
+    let entry = event
+        .get("attendees")
+        .and_then(Value::as_array)
+        .and_then(|items| items.iter().find(|item| attendee_is_self(item)));
+    let current = entry.map(self_attendee_from_json);
+    answerable_attendee(current.as_ref(), event_id)?;
+
+    let mut entry = entry.cloned().unwrap_or_default();
+    entry["responseStatus"] = Value::String(response.to_string());
+    Ok(json!({ "attendees": [entry], "attendeesOmitted": true }))
+}
+
+fn attendee_is_self(attendee: &Value) -> bool {
+    attendee
+        .get("self")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn self_attendee_from_json(attendee: &Value) -> SelfAttendee {
+    SelfAttendee {
+        response_status: string_field(attendee, "responseStatus"),
+        organizer: attendee
+            .get("organizer")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    }
+}
+
 fn apply_fixture_update(event: &mut EventView, request: &EventUpdateRequest) {
     if let Some(summary) = &request.summary {
         event.summary.clone_from(summary);
@@ -834,6 +952,11 @@ fn event_view_from_json(value: &Value) -> EventView {
                     .collect()
             })
             .unwrap_or_default(),
+        self_attendee: value
+            .get("attendees")
+            .and_then(Value::as_array)
+            .and_then(|items| items.iter().find(|item| attendee_is_self(item)))
+            .map(self_attendee_from_json),
         private_properties: value
             .get("extendedProperties")
             .and_then(|extended| extended.get("private"))
@@ -1184,6 +1307,71 @@ mod tests {
         assert_eq!(
             encode_path("abc123@group.calendar.google.com"),
             "abc123%40group.calendar.google.com"
+        );
+    }
+
+    fn invitation() -> Value {
+        json!({
+            "id": "ev-invite",
+            "summary": "Design review",
+            "attendees": [
+                {"email": "organizer@example.com", "organizer": true, "responseStatus": "accepted"},
+                {"email": "me@example.com", "self": true, "responseStatus": "needsAction"},
+                {"email": "guest@example.com", "responseStatus": "declined", "comment": "away"}
+            ]
+        })
+    }
+
+    #[test]
+    fn response_patch_sends_only_the_self_attendee_with_attendees_omitted() {
+        let patch = build_response_patch(&invitation(), "ev-invite", "accepted").expect("patch");
+        let attendees = patch["attendees"].as_array().expect("attendees");
+        assert_eq!(attendees.len(), 1, "only the self entry is sent");
+        assert_eq!(attendees[0]["email"], "me@example.com");
+        assert_eq!(attendees[0]["self"], true);
+        assert_eq!(attendees[0]["responseStatus"], "accepted");
+        assert_eq!(patch["attendeesOmitted"], true);
+        assert_eq!(patch.as_object().map(|body| body.len()), Some(2));
+    }
+
+    #[test]
+    fn response_patch_is_safe_when_the_guest_list_is_hidden() {
+        // With guests hidden, Calendar returns only the caller's entry. The
+        // patch must still mark the list partial, or Google could read the
+        // single entry as the whole guest list.
+        let hidden = json!({"id": "ev", "attendeesOmitted": true, "attendees": [
+            {"email": "me@example.com", "self": true, "responseStatus": "needsAction"}
+        ]});
+        let patch = build_response_patch(&hidden, "ev", "declined").expect("patch");
+        assert_eq!(patch["attendeesOmitted"], true);
+        assert_eq!(patch["attendees"][0]["responseStatus"], "declined");
+    }
+
+    #[test]
+    fn response_patch_refuses_a_non_attendee_and_the_organizer() {
+        let not_invited = json!({"id": "ev", "attendees": [{"email": "a@example.com"}]});
+        assert!(build_response_patch(&not_invited, "ev", "accepted").is_err());
+        assert!(build_response_patch(&json!({"id": "ev"}), "ev", "accepted").is_err());
+
+        let organized = json!({"id": "ev", "attendees": [
+            {"email": "me@example.com", "self": true, "organizer": true, "responseStatus": "accepted"}
+        ]});
+        assert!(build_response_patch(&organized, "ev", "declined").is_err());
+    }
+
+    #[test]
+    fn event_view_reports_the_self_attendee() {
+        let view = event_view_from_json(&invitation());
+        assert_eq!(
+            view.self_attendee,
+            Some(SelfAttendee {
+                response_status: "needsAction".to_string(),
+                organizer: false
+            })
+        );
+        assert_eq!(
+            event_view_from_json(&json!({"id": "ev"})).self_attendee,
+            None
         );
     }
 }

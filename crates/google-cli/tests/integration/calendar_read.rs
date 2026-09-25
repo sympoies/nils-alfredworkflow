@@ -41,6 +41,32 @@ fn fixture_payload() -> Value {
                 }
             },
             {
+                "id": "ev-invite",
+                "summary": "Design review",
+                "status": "confirmed",
+                "start": "2026-08-17T14:00:00+08:00",
+                "end": "2026-08-17T15:00:00+08:00",
+                "all_day": false,
+                "attendees": ["organizer@example.com", "default@example.com"],
+                "self_attendee": {
+                    "response_status": "needsAction",
+                    "organizer": false
+                }
+            },
+            {
+                "id": "ev-organized",
+                "summary": "My own meeting",
+                "status": "confirmed",
+                "start": "2026-08-18T14:00:00+08:00",
+                "end": "2026-08-18T15:00:00+08:00",
+                "all_day": false,
+                "attendees": ["default@example.com", "guest@example.com"],
+                "self_attendee": {
+                    "response_status": "accepted",
+                    "organizer": true
+                }
+            },
+            {
                 "id": "ev-other-group",
                 "summary": "Unrelated",
                 "status": "confirmed",
@@ -403,4 +429,167 @@ fn events_update_changes_only_supplied_fields() {
     );
     assert_eq!(event["start"].as_str(), Some("2026-08-15T11:20:00+08:00"));
     assert_eq!(event["end"].as_str(), Some("2026-08-15T13:00:00+08:00"));
+}
+
+fn respond(temp: &std::path::Path, env: (&str, &str), extra: &[&str]) -> std::process::Output {
+    let mut arguments = vec!["--output", "json", "calendar", "events", "respond"];
+    arguments.extend_from_slice(extra);
+    native_calendar::run(temp, &arguments, &[env])
+}
+
+#[test]
+fn events_get_reports_the_account_attendee_status() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    let output = native_calendar::run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "calendar",
+            "events",
+            "get",
+            "ev-invite",
+            "--calendar-id",
+            "primary@example.com",
+        ],
+        &[(key, value.as_str())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let event = &native_calendar::json(&output)["result"]["event"];
+    assert_eq!(
+        event["self_attendee"]["response_status"].as_str(),
+        Some("needsAction")
+    );
+    assert_eq!(event["self_attendee"]["organizer"].as_bool(), Some(false));
+}
+
+#[test]
+fn events_respond_sets_only_the_account_response() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    let output = respond(
+        temp.path(),
+        (key, value.as_str()),
+        &[
+            "ev-invite",
+            "--calendar-id",
+            "primary@example.com",
+            "--response",
+            "accepted",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let payload = native_calendar::json(&output);
+    assert_eq!(
+        payload.get("command").and_then(Value::as_str),
+        Some("google.calendar.events.respond")
+    );
+    let result = &payload["result"];
+    assert_eq!(result["response"].as_str(), Some("accepted"));
+    assert_eq!(result["send_updates"].as_str(), Some("all"));
+    assert_eq!(
+        result["event"]["self_attendee"]["response_status"].as_str(),
+        Some("accepted")
+    );
+    assert_eq!(result["event"]["summary"].as_str(), Some("Design review"));
+
+    let quiet = respond(
+        temp.path(),
+        (key, value.as_str()),
+        &[
+            "ev-invite",
+            "--calendar-id",
+            "primary@example.com",
+            "--response",
+            "tentative",
+            "--send-updates",
+            "none",
+        ],
+    );
+    assert_eq!(quiet.status.code(), Some(0));
+    assert_eq!(
+        native_calendar::json(&quiet)["result"]["send_updates"].as_str(),
+        Some("none")
+    );
+}
+
+#[test]
+fn events_respond_refuses_events_the_account_cannot_answer() {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &fixture_payload());
+    let (key, value) = native_calendar::fixture_env(&fixture);
+
+    // Not an attendee, the organizer's own event, a missing id, an unknown
+    // response, and an unknown notification mode must all fail closed.
+    for (arguments, code) in [
+        (
+            vec![
+                "ev-hotpot",
+                "--calendar-id",
+                CALENDAR_ID,
+                "--response",
+                "accepted",
+            ],
+            "NILS_GOOGLE_015",
+        ),
+        (
+            vec![
+                "ev-organized",
+                "--calendar-id",
+                "primary@example.com",
+                "--response",
+                "declined",
+            ],
+            "NILS_GOOGLE_015",
+        ),
+        (
+            vec![
+                "ev-nope",
+                "--calendar-id",
+                "primary@example.com",
+                "--response",
+                "accepted",
+            ],
+            "NILS_GOOGLE_016",
+        ),
+        (
+            vec![
+                "ev-invite",
+                "--calendar-id",
+                "primary@example.com",
+                "--response",
+                "maybe",
+            ],
+            "NILS_GOOGLE_015",
+        ),
+        (
+            vec![
+                "ev-invite",
+                "--calendar-id",
+                "primary@example.com",
+                "--response",
+                "accepted",
+                "--send-updates",
+                "loud",
+            ],
+            "NILS_GOOGLE_015",
+        ),
+        (
+            vec!["ev-invite", "--calendar-id", "primary@example.com"],
+            "NILS_GOOGLE_015",
+        ),
+    ] {
+        let output = respond(temp.path(), (key, value.as_str()), &arguments);
+        assert_ne!(output.status.code(), Some(0), "{arguments:?}");
+        let error = native_calendar::json(&output);
+        assert_eq!(error["error"]["code"].as_str(), Some(code), "{arguments:?}");
+    }
 }

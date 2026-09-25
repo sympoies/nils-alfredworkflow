@@ -79,6 +79,9 @@ enforce its own write scope; these native commands have no folder allowlist.
 | `calendar events list` | `--calendar-id`, `--from`, `--to`, `--query`, `--max`, `--private-property` | List events, expanded to single instances and ordered by start time. |
 | `calendar events get` | event id, `--calendar-id` | Fetch one event. |
 | `calendar events create` | `--calendar-id`, `--summary`, `--start`, `--end`, `--time-zone`, `--location`, `--description`, `--attendee`, `--private-property` | Create an all-day or timed event. |
+| `calendar events update` | event id, `--calendar-id`, `--summary`, `--start`, `--end`, `--time-zone`, `--location`, `--description` | Change only the supplied fields of an event. |
+| `calendar events delete` | event id, `--calendar-id` | Delete one event; a missing id is not-found. |
+| `calendar events respond` | event id, `--calendar-id`, `--response`, `--send-updates` | Answer an invitation by changing only the account's own attendee status. |
 
 ## JSON envelope shape
 
