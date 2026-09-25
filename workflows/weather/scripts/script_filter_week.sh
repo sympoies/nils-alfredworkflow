@@ -45,6 +45,23 @@ split_city_csv() {
   printf '%s' "$value" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d'
 }
 
+preference_projection_configured() {
+  [[ -n "$(trim_query "${PREFERENCE_PROJECTION_FILE:-}")" ]]
+}
+
+emit_picker_with_preference_status() {
+  local raw_query="${1-}"
+  local picker_json
+
+  picker_json="$(emit_city_picker_items "$raw_query")"
+  if [[ -z "$(trim_query "$raw_query")" ]] && preference_projection_configured; then
+    "$script_dir/script_filter_common.sh" with-preference-status "$picker_json"
+    return 0
+  fi
+
+  printf '%s\n' "$picker_json"
+}
+
 is_lat_lon_query() {
   local value="${1-}"
   [[ "$value" =~ ^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?[[:space:]]*,[[:space:]]*[+-]?[0-9]+([.][0-9]+)?[[:space:]]*$ ]]
@@ -73,7 +90,12 @@ emit_city_picker_items() {
   defaults_csv="$(trim_query "${WEATHER_DEFAULT_CITIES:-$DEFAULT_CITY_FALLBACK}")"
   [[ -n "$defaults_csv" ]] || defaults_csv="$DEFAULT_CITY_FALLBACK"
 
-  mapfile -t default_cities < <(split_city_csv "$defaults_csv")
+  if preference_projection_configured; then
+    # Projection labels arrive one per line and are never comma-split.
+    mapfile -t default_cities < <("$script_dir/script_filter_common.sh" default-locations)
+  else
+    mapfile -t default_cities < <(split_city_csv "$defaults_csv")
+  fi
   if [[ ${#default_cities[@]} -eq 0 ]]; then
     default_cities=("$DEFAULT_CITY_FALLBACK")
   fi
@@ -155,11 +177,12 @@ trimmed_query="$(trim_query "$query")"
 if [[ "$trimmed_query" == "${CITY_TOKEN_PREFIX}"* ]]; then
   selected_city="$(trim_query "${trimmed_query#"${CITY_TOKEN_PREFIX}"}")"
   if [[ -z "$selected_city" ]]; then
-    emit_city_picker_items ""
+    emit_picker_with_preference_status ""
     exit 0
   fi
 
-  if week_json="$("$script_dir/script_filter_common.sh" week "$selected_city")"; then
+  # A selected city token names one location, even when it contains commas.
+  if week_json="$(WEATHER_QUERY_SINGLE_LOCATION=1 "$script_dir/script_filter_common.sh" week "$selected_city")"; then
     if command -v jq >/dev/null 2>&1; then
       jq -ce 'if (.items | type) == "array" then .items |= .[:7] else . end' <<<"$week_json"
       exit 0
@@ -173,4 +196,4 @@ if [[ "$trimmed_query" == "${CITY_TOKEN_PREFIX}"* ]]; then
   exit 0
 fi
 
-emit_city_picker_items "$trimmed_query"
+emit_picker_with_preference_status "$trimmed_query"

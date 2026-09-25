@@ -8,6 +8,7 @@
 //! - `output_contract`: shared output modes + JSON envelope helpers.
 //! - `list_parser`: ordered comma/newline list parsing utilities.
 //! - `http`: opt-in blocking reqwest client builder primitive.
+//! - `preference_projection`: read-only loader for an external preference projection.
 
 pub mod config;
 pub mod discovery;
@@ -18,6 +19,7 @@ pub mod git;
 pub mod http;
 pub mod list_parser;
 pub mod output_contract;
+pub mod preference_projection;
 pub mod usage_log;
 
 pub use alfred_core::Feedback;

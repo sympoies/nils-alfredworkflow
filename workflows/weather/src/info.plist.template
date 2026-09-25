@@ -377,6 +377,27 @@
       <key>variable</key>
       <string>WEATHER_CACHE_TTL_SECS</string>
     </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>default</key>
+        <string></string>
+        <key>placeholder</key>
+        <string>~/path/to/preference-projection.json</string>
+        <key>required</key>
+        <false/>
+        <key>trim</key>
+        <true/>
+      </dict>
+      <key>description</key>
+      <string>Optional external preference projection JSON file (read-only). When valid and fresh, its default and saved locations replace WEATHER_DEFAULT_CITIES for empty queries and a status row shows the sync state. Empty keeps workflow settings.</string>
+      <key>label</key>
+      <string>PREFERENCE_PROJECTION_FILE</string>
+      <key>type</key>
+      <string>textfield</string>
+      <key>variable</key>
+      <string>PREFERENCE_PROJECTION_FILE</string>
+    </dict>
   </array>
   <key>variablesdontexport</key>
   <array/>

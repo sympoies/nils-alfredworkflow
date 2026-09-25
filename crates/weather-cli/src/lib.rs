@@ -5,6 +5,7 @@ pub mod error;
 pub mod geocoding;
 pub mod hourly_service;
 pub mod model;
+pub mod preferences;
 pub mod providers;
 pub mod service;
 pub mod weather_code;

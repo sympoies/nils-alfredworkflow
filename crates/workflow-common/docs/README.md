@@ -10,6 +10,8 @@ Crate-local documentation index for `nils-workflow-common`.
 ## Canonical Documents
 
 - `../README.md`: crate purpose, public API summary, and validation commands.
+- [`preference-projection-contract.md`](preference-projection-contract.md): external preference projection
+  file format, validation, freshness, precedence, status-row wording, and privacy rules.
 
 ## Why no `workflow-contract.md`
 

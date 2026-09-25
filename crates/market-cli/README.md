@@ -9,7 +9,7 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
 | `market-cli fx` | `--base <BASE> --quote <QUOTE> --amount <AMOUNT>` | Query fiat exchange rate (Frankfurter). |
 | `market-cli crypto` | `--base <BASE> --quote <QUOTE> --amount <AMOUNT>` | Query crypto spot price (Coinbase primary, Kraken fallback). |
 | `market-cli expr` | `--query <QUERY> [--default-fiat <DEFAULT_FIAT>]` | Evaluate market expressions and return Alfred Script Filter JSON. |
-| `market-cli favorites` | `[--list <LIST>] [--default-fiat <DEFAULT_FIAT>] [--output <MODE> \| --json]` | Render the empty-query market prompt row plus non-actionable favorite quote rows for the `market-expression` workflow. |
+| `market-cli favorites` | `[--list <LIST>] [--default-fiat <DEFAULT_FIAT>] [--preference-projection-file <PATH>] [--output <MODE> \| --json]` | Render the empty-query market prompt row plus non-actionable favorite quote rows for the `market-expression` workflow. |
 
 ## Environment Variables
 
@@ -26,6 +26,11 @@ CLI backend for market data (`fx`, `crypto`) and market-expression workflow supp
   Tokens may be plain symbols (`BTC`, `JPY`) or explicit FX pairs (`JPY/USD`, `JPY/TWD`).
   Plain symbols resolve against `MARKET_DEFAULT_FIAT`.
   Empty or delimiter-only input falls back to `BTC,ETH,<MARKET_DEFAULT_FIAT>,JPY`
+- Optional external preference projection: `--preference-projection-file <PATH>` (workflow variable
+  `PREFERENCE_PROJECTION_FILE`). When valid and fresh, its watchlist replaces `--list`: ISO 4217 fiat entries become
+  `SYM/<projection quote currency>` pairs and other symbols stay bare, quoted in `--default-fiat`. A non-selectable
+  status row follows the prompt row. See
+  [`preference-projection-contract.md`](../workflow-common/docs/preference-projection-contract.md).
 
 ## Output Contract
 

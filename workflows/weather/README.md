@@ -24,7 +24,8 @@ Show no-token weather forecasts from `weather-cli`, with `wt` for today/hourly f
 - Week view is two-stage:
   1. `ww <query>` to pick a city.
   2. Select a city row to show fixed 7-day forecast rows.
-- Empty query uses `WEATHER_DEFAULT_CITIES`.
+- Empty query uses a valid fresh external preference projection when
+  `PREFERENCE_PROJECTION_FILE` is set, otherwise `WEATHER_DEFAULT_CITIES`.
 
 ## Workflow Variables
 
@@ -36,6 +37,30 @@ Set these via Alfred's `Configure Workflow...` UI:
 | `WEATHER_LOCALE` | No | `en` | Output locale for weather labels (`en` default, `zh` optional). |
 | `WEATHER_DEFAULT_CITIES` | No | `Tokyo` | Default city list when query is empty (comma-separated). |
 | `WEATHER_CACHE_TTL_SECS` | No | `900` | Cache TTL in seconds for weather responses (15 minutes). |
+| `PREFERENCE_PROJECTION_FILE` | No | `(empty)` | Optional path to an external preference projection JSON file (`~/` supported). When valid and fresh, its locations replace `WEATHER_DEFAULT_CITIES` for empty queries. Empty keeps workflow settings. |
+
+### External preference projection
+
+`PREFERENCE_PROJECTION_FILE` lets another preference owner supply the
+empty-query locations for both `wt` and `ww`. The workflow only reads the file;
+queries never write anything. Precedence is: explicit query (including
+`lat,lon`), then a valid fresh projection, then `WEATHER_DEFAULT_CITIES`, then
+the built-in `Tokyo`.
+
+- Locations are the projection default location followed by its saved
+  locations, deduplicated case-insensitively in first-seen order.
+- Projection locations are never split on commas, so labels like
+  `Springfield, Oregon` or `東京` stay whole; `weather-cli default-locations`
+  returns them one per line.
+- When the variable is set, the empty query adds one non-selectable status row,
+  such as `Preferences: projection revision 2 · synced 12m ago` or
+  `Preferences: projection invalid — using workflow settings`. It never shows
+  the path or location values.
+- `ww` query filtering keeps its existing behavior against the resolved default
+  list.
+
+The file format, validation, and freshness rules are defined in the
+[preference projection contract](../../crates/workflow-common/docs/preference-projection-contract.md).
 
 ## Notes
 

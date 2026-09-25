@@ -11,7 +11,9 @@ pub mod model;
 pub mod providers;
 pub mod service;
 
-use crate::model::{ValidationError, normalize_crypto_symbol, normalize_fx_symbol};
+use crate::model::{
+    ValidationError, is_fiat_currency, normalize_crypto_symbol, normalize_fx_symbol,
+};
 
 const FAVORITE_TOKEN_EXPECTED_FORMAT: &str =
     "2-10 uppercase alphanumeric symbol or 3-letter FX pair BASE/QUOTE";
@@ -127,6 +129,69 @@ fn invalid_favorite_token(raw: &str) -> ValidationError {
     }
 }
 
+/// Favorites derived from an external preference projection watchlist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WatchlistFavorites {
+    pub favorites: Vec<FavoriteTarget>,
+    /// Entries market-cli rejected (unsupported symbol, or a fiat entry
+    /// without a valid quote currency). Values are intentionally not kept.
+    pub skipped: usize,
+}
+
+/// Map an ordered projection watchlist to favorites.
+///
+/// - An ISO 4217 fiat entry becomes the explicit pair `SYM/<quote_currency>`;
+///   a fiat equal to `quote_currency` is omitted.
+/// - Any other entry that passes crypto symbol validation stays a bare symbol
+///   quoted in `default_fiat` (the workflow's `MARKET_DEFAULT_FIAT`).
+/// - Rejected entries are counted in `skipped`; duplicates are dropped.
+pub fn favorites_from_watchlist(
+    watchlist: &[String],
+    quote_currency: &str,
+    default_fiat: &str,
+) -> Result<WatchlistFavorites, ValidationError> {
+    let default_fiat = normalize_fx_symbol(default_fiat, "default_fiat")?;
+    let quote_currency = normalize_fx_symbol(quote_currency, "quote_currency")
+        .ok()
+        .filter(|code| is_fiat_currency(code));
+
+    let mut seen = HashSet::new();
+    let mut favorites = Vec::new();
+    let mut skipped = 0;
+
+    for entry in watchlist {
+        let favorite = if is_fiat_currency(entry) {
+            let base = normalize_fx_symbol(entry, "favorite")?;
+            let Some(quote) = quote_currency.as_ref() else {
+                skipped += 1;
+                continue;
+            };
+            if &base == quote {
+                continue;
+            }
+            FavoriteTarget::FxPair {
+                base,
+                quote: quote.clone(),
+            }
+        } else {
+            let Ok(symbol) = normalize_crypto_symbol(entry, "favorite") else {
+                skipped += 1;
+                continue;
+            };
+            FavoriteTarget::Symbol {
+                symbol,
+                quote: default_fiat.clone(),
+            }
+        };
+
+        if seen.insert(favorite.dedup_key()) {
+            favorites.push(favorite);
+        }
+    }
+
+    Ok(WatchlistFavorites { favorites, skipped })
+}
+
 fn default_favorites(default_fiat: &str) -> Vec<FavoriteTarget> {
     let mut seen = HashSet::new();
     let mut defaults = Vec::new();
@@ -205,6 +270,101 @@ mod tests {
                 },
             ]
         );
+    }
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    fn symbol(symbol: &str, quote: &str) -> FavoriteTarget {
+        FavoriteTarget::Symbol {
+            symbol: symbol.to_string(),
+            quote: quote.to_string(),
+        }
+    }
+
+    fn pair(base: &str, quote: &str) -> FavoriteTarget {
+        FavoriteTarget::FxPair {
+            base: base.to_string(),
+            quote: quote.to_string(),
+        }
+    }
+
+    #[test]
+    fn watchlist_maps_fiat_to_quote_pairs_and_crypto_to_default_fiat() {
+        let mapped = favorites_from_watchlist(
+            &strings(&["USD", "JPY", "BTC", "ETH", "ADA", "DOT"]),
+            "TWD",
+            "USD",
+        )
+        .expect("watchlist should map");
+
+        assert_eq!(
+            mapped.favorites,
+            vec![
+                pair("USD", "TWD"),
+                pair("JPY", "TWD"),
+                symbol("BTC", "USD"),
+                symbol("ETH", "USD"),
+                symbol("ADA", "USD"),
+                symbol("DOT", "USD"),
+            ]
+        );
+        assert_eq!(mapped.skipped, 0);
+    }
+
+    #[test]
+    fn watchlist_crypto_uses_workflow_default_fiat_not_projection_quote() {
+        let mapped = favorites_from_watchlist(&strings(&["btc", "eur"]), "TWD", "EUR")
+            .expect("watchlist should map");
+
+        assert_eq!(
+            mapped.favorites,
+            vec![symbol("BTC", "EUR"), pair("EUR", "TWD")]
+        );
+    }
+
+    #[test]
+    fn watchlist_skips_fiat_equal_to_quote_and_dedups_case_variants() {
+        let mapped =
+            favorites_from_watchlist(&strings(&["TWD", "usd", "USD", "Btc", "BTC"]), "twd", "USD")
+                .expect("watchlist should map");
+
+        assert_eq!(
+            mapped.favorites,
+            vec![pair("USD", "TWD"), symbol("BTC", "USD")]
+        );
+        assert_eq!(mapped.skipped, 0);
+    }
+
+    #[test]
+    fn watchlist_drops_rejected_entries_with_count() {
+        let mapped = favorites_from_watchlist(
+            &strings(&["BTC-USD", "X", "東京", "ABCDEFGHIJKLMNOP", "ETH"]),
+            "TWD",
+            "USD",
+        )
+        .expect("watchlist should map");
+
+        assert_eq!(mapped.favorites, vec![symbol("ETH", "USD")]);
+        assert_eq!(mapped.skipped, 4);
+    }
+
+    #[test]
+    fn watchlist_fiat_entries_are_skipped_without_valid_quote_currency() {
+        for quote in ["", "BTC", "TOOLONG"] {
+            let mapped = favorites_from_watchlist(&strings(&["JPY", "BTC"]), quote, "USD")
+                .expect("watchlist should map");
+            assert_eq!(mapped.favorites, vec![symbol("BTC", "USD")]);
+            assert_eq!(mapped.skipped, 1);
+        }
+    }
+
+    #[test]
+    fn watchlist_empty_input_yields_empty_favorites() {
+        let mapped = favorites_from_watchlist(&[], "TWD", "USD").expect("empty maps");
+        assert!(mapped.favorites.is_empty());
+        assert_eq!(mapped.skipped, 0);
     }
 
     #[test]

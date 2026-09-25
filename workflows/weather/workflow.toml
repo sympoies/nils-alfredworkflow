@@ -16,6 +16,8 @@ WEATHER_LOCALE = "en"
 WEATHER_DEFAULT_CITIES = "Tokyo"
 # Cache TTL in seconds for weather-cli responses (15 minutes default).
 WEATHER_CACHE_TTL_SECS = "900"
+# Optional external preference projection JSON file (read-only). Empty keeps workflow settings.
+PREFERENCE_PROJECTION_FILE = ""
 
 [alfred]
 min_alfred = "5"

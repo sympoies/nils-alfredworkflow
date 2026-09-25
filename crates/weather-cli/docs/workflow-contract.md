@@ -21,6 +21,24 @@ Primary source is Open-Meteo, with MET Norway as fallback where supported.
 - `weather-cli week --lat <f64> --lon <f64> [--output <human|json|alfred-json> | --json] [--lang <en|zh>]`
 - `weather-cli hourly --city <name> [--output <human|json|alfred-json> | --json] [--lang <en|zh>] [--hours <1..48>]`
 - `weather-cli hourly --lat <f64> --lon <f64> [--output <human|json|alfred-json> | --json] [--lang <en|zh>] [--hours <1..48>]`
+- `weather-cli default-locations [--fallback <comma/newline list>] [--preference-projection-file <path>] [--output <human|json|alfred-json>]`
+- `weather-cli preference-status [--preference-projection-file <path>] [--output <human|json|alfred-json>]`
+
+Preference commands (local file reads only, no provider calls; see
+[`preference-projection-contract.md`](../../workflow-common/docs/preference-projection-contract.md)):
+
+- `default-locations` resolves empty-query locations: a valid fresh projection
+  (`default_location` then `saved_locations`, deduplicated case-insensitively,
+  never comma-split) wins; otherwise `--fallback` is split on commas/newlines.
+  `human` output (default) prints one location per line for the shell adapter;
+  `json` returns `{source, locations, preference_status}`; `alfred-json` returns
+  the status row (when configured) followed by one non-actionable row per
+  location.
+- `preference-status` returns the non-selectable status row as Alfred JSON
+  (default), `{"items":[]}` when no projection path is given, a
+  `{state, title, subtitle}` JSON envelope, or the title in `human` mode.
+- An empty `--preference-projection-file` value is ignored. Output never
+  contains the projection path or location values in status text.
 
 Location input rules:
 

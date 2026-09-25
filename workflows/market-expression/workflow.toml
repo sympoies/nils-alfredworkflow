@@ -20,6 +20,8 @@ MARKET_CRYPTO_CACHE_TTL = ""
 MARKET_FAVORITES_ENABLED = "1"
 # Ordered favorites list shown when query is empty. Supports comma/newline separated symbols.
 MARKET_FAVORITE_LIST = "BTC,ETH,EUR,JPY"
+# Optional external preference projection JSON file (read-only). Empty keeps workflow settings.
+PREFERENCE_PROJECTION_FILE = ""
 
 [alfred]
 min_alfred = "5"

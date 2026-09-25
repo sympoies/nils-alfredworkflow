@@ -1,17 +1,21 @@
+use std::path::Path;
+
 use alfred_core::{Feedback, Item, ItemIcon};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use rust_decimal::Decimal;
 use workflow_common::{
     AppError as CliError, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
-    build_error_details_json, build_error_envelope, build_success_envelope, redact_sensitive,
+    build_error_details_json, build_error_envelope, build_success_envelope,
+    preference_projection::{ProjectionStatus, load_preference_projection},
+    redact_sensitive,
 };
 
 use market_cli::{
     FavoriteTarget,
     config::RuntimeConfig,
     error::AppError,
-    expression, icons,
+    expression, favorites_from_watchlist, icons,
     model::{MarketKind, MarketRequest, normalize_fx_symbol},
     parse_favorites_list,
     providers::{HttpProviders, ProviderApi},
@@ -64,6 +68,10 @@ enum Commands {
         list: Option<String>,
         #[arg(long, default_value = "USD")]
         default_fiat: String,
+        /// Optional external preference projection file. When valid and
+        /// fresh, its market watchlist replaces `--list`. Read-only.
+        #[arg(long, value_name = "PATH")]
+        preference_projection_file: Option<String>,
         #[arg(long, value_enum, default_value_t = OutputMode::AlfredJson)]
         output: OutputMode,
     },
@@ -79,6 +87,8 @@ const FAVORITES_PROMPT_UID: &str = "market-favorites-ordered-prompt-v1";
 const FAVORITES_UID_NAMESPACE: &str = "market-favorite-ordered-v1";
 const FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE: &str =
     "Favorite quote. Type an expression to convert. Quote unavailable.";
+const FAVORITES_PROJECTION_USED_HINT: &str =
+    "Favorites from the external preference projection. Type an expression to override.";
 
 impl Cli {
     fn command_name(&self) -> &'static str {
@@ -198,16 +208,30 @@ where
         Commands::Favorites {
             list,
             default_fiat,
+            preference_projection_file,
             output,
         } => {
-            let favorites = parse_favorites_list(list.as_deref(), &default_fiat)
-                .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
+            let now = now_fn();
+            let projection_path = preference_projection_file
+                .as_deref()
+                .filter(|path| !path.is_empty())
+                .map(Path::new);
+            let (favorites, projection_status) =
+                resolve_favorites(list.as_deref(), &default_fiat, projection_path, now).map_err(
+                    |error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()),
+                )?;
             let default_fiat = normalize_fx_symbol(&default_fiat, "default_fiat")
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
+            let status_item = projection_status
+                .as_ref()
+                .map(|status| status.to_item(now, FAVORITES_PROJECTION_USED_HINT));
             let output_mode = output;
 
             match output_mode {
-                OutputMode::Human => Ok(format_favorites_human_output(&favorites)),
+                OutputMode::Human => Ok(format_favorites_human_output(
+                    &favorites,
+                    projection_status.as_ref().map(|status| status.title(now)),
+                )),
                 OutputMode::AlfredJson | OutputMode::Json => {
                     let alfred_json = render_favorites_alfred_output(
                         config,
@@ -215,6 +239,7 @@ where
                         now_fn,
                         &favorites,
                         &default_fiat,
+                        status_item,
                     )?;
 
                     match output_mode {
@@ -317,15 +342,62 @@ fn render_market_alfred_output(
     })
 }
 
-fn format_favorites_human_output(favorites: &[FavoriteTarget]) -> String {
-    format!(
+/// Resolve favorites with precedence: valid fresh projection watchlist, then
+/// `--list`, then the built-in default set. Returns the projection status when
+/// a projection path is configured.
+fn resolve_favorites(
+    list: Option<&str>,
+    default_fiat: &str,
+    projection_path: Option<&Path>,
+    now: DateTime<Utc>,
+) -> Result<(Vec<FavoriteTarget>, Option<ProjectionStatus>), market_cli::model::ValidationError> {
+    let Some(path) = projection_path else {
+        return Ok((parse_favorites_list(list, default_fiat)?, None));
+    };
+
+    let status = match load_preference_projection(path, now) {
+        Ok(projection) => {
+            let mapped = favorites_from_watchlist(
+                &projection.market.watchlist,
+                &projection.market.default_quote_currency,
+                default_fiat,
+            )?;
+            if !mapped.favorites.is_empty() {
+                let status = ProjectionStatus::Used {
+                    revision: projection.revision,
+                    generated_at: projection.generated_at,
+                    skipped: mapped.skipped,
+                };
+                return Ok((mapped.favorites, Some(status)));
+            }
+            ProjectionStatus::Empty {
+                revision: projection.revision,
+                skipped: mapped.skipped,
+            }
+        }
+        Err(error) => ProjectionStatus::Failed(error),
+    };
+
+    Ok((parse_favorites_list(list, default_fiat)?, Some(status)))
+}
+
+fn format_favorites_human_output(
+    favorites: &[FavoriteTarget],
+    projection_status_title: Option<String>,
+) -> String {
+    let line = format!(
         "favorites: {}",
         favorites
             .iter()
             .map(FavoriteTarget::display_token)
             .collect::<Vec<_>>()
             .join(", ")
-    )
+    );
+
+    match projection_status_title {
+        Some(title) => format!("{line}\n{title}"),
+        None => line,
+    }
 }
 
 fn render_favorites_alfred_output<P, N>(
@@ -334,12 +406,13 @@ fn render_favorites_alfred_output<P, N>(
     now_fn: N,
     favorites: &[FavoriteTarget],
     default_fiat: &str,
+    status_item: Option<Item>,
 ) -> Result<String, CliError>
 where
     P: ProviderApi + Clone + Send,
     N: Fn() -> DateTime<Utc> + Copy + Send,
 {
-    let mut items = Vec::with_capacity(favorites.len() + 1);
+    let mut items = Vec::with_capacity(favorites.len() + 2);
     items.push(
         Item::new(FAVORITES_PROMPT_TITLE)
             .with_uid(FAVORITES_PROMPT_UID)
@@ -348,6 +421,7 @@ where
             ))
             .with_valid(false),
     );
+    items.extend(status_item);
 
     let favorite_items =
         std::thread::scope(|scope| {
@@ -568,6 +642,7 @@ fn cache_status_label(status: market_cli::model::CacheStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::PathBuf;
 
     use chrono::TimeZone;
     use market_cli::{
@@ -1355,6 +1430,238 @@ mod tests {
         );
         assert_eq!(envelope_json.get("ok").and_then(Value::as_bool), Some(true));
         assert_eq!(envelope_json.get("result"), Some(&direct_json));
+    }
+
+    fn write_projection(dir: &tempfile::TempDir, generated_at: &str, watchlist: Value) -> PathBuf {
+        let path = dir.path().join("preference-projection.json");
+        let document = serde_json::json!({
+            "schema": "sympoies.alfred-preference-projection/v1",
+            "generatedAt": generated_at,
+            "revision": 2,
+            "digest": format!("sha256:{}", "a".repeat(64)),
+            "market": {"default_quote_currency": "TWD", "watchlist": watchlist},
+            "weather": {"default_location": "Synthetic City", "saved_locations": []},
+            "sources": {
+                "market.default_quote_currency": "profile",
+                "market.watchlist": "owner_override",
+                "weather.default_location": "profile",
+                "weather.saved_locations": "profile"
+            }
+        });
+        fs::write(&path, document.to_string()).expect("write projection");
+        path
+    }
+
+    fn favorites_cli(list: &str, projection: Option<&Path>, output: &str) -> Cli {
+        let mut args = vec![
+            "market-cli".to_string(),
+            "favorites".to_string(),
+            "--list".to_string(),
+            list.to_string(),
+            "--default-fiat".to_string(),
+            "USD".to_string(),
+            "--output".to_string(),
+            output.to_string(),
+        ];
+        if let Some(path) = projection {
+            args.push("--preference-projection-file".to_string());
+            args.push(path.to_string_lossy().into_owned());
+        }
+        Cli::parse_from(args)
+    }
+
+    fn items_of(output: &str) -> Vec<Value> {
+        let json: Value = serde_json::from_str(output).expect("json");
+        json.get("items")
+            .and_then(Value::as_array)
+            .cloned()
+            .expect("items should be array")
+    }
+
+    #[test]
+    fn favorites_prefer_valid_projection_watchlist_over_list() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(
+            &dir,
+            "2026-02-10T11:53:00Z",
+            serde_json::json!(["USD", "JPY", "BTC", "ETH"]),
+        );
+
+        let output = run_with(
+            favorites_cli("eth", Some(&path), "alfred-json"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("favorites should pass");
+        let items = items_of(&output);
+        let titles: Vec<&str> = items
+            .iter()
+            .filter_map(|item| item.get("title").and_then(Value::as_str))
+            .collect();
+
+        assert_eq!(
+            titles,
+            vec![
+                FAVORITES_PROMPT_TITLE,
+                "Preferences: projection revision 2 · synced 12m ago",
+                "USD/TWD",
+                "1 JPY = 2.150 TWD",
+                "1 BTC = 68194 USD",
+                "1 ETH = 1980 USD",
+            ]
+        );
+        assert_eq!(
+            items[1].get("subtitle").and_then(Value::as_str),
+            Some(FAVORITES_PROJECTION_USED_HINT)
+        );
+        assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(false));
+        assert!(items[1].get("uid").is_none());
+        assert!(!output.contains(path.to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn favorites_human_output_reports_projection_mapping_without_quotes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(
+            &dir,
+            "2026-02-10T11:53:00Z",
+            serde_json::json!(["USD", "JPY", "BTC", "ETH", "ADA", "DOT", "BTC-USD"]),
+        );
+
+        let output = run_with(
+            favorites_cli("", Some(&path), "human"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("favorites should pass");
+
+        assert_eq!(
+            output,
+            "favorites: USD/TWD, JPY/TWD, BTC, ETH, ADA, DOT\n\
+             Preferences: projection revision 2 · synced 12m ago"
+        );
+    }
+
+    #[test]
+    fn favorites_fall_back_to_list_with_status_when_projection_unusable() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let stale = write_projection(&dir, "2026-02-01T12:00:00Z", serde_json::json!(["BTC"]));
+        let stale_output = run_with(
+            favorites_cli("eth,jpy", Some(&stale), "human"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("stale projection falls back");
+        assert_eq!(
+            stale_output,
+            "favorites: ETH, JPY\nPreferences: projection stale — using workflow settings"
+        );
+
+        let missing = dir.path().join("missing.json");
+        let missing_output = run_with(
+            favorites_cli("eth", Some(&missing), "human"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("missing projection falls back");
+        assert_eq!(
+            missing_output,
+            "favorites: ETH\nPreferences: projection unavailable — using workflow settings"
+        );
+
+        let malformed = dir.path().join("malformed.json");
+        fs::write(&malformed, "{\"schema\":").expect("write");
+        let malformed_output = run_with(
+            favorites_cli("", Some(&malformed), "human"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("malformed projection falls back");
+        assert_eq!(
+            malformed_output,
+            "favorites: BTC, ETH, USD, JPY\nPreferences: projection invalid — using workflow settings"
+        );
+
+        let future = write_projection(&dir, "2026-02-10T13:00:00Z", serde_json::json!(["BTC"]));
+        let future_output = run_with(
+            favorites_cli("eth", Some(&future), "human"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("future projection falls back");
+        assert!(
+            future_output.ends_with("Preferences: projection invalid — using workflow settings")
+        );
+    }
+
+    #[test]
+    fn favorites_fall_back_when_projection_watchlist_has_no_usable_entries() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for watchlist in [serde_json::json!([]), serde_json::json!(["TWD", "BTC-USD"])] {
+            let path = write_projection(&dir, "2026-02-10T11:53:00Z", watchlist);
+            let output = run_with(
+                favorites_cli("eth", Some(&path), "alfred-json"),
+                &config_in_tempdir(),
+                &FavoritesProviders,
+                fixed_now,
+            )
+            .expect("empty projection falls back");
+            let items = items_of(&output);
+            assert_eq!(
+                items[1].get("title").and_then(Value::as_str),
+                Some(
+                    "Preferences: projection revision 2 has no usable entries — using workflow settings"
+                )
+            );
+            assert_eq!(
+                items[2].get("title").and_then(Value::as_str),
+                Some("1 ETH = 1980 USD")
+            );
+        }
+    }
+
+    #[test]
+    fn favorites_without_projection_emit_no_status_row() {
+        let empty_path = run_with(
+            Cli::parse_from([
+                "market-cli",
+                "favorites",
+                "--list",
+                "eth",
+                "--default-fiat",
+                "USD",
+                "--preference-projection-file",
+                "",
+                "--output",
+                "alfred-json",
+            ]),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("empty projection path is ignored");
+        let unset = run_with(
+            favorites_cli("eth", None, "alfred-json"),
+            &config_in_tempdir(),
+            &FavoritesProviders,
+            fixed_now,
+        )
+        .expect("unset projection path");
+
+        for output in [empty_path, unset] {
+            let items = items_of(&output);
+            assert_eq!(items.len(), 2);
+            assert_eq!(
+                items[1].get("title").and_then(Value::as_str),
+                Some("1 ETH = 1980 USD")
+            );
+        }
     }
 
     #[test]
