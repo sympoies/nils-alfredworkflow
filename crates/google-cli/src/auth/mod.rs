@@ -9,7 +9,7 @@ pub mod store;
 
 use std::env;
 use std::ffi::OsString;
-use std::io::Read;
+use std::io::{BufRead, Read};
 
 use serde_json::{Value, json};
 
@@ -289,22 +289,28 @@ fn execute_status(
 const MAX_CALLBACK_BYTES: u64 = 8192;
 
 /// Read the redirected callback URL from stdin, so the one-time code never
-/// appears in a process list the way a `--code` argument does.
+/// appears in a process list the way a `--code` argument does. It stops at
+/// the first non-empty line, so a paste into an interactive terminal completes
+/// on Enter instead of waiting for end of input.
 fn read_callback_line() -> Result<String, AppError> {
-    let mut raw = String::new();
-    std::io::stdin()
-        .take(MAX_CALLBACK_BYTES)
-        .read_to_string(&mut raw)
-        .map_err(|error| {
+    let mut reader = std::io::stdin().lock().take(MAX_CALLBACK_BYTES);
+    loop {
+        let mut line = String::new();
+        let read = reader.read_line(&mut line).map_err(|error| {
             AppError::invalid_auth_input(format!(
                 "failed to read the callback URL from stdin: {error}"
             ))
         })?;
-    raw.lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| AppError::invalid_auth_input("stdin carried no callback URL"))
+        if read == 0 {
+            return Err(AppError::invalid_auth_input(
+                "stdin carried no callback URL",
+            ));
+        }
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_owned());
+        }
+    }
 }
 
 fn execute_default(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse, AppError> {
@@ -350,13 +356,15 @@ fn execute_remove(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthRespon
     // Revoked first and fail-closed: forgetting a token Google still honours
     // would leave a live grant that nothing here tracks any more.
     let revoked = if revoke {
-        let credentials = load_credentials(paths)?.ok_or_else(|| {
-            AppError::invalid_auth_input(
-                "OAuth credentials are not configured; revocation needs the client configuration",
-            )
-        })?;
         match load_token(paths, &resolved.account)? {
-            Some(token) => Some(oauth::revoke_refresh_token(&credentials, &token)?.as_str()),
+            Some(token) => {
+                let credentials = load_credentials(paths)?.ok_or_else(|| {
+                    AppError::invalid_auth_input(
+                        "OAuth credentials are not configured; revocation needs the client configuration",
+                    )
+                })?;
+                Some(oauth::revoke_refresh_token(&credentials, &token)?.as_str())
+            }
             None => Some("no-token"),
         }
     } else {

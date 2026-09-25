@@ -574,3 +574,83 @@ fn credentials_report_the_configured_revoke_endpoint() {
         Some("http://127.0.0.1:9/revoke")
     );
 }
+
+#[test]
+fn a_pasted_callback_line_completes_without_closing_stdin() {
+    let temp = tempdir().expect("tempdir");
+    seed_credentials(temp.path(), &[]);
+    let state = remote_step_one(temp.path(), "me@example.com");
+    let mut child = command(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "add",
+            "me@example.com",
+            "--remote",
+            "--step",
+            "2",
+            "--callback-url-stdin",
+        ],
+    )
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .expect("spawn google-cli");
+    // Held open, as an interactive terminal is after the operator presses Enter.
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin
+        .write_all(format!("http://localhost/?state={state}&code=abc\n").as_bytes())
+        .expect("write stdin");
+    stdin.flush().expect("flush");
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = child.try_wait().expect("poll") {
+            break Some(status);
+        }
+        if std::time::Instant::now() > deadline {
+            break None;
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+    drop(stdin);
+    if status.is_none() {
+        child.kill().expect("kill");
+    }
+    let output = child.wait_with_output().expect("wait");
+    assert_eq!(status.and_then(|value| value.code()), Some(0));
+    assert_eq!(result(&json(&output), "stored").as_bool(), Some(true));
+}
+
+#[test]
+fn revoke_without_a_token_needs_no_client_credentials() {
+    let temp = tempdir().expect("tempdir");
+    std::fs::write(
+        temp.path().join("accounts.v1.json"),
+        serde_json::json!({
+            "version": 1,
+            "default_account": "keep@example.com",
+            "aliases": {},
+            "accounts": ["ghost@example.com", "keep@example.com"]
+        })
+        .to_string(),
+    )
+    .expect("write metadata");
+
+    let output = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "remove",
+            "ghost@example.com",
+            "--revoke",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(result(&json(&output), "revoked").as_str(), Some("no-token"));
+}
