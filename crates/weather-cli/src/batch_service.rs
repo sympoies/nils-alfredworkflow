@@ -626,10 +626,18 @@ mod tests {
     #[test]
     fn batch_service_lists_cities_resolving_to_one_place_once() {
         let mut providers = BatchProviders::ok();
-        let taipei = providers.locations["Taipei"].clone();
+        // Only the rounded coordinates decide a match, whatever the resolved
+        // name: the alias differs in name and below the fourth decimal.
+        let mut alias = providers.locations["Taipei"].clone();
+        alias.name = "臺北市".to_string();
+        alias.latitude += 0.00004;
+        providers.open_results.insert(
+            alias.cache_key(),
+            providers.open_results[&providers.locations["Taipei"].cache_key()].clone(),
+        );
         providers
             .locations
-            .insert("Taipei, Taiwan".to_string(), taipei.clone());
+            .insert("Taipei, Taiwan".to_string(), alias);
         let config = config_in_tempdir();
         let cities = vec![
             "Taipei, Taiwan".to_string(),

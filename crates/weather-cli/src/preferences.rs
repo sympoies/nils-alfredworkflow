@@ -163,6 +163,17 @@ mod tests {
     }
 
     #[test]
+    fn collapse_same_place_keeps_a_label_whose_cache_entry_is_unreadable() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // A directory at the cache file path makes the read fail, not miss.
+        fs::create_dir_all(crate::geocoding::geocode_cache_path(dir.path(), "Kyoto"))
+            .expect("block cache entry");
+
+        let kept = collapse_same_place(vec!["Kyoto".to_string()], dir.path());
+        assert_eq!(kept, vec!["Kyoto"]);
+    }
+
+    #[test]
     fn fallback_list_is_split_when_projection_unset() {
         let resolved = resolve_default_locations(" Tokyo, Osaka ,,", None, now());
         assert_eq!(resolved.locations, vec!["Tokyo", "Osaka"]);

@@ -1922,24 +1922,24 @@ mod tests {
             cache_dir: dir.path().join("cache"),
             cache_ttl_secs: weather_cli::config::WEATHER_CACHE_TTL_SECS,
         };
-        let place = |latitude| ResolvedLocation {
-            name: "Springfield".to_string(),
+        let place = |name: &str, latitude| ResolvedLocation {
+            name: name.to_string(),
             latitude,
             longitude: -123.0220,
             timezone: "America/Los_Angeles".to_string(),
         };
-        // Zürich is deliberately cached at Springfield's coordinates; 東京 stays
-        // uncached and must be kept.
+        // Zürich is deliberately cached at Springfield's rounded coordinates
+        // under another resolved name; 東京 stays uncached and must be kept.
         weather_cli::geocoding::write_cached_city_location(
             &config.cache_dir,
             "Springfield, Oregon",
-            &place(44.04620),
+            &place("Springfield", 44.04620),
         )
         .expect("cache springfield");
         weather_cli::geocoding::write_cached_city_location(
             &config.cache_dir,
             "Zürich",
-            &place(44.04624),
+            &place("Zürich", 44.04624),
         )
         .expect("cache zurich");
 
