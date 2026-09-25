@@ -29,7 +29,11 @@ pub fn parse_callback_url(input: &str) -> Result<CallbackPayload, AppError> {
     if let Some(error) = values.get("error") {
         return Err(AppError::invalid_auth_input(format!(
             "authorization was not granted: {}",
-            error.chars().take(64).collect::<String>()
+            error
+                .chars()
+                .filter(|character| !character.is_control())
+                .take(64)
+                .collect::<String>()
         )));
     }
 

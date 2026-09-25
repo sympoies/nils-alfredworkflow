@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use serde_json::Value;
 use tempfile::tempdir;
@@ -274,7 +275,9 @@ fn remove_with_revoke_revokes_the_refresh_token_before_forgetting_it() {
     assert_eq!(result(&payload, "revoked").as_str(), Some("revoked"));
     assert_eq!(result(&payload, "removed_token").as_bool(), Some(true));
 
-    let (request_line, body) = requests.recv().expect("revoke request");
+    let (request_line, body) = requests
+        .recv_timeout(Duration::from_secs(10))
+        .expect("revoke request");
     assert!(request_line.starts_with("POST /revoke"));
     assert!(body.starts_with("token=refresh-"));
     assert_eq!(
@@ -350,4 +353,224 @@ fn resolve_cli_path() -> PathBuf {
     }
 
     PathBuf::from(env!("CARGO_BIN_EXE_google-cli"))
+}
+
+/// A revoke endpoint that must never be contacted: the returned check fails if
+/// anything connected to it.
+fn untouchable_endpoint() -> (String, impl FnOnce()) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let uri = format!("http://{}/revoke", listener.local_addr().expect("address"));
+    let check = move || {
+        listener.set_nonblocking(true).expect("nonblocking");
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            "the revoke endpoint was contacted"
+        );
+    };
+    (uri, check)
+}
+
+#[test]
+fn plain_remove_stays_local_and_never_contacts_the_revoke_endpoint() {
+    let (uri, never_contacted) = untouchable_endpoint();
+    let temp = seeded_with_revoke_endpoint(&uri);
+
+    let output = run(
+        temp.path(),
+        &["--output", "json", "auth", "remove", "gone@example.com"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let payload = json(&output);
+    assert_eq!(result(&payload, "revoked"), &Value::Null);
+    assert_eq!(result(&payload, "removed_token").as_bool(), Some(true));
+    assert_eq!(
+        result(&list(temp.path()), "accounts"),
+        &serde_json::json!(["keep@example.com"])
+    );
+    never_contacted();
+}
+
+#[test]
+fn revoke_of_an_account_without_a_token_reports_no_token_without_a_request() {
+    let (uri, never_contacted) = untouchable_endpoint();
+    let temp = seeded_with_revoke_endpoint(&uri);
+    let metadata = temp.path().join("accounts.v1.json");
+    let mut accounts: Value =
+        serde_json::from_str(&std::fs::read_to_string(&metadata).expect("metadata")).expect("json");
+    accounts["accounts"]
+        .as_array_mut()
+        .expect("accounts")
+        .push(Value::from("ghost@example.com"));
+    std::fs::write(&metadata, accounts.to_string()).expect("write metadata");
+
+    let output = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "remove",
+            "ghost@example.com",
+            "--revoke",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(result(&json(&output), "revoked").as_str(), Some("no-token"));
+    never_contacted();
+}
+
+#[test]
+fn an_invalid_token_answer_outside_http_400_is_a_failure() {
+    let (uri, _requests) = one_shot_server(401, r#"{"error":"invalid_token"}"#);
+    let temp = seeded_with_revoke_endpoint(&uri);
+
+    let output = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "remove",
+            "gone@example.com",
+            "--revoke",
+        ],
+    );
+    assert_eq!(error_code(&output).as_deref(), Some("NILS_GOOGLE_007"));
+    assert_eq!(
+        result(&list(temp.path()), "accounts"),
+        &serde_json::json!(["gone@example.com", "keep@example.com"])
+    );
+}
+
+#[test]
+fn lifecycle_arguments_fail_closed() {
+    let temp = tempdir().expect("tempdir");
+    seed_credentials(temp.path(), &[]);
+    seed_account(temp.path(), "me@example.com");
+
+    let step_one_stdin = run_with_stdin(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "add",
+            "other@example.com",
+            "--remote",
+            "--step",
+            "1",
+            "--callback-url-stdin",
+        ],
+        "http://localhost/?state=x&code=y\n",
+    );
+    assert_eq!(
+        error_code(&step_one_stdin).as_deref(),
+        Some("NILS_GOOGLE_005")
+    );
+
+    remote_step_one(temp.path(), "other@example.com");
+    let empty = run_with_stdin(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "add",
+            "other@example.com",
+            "--remote",
+            "--step",
+            "2",
+            "--callback-url-stdin",
+        ],
+        "\n  \n",
+    );
+    assert_eq!(error_code(&empty).as_deref(), Some("NILS_GOOGLE_005"));
+
+    let bogus = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "remove",
+            "me@example.com",
+            "--bogus",
+        ],
+    );
+    assert_eq!(error_code(&bogus).as_deref(), Some("NILS_GOOGLE_005"));
+    assert_eq!(
+        result(&list(temp.path()), "accounts"),
+        &serde_json::json!(["me@example.com"])
+    );
+}
+
+#[test]
+fn default_accepts_an_alias() {
+    let temp = tempdir().expect("tempdir");
+    seed_credentials(temp.path(), &[]);
+    seed_account(temp.path(), "first@example.com");
+    seed_account(temp.path(), "second@example.com");
+    let alias = run(
+        temp.path(),
+        &[
+            "--output",
+            "json",
+            "auth",
+            "alias",
+            "set",
+            "work",
+            "second@example.com",
+        ],
+    );
+    assert_eq!(alias.status.code(), Some(0));
+
+    let output = run(
+        temp.path(),
+        &["--output", "json", "auth", "default", "work"],
+    );
+    assert_eq!(
+        result(&json(&output), "default_account").as_str(),
+        Some("second@example.com")
+    );
+}
+
+#[test]
+fn credentials_written_before_revocation_existed_use_the_google_endpoint() {
+    let temp = tempdir().expect("tempdir");
+    let legacy = serde_json::json!({
+        "version": 1,
+        "credentials": {
+            "client_id": "client-id",
+            "client_secret": "client-secret",
+            "auth_uri": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uri": "http://localhost"
+        }
+    });
+    std::fs::write(temp.path().join("credentials.v1.json"), legacy.to_string())
+        .expect("write legacy credentials");
+
+    let output = run(
+        temp.path(),
+        &["--output", "json", "auth", "credentials", "list"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        result(&json(&output), "revoke_uri").as_str(),
+        Some("https://oauth2.googleapis.com/revoke")
+    );
+}
+
+#[test]
+fn credentials_report_the_configured_revoke_endpoint() {
+    let temp = tempdir().expect("tempdir");
+    seed_credentials(temp.path(), &["--revoke-uri", "http://127.0.0.1:9/revoke"]);
+    let output = run(
+        temp.path(),
+        &["--output", "json", "auth", "credentials", "list"],
+    );
+    assert_eq!(
+        result(&json(&output), "revoke_uri").as_str(),
+        Some("http://127.0.0.1:9/revoke")
+    );
 }

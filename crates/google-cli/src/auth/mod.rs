@@ -87,6 +87,7 @@ fn execute_credentials(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthR
                     "auth_uri": parsed.auth_uri,
                     "token_uri": parsed.token_uri,
                     "redirect_uri": parsed.redirect_uri,
+                    "revoke_uri": parsed.revoke_uri,
                 }),
                 "Saved native OAuth credentials.",
             ))
@@ -102,6 +103,7 @@ fn execute_credentials(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthR
                         "auth_uri": credentials.auth_uri,
                         "token_uri": credentials.token_uri,
                         "redirect_uri": credentials.redirect_uri,
+                        "revoke_uri": credentials.revoke_uri,
                     }),
                     "Native OAuth credentials are configured.",
                 ))
