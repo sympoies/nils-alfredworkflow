@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -7,7 +8,9 @@ use crate::cache::{
 };
 use crate::config::RuntimeConfig;
 use crate::error::AppError;
-use crate::geocoding::{ResolvedLocation, read_cached_city_location, write_cached_city_location};
+use crate::geocoding::{
+    ResolvedLocation, coordinate_label, read_cached_city_location, write_cached_city_location,
+};
 use crate::model::{
     CacheMetadata, ForecastBatchEntry, ForecastBatchOutput, ForecastDay, ForecastOutput,
     ForecastPeriod, FreshnessStatus, normalize_cities,
@@ -34,6 +37,7 @@ where
         .take(cities.len())
         .collect::<Vec<Option<ForecastBatchEntry>>>();
     let mut pending = Vec::new();
+    let mut listed_places = HashSet::new();
 
     for (index, city) in cities.iter().enumerate() {
         let location = match &locations[index] {
@@ -43,6 +47,11 @@ where
                 continue;
             }
         };
+        // Two spellings of one place geocode together; list it once, where it
+        // first appears.
+        if !listed_places.insert(coordinate_label(location.latitude, location.longitude)) {
+            continue;
+        }
 
         let cache_key = location.cache_key();
         let path = cache_path(&config.cache_dir, period, &cache_key);
@@ -612,6 +621,37 @@ mod tests {
                 .into()),
             Some("Tokyo")
         );
+    }
+
+    #[test]
+    fn batch_service_lists_cities_resolving_to_one_place_once() {
+        let mut providers = BatchProviders::ok();
+        let taipei = providers.locations["Taipei"].clone();
+        providers
+            .locations
+            .insert("Taipei, Taiwan".to_string(), taipei.clone());
+        let config = config_in_tempdir();
+        let cities = vec![
+            "Taipei, Taiwan".to_string(),
+            "Tokyo".to_string(),
+            "Taipei".to_string(),
+        ];
+
+        let output = resolve_forecast_batch(
+            &config,
+            &providers,
+            fixed_now,
+            ForecastPeriod::Today,
+            &cities,
+        )
+        .expect("batch output");
+
+        let listed = output
+            .entries
+            .iter()
+            .map(|entry| entry.city.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(listed, vec!["Taipei, Taiwan", "Tokyo"]);
     }
 
     #[test]

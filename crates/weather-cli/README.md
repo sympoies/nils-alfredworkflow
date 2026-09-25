@@ -37,7 +37,8 @@ No-token weather CLI for the Alfred weather workflow.
 
 - Repeating `--city` is supported on `today` and `week` only.
 - Batch city input is trimmed and deduped case-insensitively while preserving
-  first-seen order.
+  first-seen order. After geocoding, a city whose coordinates (rounded to four
+  decimals) match an earlier city is dropped, so one place is listed once.
 - Batch mode reuses persistent geocoding cache, resolves cache misses in
   parallel, and issues one Open-Meteo daily batch request once all coordinates
   are known.

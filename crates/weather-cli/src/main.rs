@@ -166,15 +166,15 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<String, CliError> {
+    let config = RuntimeConfig::from_env();
     // Preference commands are local file reads; skip provider initialization.
     if matches!(
         cli.command,
         Commands::DefaultLocations { .. } | Commands::PreferenceStatus { .. }
     ) {
-        return run_preference_command(cli.command, Utc::now());
+        return run_preference_command(cli.command, &config, Utc::now());
     }
 
-    let config = RuntimeConfig::from_env();
     let providers = HttpProviders::new()
         .map_err(|error| runtime_error(ERROR_CODE_RUNTIME_PROVIDER_INIT, error.to_string()))?;
     run_with(cli, &config, &providers, Utc::now)
@@ -185,18 +185,24 @@ fn non_empty_path(raw: Option<&str>) -> Option<&std::path::Path> {
         .map(std::path::Path::new)
 }
 
-fn run_preference_command(command: Commands, now: DateTime<Utc>) -> Result<String, CliError> {
+fn run_preference_command(
+    command: Commands,
+    config: &RuntimeConfig,
+    now: DateTime<Utc>,
+) -> Result<String, CliError> {
     match command {
         Commands::DefaultLocations {
             fallback,
             preference_projection_file,
             output,
         } => {
-            let resolved = preferences::resolve_default_locations(
+            let mut resolved = preferences::resolve_default_locations(
                 &fallback,
                 non_empty_path(preference_projection_file.as_deref()),
                 now,
             );
+            resolved.locations =
+                preferences::collapse_same_place(resolved.locations, &config.cache_dir);
             render_default_locations(&resolved, output, now)
         }
         Commands::PreferenceStatus {
@@ -308,7 +314,7 @@ where
 {
     match cli.command {
         command @ (Commands::DefaultLocations { .. } | Commands::PreferenceStatus { .. }) => {
-            run_preference_command(command, now_fn())
+            run_preference_command(command, config, now_fn())
         }
         Commands::Today {
             city,
@@ -1905,6 +1911,53 @@ mod tests {
             &path,
         ]);
         assert_eq!(output, "Springfield, Oregon\n東京\nZürich");
+    }
+
+    #[test]
+    fn default_locations_lists_cached_same_place_labels_once() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(&dir, "2026-02-10T23:53:00Z");
+        let path = path.to_string_lossy();
+        let config = RuntimeConfig {
+            cache_dir: dir.path().join("cache"),
+            cache_ttl_secs: weather_cli::config::WEATHER_CACHE_TTL_SECS,
+        };
+        let place = |latitude| ResolvedLocation {
+            name: "Springfield".to_string(),
+            latitude,
+            longitude: -123.0220,
+            timezone: "America/Los_Angeles".to_string(),
+        };
+        // Zürich is deliberately cached at Springfield's coordinates; 東京 stays
+        // uncached and must be kept.
+        weather_cli::geocoding::write_cached_city_location(
+            &config.cache_dir,
+            "Springfield, Oregon",
+            &place(44.04620),
+        )
+        .expect("cache springfield");
+        weather_cli::geocoding::write_cached_city_location(
+            &config.cache_dir,
+            "Zürich",
+            &place(44.04624),
+        )
+        .expect("cache zurich");
+
+        let output = run_with(
+            Cli::parse_from([
+                "weather-cli",
+                "default-locations",
+                "--fallback",
+                "Tokyo",
+                "--preference-projection-file",
+                &path,
+            ]),
+            &config,
+            &FakeProviders::ok(),
+            fixed_now,
+        )
+        .expect("default-locations should pass");
+        assert_eq!(output, "Springfield, Oregon\n東京");
     }
 
     #[test]

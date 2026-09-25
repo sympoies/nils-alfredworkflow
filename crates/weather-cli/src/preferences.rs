@@ -5,6 +5,7 @@
 //! (`WEATHER_DEFAULT_CITIES`). Projection labels are used verbatim and are
 //! never split on commas; only the fallback list uses comma/newline splitting.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -12,6 +13,8 @@ use workflow_common::{
     preference_projection::{ProjectionStatus, load_preference_projection},
     split_ordered_list,
 };
+
+use crate::geocoding::{coordinate_label, read_cached_city_location};
 
 /// Status-row subtitle when the projection supplied the default locations.
 pub const PROJECTION_USED_HINT: &str =
@@ -71,6 +74,22 @@ pub fn resolve_default_locations(
         locations: split_ordered_list(fallback),
         status: Some(status),
     }
+}
+
+/// Drops a label whose cached geocode resolves to the same coordinates as an
+/// earlier label, so two spellings of one place are listed once. Reads only
+/// the local geocode cache; a label without a cached geocode is always kept.
+pub fn collapse_same_place(locations: Vec<String>, cache_dir: &Path) -> Vec<String> {
+    let mut listed_places = HashSet::new();
+    locations
+        .into_iter()
+        .filter(|label| match read_cached_city_location(cache_dir, label) {
+            Ok(Some(location)) => {
+                listed_places.insert(coordinate_label(location.latitude, location.longitude))
+            }
+            _ => true,
+        })
+        .collect()
 }
 
 #[cfg(test)]
