@@ -14,6 +14,8 @@ pub mod native_gmail;
 
 #[path = "integration/account_resolution_shared.rs"]
 mod account_resolution_shared;
+#[path = "integration/auth_account_lifecycle.rs"]
+mod auth_account_lifecycle;
 #[path = "integration/auth_account_resolution.rs"]
 mod auth_account_resolution;
 #[path = "integration/auth_cli_contract.rs"]

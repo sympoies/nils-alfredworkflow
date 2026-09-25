@@ -9,6 +9,7 @@ pub mod store;
 
 use std::env;
 use std::ffi::OsString;
+use std::io::Read;
 
 use serde_json::{Value, json};
 
@@ -45,7 +46,7 @@ pub fn execute_native(
 ) -> Result<NativeAuthResponse, AppError> {
     let Some(subcommand) = invocation.path.get(1) else {
         return Err(AppError::invalid_auth_input(
-            "missing auth subcommand; expected one of credentials/add/list/status/remove/alias/manage",
+            "missing auth subcommand; expected one of credentials/add/list/status/default/remove/alias/manage",
         ));
     };
 
@@ -58,6 +59,7 @@ pub fn execute_native(
         "add" => execute_add(&paths, &args),
         "list" => execute_list(&paths),
         "status" => execute_status(&paths, global),
+        "default" => execute_default(&paths, &args),
         "remove" => execute_remove(&paths, &args),
         "alias" => execute_alias(&paths, &args),
         "manage" => execute_manage(&paths),
@@ -166,20 +168,26 @@ fn execute_add(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse,
                         "remote auth step 2 is missing saved state; restart with `auth add <email> --remote --step 1`",
                     )
                 })?;
-                let provided_state = options.state.as_deref().ok_or_else(|| {
-                    AppError::invalid_auth_input("remote step 2 requires `--state <state>`")
-                })?;
-                let code = options.code.as_deref().ok_or_else(|| {
-                    AppError::invalid_auth_input(
-                        "remote step 2 requires `--code <authorization_code>`",
-                    )
-                })?;
+                let (provided_state, code) = if options.callback_url_stdin {
+                    let payload = callback::parse_callback_url(&read_callback_line()?)?;
+                    (payload.state, payload.code)
+                } else {
+                    let provided_state = options.state.clone().ok_or_else(|| {
+                        AppError::invalid_auth_input("remote step 2 requires `--state <state>`")
+                    })?;
+                    let code = options.code.clone().ok_or_else(|| {
+                        AppError::invalid_auth_input(
+                            "remote step 2 requires `--code <authorization_code>` or `--callback-url-stdin`",
+                        )
+                    })?;
+                    (provided_state, code)
+                };
 
                 let token = oauth::finish_remote(
                     &account,
                     &expected.state,
-                    provided_state,
-                    code,
+                    &provided_state,
+                    &code,
                     &credentials,
                 )?;
                 let persist = persist_token(paths, &account, &token)?;
@@ -274,15 +282,84 @@ fn execute_status(
     ))
 }
 
-fn execute_remove(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse, AppError> {
-    let Some(target) = args.first() else {
+/// Longest callback line read from stdin. A Google redirect is a few hundred
+/// bytes; the bound only keeps a runaway pipe from being buffered whole.
+const MAX_CALLBACK_BYTES: u64 = 8192;
+
+/// Read the redirected callback URL from stdin, so the one-time code never
+/// appears in a process list the way a `--code` argument does.
+fn read_callback_line() -> Result<String, AppError> {
+    let mut raw = String::new();
+    std::io::stdin()
+        .take(MAX_CALLBACK_BYTES)
+        .read_to_string(&mut raw)
+        .map_err(|error| {
+            AppError::invalid_auth_input(format!(
+                "failed to read the callback URL from stdin: {error}"
+            ))
+        })?;
+    raw.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| AppError::invalid_auth_input("stdin carried no callback URL"))
+}
+
+fn execute_default(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse, AppError> {
+    let [target] = args else {
         return Err(AppError::invalid_auth_input(
-            "missing account; expected `auth remove <email-or-alias>`",
+            "expected `auth default <email-or-alias>`",
         ));
     };
 
     let mut metadata = load_metadata(paths)?;
     let resolved = resolve_account(Some(target), &metadata)?;
+    let previous = metadata.default_account.clone();
+    metadata.default_account = Some(resolved.account.clone());
+    save_metadata(paths, &metadata)?;
+
+    Ok(response(
+        json!({
+            "default_account": resolved.account,
+            "previous_default": previous,
+        }),
+        "Updated the default account.",
+    ))
+}
+
+fn execute_remove(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthResponse, AppError> {
+    let Some(target) = args.first() else {
+        return Err(AppError::invalid_auth_input(
+            "missing account; expected `auth remove <email-or-alias> [--revoke]`",
+        ));
+    };
+    let revoke = match &args[1..] {
+        [] => false,
+        [flag] if flag == "--revoke" => true,
+        [unknown, ..] => {
+            return Err(AppError::invalid_auth_input(format!(
+                "unknown auth remove option `{unknown}`"
+            )));
+        }
+    };
+
+    let mut metadata = load_metadata(paths)?;
+    let resolved = resolve_account(Some(target), &metadata)?;
+    // Revoked first and fail-closed: forgetting a token Google still honours
+    // would leave a live grant that nothing here tracks any more.
+    let revoked = if revoke {
+        let credentials = load_credentials(paths)?.ok_or_else(|| {
+            AppError::invalid_auth_input(
+                "OAuth credentials are not configured; revocation needs the client configuration",
+            )
+        })?;
+        match load_token(paths, &resolved.account)? {
+            Some(token) => Some(oauth::revoke_refresh_token(&credentials, &token)?.as_str()),
+            None => Some("no-token"),
+        }
+    } else {
+        None
+    };
     let removed_token = remove_token(paths, &resolved.account)?;
     metadata.remove_account(&resolved.account);
     save_metadata(paths, &metadata)?;
@@ -295,6 +372,7 @@ fn execute_remove(paths: &AuthPaths, args: &[String]) -> Result<NativeAuthRespon
         json!({
             "account": resolved.account,
             "removed_token": removed_token,
+            "revoked": revoked,
             "remaining_accounts": metadata.accounts.len(),
         }),
         "Removed native auth account.",
@@ -384,6 +462,7 @@ struct AddOptions {
     step: Option<u8>,
     code: Option<String>,
     state: Option<String>,
+    callback_url_stdin: bool,
 }
 
 fn parse_add_options(args: &[String]) -> Result<AddOptions, AppError> {
@@ -416,6 +495,10 @@ fn parse_add_options(args: &[String]) -> Result<AddOptions, AppError> {
                 options.code = Some(value.clone());
                 index += 2;
             }
+            "--callback-url-stdin" => {
+                options.callback_url_stdin = true;
+                index += 1;
+            }
             "--state" => {
                 let Some(value) = args.get(index + 1) else {
                     return Err(AppError::invalid_auth_input("missing value for `--state`"));
@@ -434,6 +517,18 @@ fn parse_add_options(args: &[String]) -> Result<AddOptions, AppError> {
     if options.manual && options.remote {
         return Err(AppError::invalid_auth_input(
             "choose one auth mode: `--manual` or `--remote`",
+        ));
+    }
+
+    if options.callback_url_stdin && (options.code.is_some() || options.state.is_some()) {
+        return Err(AppError::invalid_auth_input(
+            "`--callback-url-stdin` carries the code and state; do not also pass `--code` or `--state`",
+        ));
+    }
+
+    if options.callback_url_stdin && !(options.remote && options.step == Some(2)) {
+        return Err(AppError::invalid_auth_input(
+            "`--callback-url-stdin` is only valid with `--remote --step 2`",
         ));
     }
 

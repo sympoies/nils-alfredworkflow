@@ -7,6 +7,7 @@ pub fn parse_set_args(args: &[String]) -> Result<OAuthClientCredentials, AppErro
     let mut auth_uri = None;
     let mut token_uri = None;
     let mut redirect_uri = None;
+    let mut revoke_uri = None;
 
     let mut index = 0;
     while index < args.len() {
@@ -24,6 +25,7 @@ pub fn parse_set_args(args: &[String]) -> Result<OAuthClientCredentials, AppErro
             "--auth-uri" => auth_uri = Some(value),
             "--token-uri" => token_uri = Some(value),
             "--redirect-uri" => redirect_uri = Some(value),
+            "--revoke-uri" => revoke_uri = Some(value),
             unknown => {
                 return Err(AppError::invalid_auth_input(format!(
                     "unknown credentials option `{unknown}`"
@@ -53,6 +55,9 @@ pub fn parse_set_args(args: &[String]) -> Result<OAuthClientCredentials, AppErro
     }
     if let Some(value) = redirect_uri {
         credentials.redirect_uri = value;
+    }
+    if let Some(value) = revoke_uri {
+        credentials.revoke_uri = value;
     }
 
     Ok(credentials)

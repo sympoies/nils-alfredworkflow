@@ -1,6 +1,6 @@
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, RandomState};
 use std::env;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::time::Duration;
 
 use reqwest::Url;
@@ -167,11 +167,78 @@ pub fn build_authorization_url(
     Ok(url.to_string())
 }
 
+/// The anti-forgery `state` a callback must echo. It is keyed from OS
+/// randomness through `RandomState`: a fixed-key hash of the account and the
+/// current second, which this used to be, is something anyone can recompute.
 pub fn generate_state(account: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    account.hash(&mut hasher);
-    now_epoch_secs().hash(&mut hasher);
-    format!("state-{:x}", hasher.finish())
+    let part = |salt: u8| {
+        let mut hasher = RandomState::new().build_hasher();
+        account.hash(&mut hasher);
+        salt.hash(&mut hasher);
+        now_epoch_secs().hash(&mut hasher);
+        hasher.finish()
+    };
+    format!("state-{:016x}{:016x}", part(0), part(1))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevokeOutcome {
+    Revoked,
+    AlreadyInvalid,
+}
+
+impl RevokeOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RevokeOutcome::Revoked => "revoked",
+            RevokeOutcome::AlreadyInvalid => "already-invalid",
+        }
+    }
+}
+
+/// Revoke a refresh token at the provider, which also ends every access token
+/// minted from it. Google answers `invalid_token` for a token it no longer
+/// honours, which is the state revocation exists to reach.
+pub fn revoke_refresh_token(
+    credentials: &OAuthClientCredentials,
+    token: &StoredToken,
+) -> Result<RevokeOutcome, AppError> {
+    let client = build_blocking_client(None, Some(REQUEST_TIMEOUT)).map_err(|error| {
+        AppError::auth_store_failure(format!("failed to build OAuth HTTP client: {error}"))
+    })?;
+    let response = client
+        .post(&credentials.revoke_uri)
+        .form(&[("token", token.refresh_token.as_str())])
+        .send()
+        .map_err(|error| {
+            AppError::auth_store_failure(format!(
+                "failed to revoke OAuth token: {}",
+                redact_sensitive(&error.to_string())
+            ))
+        })?;
+
+    let status = response.status();
+    if status.is_success() {
+        return Ok(RevokeOutcome::Revoked);
+    }
+    let text = response.text().unwrap_or_default();
+    let error = serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("error")
+                .and_then(|v| v.as_str())
+                .map(ToOwned::to_owned)
+        });
+    if status.as_u16() == 400 && error.as_deref() == Some("invalid_token") {
+        return Ok(RevokeOutcome::AlreadyInvalid);
+    }
+    let detail = extract_error_message(&text).unwrap_or(text);
+    Err(AppError::auth_store_failure(format!(
+        "OAuth token revocation failed with HTTP {}: {}",
+        status.as_u16(),
+        redact_sensitive(&detail)
+    )))
 }
 
 pub fn refresh_access_token(
