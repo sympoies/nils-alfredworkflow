@@ -81,7 +81,7 @@ fn seed_account(config_dir: &Path, account: &str) {
             "--output", "json", "auth", "add", account, "--manual", "--code", "abc",
         ],
     );
-    assert_eq!(output.status.code(), Some(0), "seed {account}");
+    assert_eq!(output.status.code(), Some(0));
 }
 
 fn list(config_dir: &Path) -> Value {
@@ -199,7 +199,7 @@ fn remote_state_is_unpredictable_across_runs() {
     let first = remote_step_one(temp.path(), "me@example.com");
     let second = remote_step_one(temp.path(), "me@example.com");
     assert_ne!(first, second);
-    assert!(first.len() >= 32, "state too short: {first}");
+    assert!(first.len() >= 32);
 }
 
 /// Serve one HTTP request, reply with `status` and `body`, and report the
@@ -275,8 +275,8 @@ fn remove_with_revoke_revokes_the_refresh_token_before_forgetting_it() {
     assert_eq!(result(&payload, "removed_token").as_bool(), Some(true));
 
     let (request_line, body) = requests.recv().expect("revoke request");
-    assert!(request_line.starts_with("POST /revoke"), "{request_line}");
-    assert!(body.starts_with("token=refresh-"), "{body}");
+    assert!(request_line.starts_with("POST /revoke"));
+    assert!(body.starts_with("token=refresh-"));
     assert_eq!(
         result(&list(temp.path()), "accounts"),
         &serde_json::json!(["keep@example.com"])
