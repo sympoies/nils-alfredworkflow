@@ -40,11 +40,12 @@ pub fn execute_native(
         ("events", "create") => write::execute_events_create(&session, rest),
         ("events", "update") => write::execute_events_update(&session, rest),
         ("events", "delete") => write::execute_events_delete(&session, rest),
+        ("events", "respond") => write::execute_events_respond(&session, rest),
         ("calendars", unknown) => Err(AppError::invalid_calendar_input(format!(
             "unknown calendars action `{unknown}`; expected list"
         ))),
         ("events", unknown) => Err(AppError::invalid_calendar_input(format!(
-            "unknown events action `{unknown}`; expected list/get/create/update/delete"
+            "unknown events action `{unknown}`; expected list/get/create/update/delete/respond"
         ))),
         (unknown, _) => Err(AppError::invalid_calendar_input(format!(
             "unknown calendar subcommand `{unknown}`; expected calendars/events"
@@ -62,7 +63,7 @@ pub(crate) fn response(payload: Value, text: impl Into<String>) -> NativeCalenda
 fn split_action(args: &[String]) -> Result<(String, &[String]), AppError> {
     let Some(first) = args.first() else {
         return Err(AppError::invalid_calendar_input(
-            "missing calendar action; expected `calendars list`, `events list`, `events get`, `events create`, or `events delete`",
+            "missing calendar action; expected `calendars list`, `events list`, `events get`, `events create`, `events update`, `events delete`, or `events respond`",
         ));
     };
     if first.starts_with('-') {

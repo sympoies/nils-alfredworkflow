@@ -3,7 +3,8 @@ use serde_json::json;
 use crate::error::AppError;
 
 use super::client::{
-    CalendarSession, EventCreateRequest, EventGetRequest, EventUpdateRequest, TimeSpec,
+    CalendarSession, EVENT_RESPONSES, EventCreateRequest, EventGetRequest, EventRespondRequest,
+    EventUpdateRequest, SEND_UPDATES, TimeSpec,
 };
 use super::read::{parse_property, require_calendar_id, value_for};
 use super::{NativeCalendarResponse, response};
@@ -268,6 +269,99 @@ pub fn execute_events_create(
         format!(
             "Created event `{}` ({}) in `{}`.",
             event.summary, event.start, request.calendar_id
+        ),
+    ))
+}
+
+pub fn execute_events_respond(
+    session: &CalendarSession,
+    args: &[String],
+) -> Result<NativeCalendarResponse, AppError> {
+    let mut calendar_id = None;
+    let mut event_id = None;
+    let mut response_status = None;
+    let mut send_updates = "all".to_string();
+
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--calendar-id" => {
+                index += 1;
+                calendar_id = Some(value_for(args, index, "--calendar-id")?.clone());
+            }
+            "--event-id" => {
+                index += 1;
+                event_id = Some(value_for(args, index, "--event-id")?.clone());
+            }
+            "--response" => {
+                index += 1;
+                response_status = Some(value_for(args, index, "--response")?.clone());
+            }
+            "--send-updates" => {
+                index += 1;
+                send_updates = value_for(args, index, "--send-updates")?.clone();
+            }
+            unknown if unknown.starts_with('-') => {
+                return Err(AppError::invalid_calendar_input(format!(
+                    "unknown events respond flag `{unknown}`"
+                )));
+            }
+            positional => {
+                if event_id.is_some() {
+                    return Err(AppError::invalid_calendar_input(format!(
+                        "unexpected extra event id `{positional}`"
+                    )));
+                }
+                event_id = Some(positional.to_string());
+            }
+        }
+        index += 1;
+    }
+
+    let response_status = response_status.ok_or_else(|| {
+        AppError::invalid_calendar_input(format!(
+            "missing required `--response <{}>`",
+            EVENT_RESPONSES.join("|")
+        ))
+    })?;
+    if !EVENT_RESPONSES.contains(&response_status.as_str()) {
+        return Err(AppError::invalid_calendar_input(format!(
+            "unknown --response `{response_status}`; expected one of {}",
+            EVENT_RESPONSES.join("/")
+        )));
+    }
+    if !SEND_UPDATES.contains(&send_updates.as_str()) {
+        return Err(AppError::invalid_calendar_input(format!(
+            "unknown --send-updates `{send_updates}`; expected one of {}",
+            SEND_UPDATES.join("/")
+        )));
+    }
+
+    let request = EventRespondRequest {
+        calendar_id: require_calendar_id(calendar_id)?,
+        event_id: event_id.ok_or_else(|| {
+            AppError::invalid_calendar_input(
+                "`events respond` requires an event id, either positional or via --event-id",
+            )
+        })?,
+        response: response_status,
+        send_updates,
+    };
+    let event = session.respond_event(&request)?;
+
+    Ok(response(
+        json!({
+            "account": session.account,
+            "account_source": session.account_source,
+            "calendar_id": request.calendar_id,
+            "fixture_mode": session.is_fixture_mode(),
+            "response": request.response,
+            "send_updates": request.send_updates,
+            "event": event,
+        }),
+        format!(
+            "Responded `{}` to event `{}` in `{}`.",
+            request.response, request.event_id, request.calendar_id
         ),
     ))
 }
