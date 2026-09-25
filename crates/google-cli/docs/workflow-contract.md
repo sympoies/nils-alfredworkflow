@@ -31,12 +31,13 @@ Authoritative help: `cargo run -p nils-google-cli -- <namespace> <subcommand> --
 
 | Subcommand | Inputs | Behavior |
 | --- | --- | --- |
-| `auth credentials set` | `--client-id`, `--client-secret` | Persist OAuth client credentials. |
+| `auth credentials set` | `--client-id`, `--client-secret`; optional `--auth-uri`, `--token-uri`, `--redirect-uri`, `--revoke-uri` | Persist OAuth client credentials. |
 | `auth credentials list` | — | List configured credentials by alias. |
-| `auth add <account>` | `--remote --step 1` then `--remote --step 2 --state ... --code ...`; or `--manual`; or default loopback | Authorize and persist a refresh token. Three modes per the native contract. |
+| `auth add <account>` | `--remote --step 1` then `--remote --step 2` with `--state ... --code ...` or `--callback-url-stdin`; or `--manual`; or default loopback | Authorize and persist a refresh token. Three modes per the native contract. |
 | `auth list` | — | List stored accounts. |
 | `auth status` | `-a <account>` (optional) | Show backend status for one account or the resolved default. |
-| `auth remove <account>` | — | Remove a stored refresh token. |
+| `auth default <account>` | — | Make a stored account or alias the default. |
+| `auth remove <account>` | optional `--revoke` | Remove a stored refresh token; `--revoke` revokes it at Google first and keeps the account if that fails. |
 | `auth alias` | get/set/clear forms | Manage account aliases. |
 | `auth manage` | — | Terminal-native account management summary (no browser). |
 

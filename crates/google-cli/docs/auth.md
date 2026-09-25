@@ -10,7 +10,8 @@ Detailed operator guide: [`auth-setup-guide.md`](auth-setup-guide.md).
 - `auth add <email>` (supports `--manual` and `--remote`)
 - `auth list`
 - `auth status`
-- `auth remove <email-or-alias>`
+- `auth default <email-or-alias>`
+- `auth remove <email-or-alias> [--revoke]`
 - `auth alias set|remove|list`
 - `auth manage`
 
@@ -61,6 +62,17 @@ cargo run -p nils-google-cli -- --json auth add you@example.com \
   --code "<code>"
 ```
 
+Or paste the whole redirected address-bar URL on stdin, which keeps the
+one-time code out of the process list and decodes it (`4%2F0A...`):
+
+```bash
+cargo run -p nils-google-cli -- --json auth add you@example.com \
+  --remote --step 2 --callback-url-stdin
+```
+
+The `state` is random per step 1 and must match the pasted callback. A callback
+carrying `error=` (for example a denied consent) is reported, not exchanged.
+
 Verify token state:
 
 ```bash
@@ -88,6 +100,23 @@ List aliases:
 ```bash
 cargo run -p nils-google-cli -- --json auth alias list
 ```
+
+## Default account and removal
+
+Make a stored account the default that unqualified commands resolve to:
+
+```bash
+cargo run -p nils-google-cli -- --json auth default work
+```
+
+`auth remove <email-or-alias>` forgets the local token only; Google still
+honours the grant until it is revoked in the account's security settings.
+`--revoke` revokes the refresh token at the client's `revoke_uri` (default
+`https://oauth2.googleapis.com/revoke`, override with
+`auth credentials set --revoke-uri`) first. A token Google already rejects as
+`invalid_token` counts as revoked. Any other failure keeps the account, so a
+grant is never forgotten while it is still live. The result reports `revoked`
+as `revoked`, `already-invalid`, `no-token`, or `null` without `--revoke`.
 
 ## Troubleshooting
 

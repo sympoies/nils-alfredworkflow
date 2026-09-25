@@ -20,7 +20,9 @@ enum AuthCommand {
     List(ExtraArgs),
     /// Show auth configuration and keyring backend.
     Status(ExtraArgs),
-    /// Remove a stored refresh token.
+    /// Make a stored account the default.
+    Default(TargetArgs),
+    /// Remove a stored refresh token; `--revoke` revokes it at Google first.
     Remove(TargetArgs),
     /// Manage account aliases.
     Alias(NestedArgs),
@@ -35,6 +37,7 @@ impl AuthArgs {
             AuthCommand::Add(_) => "google.auth.add",
             AuthCommand::List(_) => "google.auth.list",
             AuthCommand::Status(_) => "google.auth.status",
+            AuthCommand::Default(_) => "google.auth.default",
             AuthCommand::Remove(_) => "google.auth.remove",
             AuthCommand::Alias(_) => "google.auth.alias",
             AuthCommand::Manage(_) => "google.auth.manage",
@@ -57,6 +60,11 @@ impl AuthArgs {
             AuthCommand::Status(args) => {
                 Invocation::new("google.auth.status", ["auth", "status"], args.extra_args)
             }
+            AuthCommand::Default(args) => Invocation::new(
+                "google.auth.default",
+                ["auth", "default"],
+                join_target(args),
+            ),
             AuthCommand::Remove(args) => {
                 Invocation::new("google.auth.remove", ["auth", "remove"], join_target(args))
             }

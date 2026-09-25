@@ -43,7 +43,19 @@ Define the native Rust command contract for `google-cli` over the repo-scoped Go
 Required behavior:
 
 - Remote/manual state tracking must prevent wrapper-era state mismatch failures.
+- The remote `state` must be unguessable, generated fresh for every step 1.
+- Remote step 2 may take the redirected callback URL on stdin
+  (`--callback-url-stdin`) so the one-time code never appears in process
+  arguments; the code is percent-decoded and a callback `error` is reported.
 - Browser launch is an auth helper concern only; account-manager UI is not opened.
+
+## Default account and removal
+
+- `auth default <account>` sets the configured default account used in step 3
+  of the resolution order below.
+- `auth remove --revoke` revokes the refresh token at the provider before
+  forgetting it. A token the provider already rejects counts as revoked; any
+  other failure keeps the account so a live grant is never left untracked.
 
 ## Account and default resolution semantics
 

@@ -51,6 +51,16 @@ pub struct OAuthClientCredentials {
     pub auth_uri: String,
     pub token_uri: String,
     pub redirect_uri: String,
+    // Absent from credentials written before revocation existed, which then
+    // revoke through Google's documented endpoint.
+    #[serde(default = "default_revoke_uri")]
+    pub revoke_uri: String,
+}
+
+pub const GOOGLE_REVOKE_URI: &str = "https://oauth2.googleapis.com/revoke";
+
+fn default_revoke_uri() -> String {
+    GOOGLE_REVOKE_URI.to_string()
 }
 
 impl OAuthClientCredentials {
@@ -61,6 +71,7 @@ impl OAuthClientCredentials {
             auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
             token_uri: "https://oauth2.googleapis.com/token".to_string(),
             redirect_uri: "http://127.0.0.1:51789/callback".to_string(),
+            revoke_uri: default_revoke_uri(),
         }
     }
 }
