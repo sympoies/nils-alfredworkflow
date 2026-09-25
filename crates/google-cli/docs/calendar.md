@@ -145,11 +145,14 @@ cargo run -p nils-google-cli -- --output json -a you@example.com \
 
 - `--response` is `accepted`, `declined`, or `tentative`. `--send-updates` is `all` (the default, which notifies the
   organizer), `externalOnly`, or `none`.
-- The command reads the event, finds the attendee Calendar marks `self`, and patches the `attendees` array with only
-  that entry's `responseStatus` changed. PATCH replaces the whole array, so every other attendee is sent back as read.
-- An event the account is not invited to, or one it organizes, is refused with `NILS_GOOGLE_015`; an organizer changes
-  its own event with `events update`.
-- Every event view carries `self_attendee` (`response_status`, `organizer`) when the account is an attendee, so a
+- Calendar marks one attendee `self`: the owner of the calendar named by `--calendar-id`. On the account's own
+  calendar that is the account; on a delegated or shared calendar it is that calendar's owner.
+- The command reads the event, finds the `self` attendee, and PATCHes only that entry with `attendeesOmitted: true`,
+  which Calendar documents as the way to update just the participant's response. The rest of the guest list is never
+  sent, so a hidden guest list cannot be overwritten.
+- An event whose calendar is not invited, or whose calendar organizes it, is refused with `NILS_GOOGLE_015`; an
+  organizer changes its own event with `events update`.
+- Every event view carries `self_attendee` (`response_status`, `organizer`) when that calendar is an attendee, so a
   consumer can find unanswered invitations (`needsAction`) with `events list`.
 
 ## Error codes

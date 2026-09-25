@@ -189,7 +189,8 @@ pub struct EventView {
     pub meet_link: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attendees: Vec<String>,
-    /// The authenticated account's own attendee entry, when it is invited.
+    /// The attendee entry Calendar marks `self`: the owner of the calendar the
+    /// event was read from, when that calendar is invited.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub self_attendee: Option<SelfAttendee>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -801,28 +802,26 @@ fn answerable_attendee<'a>(
     Ok(attendee)
 }
 
-/// Build the PATCH body that answers an invitation. PATCH replaces the whole
-/// `attendees` array, so every other attendee is sent back unchanged and only
-/// the account's own `responseStatus` differs.
+/// Build the PATCH body that answers an invitation. It sends only the `self`
+/// attendee with `attendeesOmitted: true`, which Calendar documents as the way
+/// to update just the participant's response. Sending the array as read would
+/// be unsafe: with the guest list hidden, Calendar returns only the caller's
+/// entry, and a PATCH without `attendeesOmitted` treats that as the whole list.
 pub fn build_response_patch(
     event: &Value,
     event_id: &str,
     response: &str,
 ) -> Result<Value, AppError> {
-    let attendees = event
+    let entry = event
         .get("attendees")
         .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let position = attendees.iter().position(attendee_is_self);
-    let current = position.map(|index| self_attendee_from_json(&attendees[index]));
+        .and_then(|items| items.iter().find(|item| attendee_is_self(item)));
+    let current = entry.map(self_attendee_from_json);
     answerable_attendee(current.as_ref(), event_id)?;
 
-    let mut attendees = attendees;
-    if let Some(index) = position {
-        attendees[index]["responseStatus"] = Value::String(response.to_string());
-    }
-    Ok(json!({ "attendees": attendees }))
+    let mut entry = entry.cloned().unwrap_or_default();
+    entry["responseStatus"] = Value::String(response.to_string());
+    Ok(json!({ "attendees": [entry], "attendeesOmitted": true }))
 }
 
 fn attendee_is_self(attendee: &Value) -> bool {
@@ -1324,15 +1323,28 @@ mod tests {
     }
 
     #[test]
-    fn response_patch_changes_only_the_self_attendee() {
+    fn response_patch_sends_only_the_self_attendee_with_attendees_omitted() {
         let patch = build_response_patch(&invitation(), "ev-invite", "accepted").expect("patch");
         let attendees = patch["attendees"].as_array().expect("attendees");
-        assert_eq!(attendees.len(), 3, "every attendee is sent back");
-        assert_eq!(attendees[0], invitation()["attendees"][0]);
-        assert_eq!(attendees[2], invitation()["attendees"][2]);
-        assert_eq!(attendees[1]["responseStatus"], "accepted");
-        assert_eq!(attendees[1]["email"], "me@example.com");
-        assert_eq!(patch.as_object().map(|body| body.len()), Some(1));
+        assert_eq!(attendees.len(), 1, "only the self entry is sent");
+        assert_eq!(attendees[0]["email"], "me@example.com");
+        assert_eq!(attendees[0]["self"], true);
+        assert_eq!(attendees[0]["responseStatus"], "accepted");
+        assert_eq!(patch["attendeesOmitted"], true);
+        assert_eq!(patch.as_object().map(|body| body.len()), Some(2));
+    }
+
+    #[test]
+    fn response_patch_is_safe_when_the_guest_list_is_hidden() {
+        // With guests hidden, Calendar returns only the caller's entry. The
+        // patch must still mark the list partial, or Google could read the
+        // single entry as the whole guest list.
+        let hidden = json!({"id": "ev", "attendeesOmitted": true, "attendees": [
+            {"email": "me@example.com", "self": true, "responseStatus": "needsAction"}
+        ]});
+        let patch = build_response_patch(&hidden, "ev", "declined").expect("patch");
+        assert_eq!(patch["attendeesOmitted"], true);
+        assert_eq!(patch["attendees"][0]["responseStatus"], "declined");
     }
 
     #[test]

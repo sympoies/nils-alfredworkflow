@@ -128,10 +128,11 @@ Command IDs are `google.calendar.calendars.list` and `google.calendar.events.{li
 - `events delete <eventId>` removes one event and answers `deleted: true`. Calendar returns 410 Gone for an event that
   was already deleted, which maps to the same not-found error as 404 so a repeated delete says so plainly instead of
   surfacing a raw HTTP failure. It never reports success for an id that is not there.
-- `events respond <eventId> --response accepted|declined|tentative` answers an invitation. It reads the event, changes
-  only the `responseStatus` of the attendee marked `self`, and sends the whole `attendees` array back with
-  `sendUpdates` (`all` by default). A non-attendee or the organizer is refused as invalid input. Event views carry
-  `self_attendee` so unanswered invitations (`needsAction`) are visible.
+- `events respond <eventId> --response accepted|declined|tentative` answers an invitation for the calendar named by
+  `--calendar-id`. It reads the event and PATCHes only the attendee marked `self`, with `attendeesOmitted: true` and
+  `sendUpdates` (`all` by default), so no other guest is ever sent. A calendar that is not invited, or that organizes
+  the event, is refused as invalid input. Event views carry `self_attendee` so unanswered invitations (`needsAction`)
+  are visible.
 - `GOOGLE_CLI_CALENDAR_FIXTURE_PATH` / `GOOGLE_CLI_CALENDAR_FIXTURE_JSON` serve a local fixture store so command wiring
   is testable without network access. Fixture mode never mutates remote state: `events create` echoes the built request
   and `events delete` resolves the id, then reports success without removing anything.
