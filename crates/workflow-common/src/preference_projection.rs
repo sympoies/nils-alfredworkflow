@@ -341,7 +341,17 @@ fn parse_generated_at(value: Option<&Value>) -> Result<DateTime<Utc>, Projection
     let raw = value
         .and_then(Value::as_str)
         .ok_or(ProjectionError::Invalid { field: FIELD })?;
-    if raw.len() != 20 {
+    // The exact canonical `YYYY-MM-DDTHH:MM:SSZ` shape: chrono alone accepts a
+    // sign, leading whitespace, and unpadded fields.
+    let canonical = raw.len() == 20
+        && raw.bytes().enumerate().all(|(index, byte)| match index {
+            4 | 7 => byte == b'-',
+            10 => byte == b'T',
+            13 | 16 => byte == b':',
+            19 => byte == b'Z',
+            _ => byte.is_ascii_digit(),
+        });
+    if !canonical {
         return Err(ProjectionError::Invalid { field: FIELD });
     }
     NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%SZ")
@@ -369,7 +379,9 @@ fn parse_digest(value: Option<&Value>) -> Result<Option<String>, ProjectionError
             let hex = raw
                 .strip_prefix(DIGEST_PREFIX)
                 .ok_or(ProjectionError::Invalid { field: FIELD })?;
-            if hex.len() != DIGEST_HEX_LEN || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            if hex.len() != DIGEST_HEX_LEN
+                || !hex.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f'))
+            {
                 return Err(ProjectionError::Invalid { field: FIELD });
             }
             Ok(Some(raw.clone()))
@@ -699,7 +711,13 @@ mod tests {
             document["revision"] = revision;
             assert_eq!(invalid_field(&document), "revision");
         }
-        for digest in [json!("sha256:abc"), json!("md5:00"), json!(7)] {
+        for digest in [
+            json!("sha256:abc"),
+            json!("md5:00"),
+            json!(7),
+            json!(format!("sha256:{}", "g".repeat(64))),
+            json!(format!("sha256:{}", "A".repeat(64))),
+        ] {
             let mut document = valid_document();
             document["digest"] = digest;
             assert_eq!(invalid_field(&document), "digest");
@@ -750,6 +768,10 @@ mod tests {
             "2026-03-01 11:48:00Z",
             "2026-03-01T11:48:00.000Z",
             "2026-13-01T11:48:00Z",
+            "2026-3-01T11:48:00Z",
+            "+2026-3-01T11:48:00Z",
+            " 2026-3-01T11:48:00Z",
+            "2026-03-01T11:48:0Z ",
         ] {
             let mut document = valid_document();
             document["generatedAt"] = json!(raw);
@@ -868,6 +890,22 @@ mod tests {
         document["generatedAt"] = json!("2026-03-01T12:04:00Z");
         fs::write(&path, document.to_string()).expect("write");
         assert!(load_preference_projection(&path, now()).is_ok());
+
+        // Exact boundaries: seven days old and five minutes ahead are accepted.
+        for accepted in ["2026-02-22T12:00:00Z", "2026-03-01T12:05:00Z"] {
+            document["generatedAt"] = json!(accepted);
+            fs::write(&path, document.to_string()).expect("write");
+            assert!(
+                load_preference_projection(&path, now()).is_ok(),
+                "{accepted}"
+            );
+        }
+        document["generatedAt"] = json!("2026-03-01T12:05:01Z");
+        fs::write(&path, document.to_string()).expect("write");
+        assert_eq!(
+            load_preference_projection(&path, now()),
+            Err(ProjectionError::FutureTimestamp)
+        );
 
         document["generatedAt"] = json!("2026-03-01T12:06:00Z");
         fs::write(&path, document.to_string()).expect("write");

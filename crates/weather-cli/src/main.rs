@@ -22,7 +22,7 @@ use weather_cli::{
     providers::{HttpProviders, ProviderApi},
     service,
 };
-use workflow_common::preference_projection::{ProjectionStatus, load_preference_projection};
+use workflow_common::preference_projection::ProjectionStatus;
 
 #[cfg(test)]
 use weather_cli::{
@@ -203,21 +203,9 @@ fn run_preference_command(command: Commands, now: DateTime<Utc>) -> Result<Strin
             preference_projection_file,
             output,
         } => {
-            let status = non_empty_path(preference_projection_file.as_deref()).map(|path| {
-                match load_preference_projection(path, now) {
-                    Ok(projection) if projection.weather_default_locations().is_empty() => {
-                        ProjectionStatus::Empty {
-                            revision: projection.revision,
-                            skipped: 0,
-                        }
-                    }
-                    Ok(projection) => ProjectionStatus::Used {
-                        revision: projection.revision,
-                        generated_at: projection.generated_at,
-                        skipped: 0,
-                    },
-                    Err(error) => ProjectionStatus::Failed(error),
-                }
+            // The same owner that resolves the defaults decides the visible state.
+            let status = non_empty_path(preference_projection_file.as_deref()).and_then(|path| {
+                preferences::resolve_default_locations("", Some(path), now).status
             });
             render_preference_status(status.as_ref(), output, now)
         }
@@ -2000,5 +1988,24 @@ mod tests {
 
         let output = run_preference_cli(&["preference-status"]);
         assert_eq!(output, r#"{"items":[]}"#);
+    }
+
+    #[test]
+    fn preference_status_reports_a_projection_without_usable_locations() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = write_projection(&dir, "2026-02-10T23:53:00Z");
+        let mut document: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
+        document["weather"] = json!({"default_location": "", "saved_locations": []});
+        std::fs::write(&path, document.to_string()).expect("write");
+        let path = path.to_string_lossy().into_owned();
+        let output =
+            run_preference_cli(&["preference-status", "--preference-projection-file", &path]);
+        let json: Value = serde_json::from_str(&output).expect("json");
+        assert_eq!(
+            json["items"][0]["title"],
+            "Preferences: projection revision 2 has no usable entries — using workflow settings"
+        );
+        assert_eq!(json["items"][0]["valid"], false);
     }
 }
