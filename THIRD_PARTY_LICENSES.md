@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `347e2c9401a58d6f5ae7fc5db5966f6149e75456d6982b79803e734612b9397b`
+- Data source fingerprint (SHA256): `9f8a06a5acb670269054485ca0f29f00a2162441aab9ef0000c0fc426023c299`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `c221fdd34bc8cca519089298f73dbac004925575992e1234d34d24788f1b8ea5` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `4512e404ed0026ffc3887ec9d0142d1ff485e36261278a4972d3b26e5bdb9cc4` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `2a71f790b6d5e4723514240b20386b7a630b536cba8dbac002f392c01b909d83` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -256,7 +256,7 @@ Do not edit manually.
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-udp | 0.5.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quote | 1.0.45 | MIT OR Apache-2.0 | <https://github.com/dtolnay/quote> |
-| rand | 0.10.2 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| rand | 0.10.3 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.8.6 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.9.5 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
@@ -313,15 +313,15 @@ Do not edit manually.
 | sync_wrapper | 1.0.2 | Apache-2.0 | <https://github.com/Actyx/sync_wrapper> |
 | synstructure | 0.13.2 | MIT | <https://github.com/mystor/synstructure> |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | <https://github.com/Stebalien/tempfile> |
-| thiserror | 2.0.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
-| thiserror-impl | 2.0.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
+| thiserror | 2.0.21 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
+| thiserror-impl | 2.0.21 | MIT OR Apache-2.0 | <https://github.com/dtolnay/thiserror> |
 | time | 0.3.47 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
 | time-core | 0.1.8 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
 | time-macros | 0.2.27 | MIT OR Apache-2.0 | <https://github.com/time-rs/time> |
 | tinystr | 0.8.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | tinyvec | 1.11.0 | Zlib OR Apache-2.0 OR MIT | <https://github.com/Lokathor/tinyvec> |
 | tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib | <https://github.com/Soveu/tinyvec_macros> |
-| tokio | 1.52.3 | MIT | <https://github.com/tokio-rs/tokio> |
+| tokio | 1.53.1 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-macros | 2.7.0 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-rustls | 0.26.4 | MIT OR Apache-2.0 | <https://github.com/rustls/tokio-rustls> |
 | tokio-util | 0.7.18 | MIT | <https://github.com/tokio-rs/tokio> |
