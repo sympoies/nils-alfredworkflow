@@ -26,7 +26,7 @@ google-gmail1 = "=7.0.0"
 keyring = "=4.2.0"
 mail-builder = "=1.0.0"
 mime_guess = "=2.0.5"
-sha2 = "=0.10.9"
+sha2 = "=0.11.0"
 hex = "=0.4.3"
 workflow-common = { package = "nils-workflow-common", path = "../workflow-common", version = "1.0.3", features = ["http"] }
 open = "=5.4.4"
