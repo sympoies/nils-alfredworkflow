@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use workflow_common::http::build_blocking_client;
 
 use crate::auth::account::resolve_account;
 use crate::auth::config::{AuthPaths, load_credentials, load_metadata};
@@ -188,10 +187,9 @@ impl DriveSession {
             refreshed
         };
 
-        let client =
-            build_blocking_client(None, Some(DRIVE_METADATA_TIMEOUT)).map_err(|error| {
-                AppError::drive_failure(format!("failed to build Drive HTTP client: {error}"))
-            })?;
+        let client = build_drive_client().map_err(|error| {
+            AppError::drive_failure(format!("failed to build Drive HTTP client: {error}"))
+        })?;
 
         Ok(Self {
             account: resolved.account,
@@ -819,6 +817,13 @@ fn metadata_request(request: RequestBuilder) -> RequestBuilder {
     request.timeout(DRIVE_METADATA_TIMEOUT)
 }
 
+fn build_drive_client() -> Result<Client, reqwest::Error> {
+    Client::builder()
+        .timeout(DRIVE_METADATA_TIMEOUT)
+        .https_only(true)
+        .build()
+}
+
 fn media_request(request: RequestBuilder) -> RequestBuilder {
     request.timeout(DRIVE_MEDIA_TIMEOUT)
 }
@@ -1335,8 +1340,9 @@ fn upload_to_fixture(
 #[cfg(test)]
 mod tests {
     use super::{
-        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, DriveSession, UploadRequest, list_params,
-        media_request, metadata_request, parse_list_payload, view_from_live_json,
+        DRIVE_MEDIA_TIMEOUT, DRIVE_METADATA_TIMEOUT, DriveSession, UploadRequest,
+        build_drive_client, list_params, media_request, metadata_request, parse_list_payload,
+        view_from_live_json,
     };
 
     use reqwest::blocking::Client;
@@ -1360,6 +1366,28 @@ mod tests {
             api_base: base.clone(),
             upload_base: base,
         }
+    }
+
+    #[tokio::test]
+    async fn production_drive_client_rejects_cleartext_requests() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/test"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/test", server.uri());
+        let result =
+            tokio::task::spawn_blocking(move || build_drive_client().unwrap().get(url).send())
+                .await
+                .expect("join");
+
+        assert!(
+            result.is_err(),
+            "production Drive client accepted an HTTP URL"
+        );
+        assert!(server.received_requests().await.unwrap().is_empty());
     }
 
     #[tokio::test]
