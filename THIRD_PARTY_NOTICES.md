@@ -3,7 +3,7 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `c221fdd34bc8cca519089298f73dbac004925575992e1234d34d24788f1b8ea5`
+- Cargo.lock SHA256: `4512e404ed0026ffc3887ec9d0142d1ff485e36261278a4972d3b26e5bdb9cc4`
 - Third-party crates (`source != null`): 317
 
 ## Notice Extraction Policy
@@ -1780,7 +1780,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### rand 0.10.2
+### rand 0.10.3
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2286,7 +2286,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### thiserror 2.0.20
+### thiserror 2.0.21
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2295,7 +2295,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### thiserror-impl 2.0.20
+### thiserror-impl 2.0.21
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2359,7 +2359,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-MIT.md`
   - `LICENSE-ZLIB.md`
 
-### tokio 1.52.3
+### tokio 1.53.1
 
 - License: `MIT`
 - Source: `crates.io`
