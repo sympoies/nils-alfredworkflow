@@ -14,9 +14,6 @@
 
 - `README.md` as the repository entrypoint.
 - `AGENTS.md` as repository-local agent/automation instructions when tracked.
-- `CLAUDE.md` as a one-line `@AGENTS.md` import bridge when tracked. The bridge
-  uses Claude import syntax rather than Markdown and is excluded from Markdown
-  lint while remaining governed by the root-doc placement audit.
 - Repository-wide maintainer/operator guides:
   - `ALFRED_WORKFLOW_DEVELOPMENT.md`
   - `BINARY_DEPENDENCIES.md`
@@ -48,8 +45,7 @@
   `docs/ARCHITECTURE.md`, `DEVELOPMENT.md`, or `docs/PACKAGING.md`, not directly from `README.md`.
 - Generated/compliance root artifacts must be linked from a canonical release/compliance entrypoint such as
   `docs/RELEASE.md`.
-- Root files that are entrypoints themselves (`README.md`, `AGENTS.md`,
-  `CLAUDE.md`) do not require inbound links.
+- Root files that are entrypoints themselves (`README.md`, `AGENTS.md`) do not require inbound links.
 
 ### Disallowed root docs patterns (crate-specific)
 
