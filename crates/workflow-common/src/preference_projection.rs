@@ -502,6 +502,38 @@ pub fn format_age(age_secs: i64) -> String {
     }
 }
 
+/// What a projection supplied for empty-query defaults, in user-facing terms.
+///
+/// The status row sentence is built here so every workflow words it the same
+/// way: the projection is read-only, and typing a query only shows that
+/// query's result instead of the defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectionDefaults {
+    /// Plural noun for the supplied defaults, for example `favorites`.
+    pub defaults: &'static str,
+    /// What the user types instead, with article, for example `a city`.
+    pub input: &'static str,
+    /// What typing it shows, for example `weather`.
+    pub result: &'static str,
+}
+
+impl ProjectionDefaults {
+    pub const fn new(defaults: &'static str, input: &'static str, result: &'static str) -> Self {
+        Self {
+            defaults,
+            input,
+            result,
+        }
+    }
+
+    fn sentence(&self) -> String {
+        format!(
+            "Showing {} from your preferences. Type {} to see its {} instead.",
+            self.defaults, self.input, self.result
+        )
+    }
+}
+
 /// Outcome of consulting a configured projection, used for the status row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectionStatus {
@@ -544,10 +576,10 @@ impl ProjectionStatus {
         }
     }
 
-    /// Status row subtitle. `used_hint` describes what the projection supplied.
-    pub fn subtitle(&self, used_hint: &str) -> String {
+    /// Status row subtitle. `defaults` describes what the projection supplied.
+    pub fn subtitle(&self, defaults: ProjectionDefaults) -> String {
         match self {
-            Self::Used { skipped, .. } => with_skipped(used_hint.to_string(), *skipped),
+            Self::Used { skipped, .. } => with_skipped(defaults.sentence(), *skipped),
             Self::Empty { skipped, .. } => with_skipped(
                 "The external preference projection supplied no usable entries.".to_string(),
                 *skipped,
@@ -566,9 +598,9 @@ impl ProjectionStatus {
     }
 
     /// Non-selectable Alfred status row.
-    pub fn to_item(&self, now: DateTime<Utc>, used_hint: &str) -> Item {
+    pub fn to_item(&self, now: DateTime<Utc>, defaults: ProjectionDefaults) -> Item {
         Item::new(self.title(now))
-            .with_subtitle(self.subtitle(used_hint))
+            .with_subtitle(self.subtitle(defaults))
             .with_valid(false)
     }
 }
@@ -961,8 +993,20 @@ mod tests {
             "Preferences: projection (no revision) · synced 12m ago"
         );
         assert_eq!(
-            unrevisioned.subtitle("Hint."),
-            "Hint. 2 entries skipped (unsupported)."
+            unrevisioned.subtitle(ProjectionDefaults::new(
+                "favorites",
+                "an expression",
+                "result"
+            )),
+            "Showing favorites from your preferences. Type an expression to see its result instead. 2 entries skipped (unsupported)."
+        );
+        assert_eq!(
+            used.subtitle(ProjectionDefaults::new(
+                "default locations",
+                "a city",
+                "weather"
+            )),
+            "Showing default locations from your preferences. Type a city to see its weather instead."
         );
 
         for (error, state) in [
@@ -993,7 +1037,8 @@ mod tests {
 
     #[test]
     fn status_item_is_not_selectable() {
-        let item = ProjectionStatus::Failed(ProjectionError::Unavailable).to_item(now(), "unused");
+        let item = ProjectionStatus::Failed(ProjectionError::Unavailable)
+            .to_item(now(), ProjectionDefaults::new("items", "a query", "result"));
         let json = serde_json::to_value(&item).expect("json");
         assert_eq!(json.get("valid"), Some(&Value::Bool(false)));
         assert!(json.get("arg").is_none());

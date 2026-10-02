@@ -226,7 +226,7 @@ fn preference_status_json(status: &ProjectionStatus, now: DateTime<Utc>) -> serd
     json!({
         "state": status.state(),
         "title": status.title(now),
-        "subtitle": status.subtitle(preferences::PROJECTION_USED_HINT),
+        "subtitle": status.subtitle(preferences::PROJECTION_DEFAULTS),
     })
 }
 
@@ -255,7 +255,7 @@ fn render_default_locations(
         OutputMode::AlfredJson => {
             let mut items = Vec::with_capacity(resolved.locations.len() + 1);
             if let Some(status) = resolved.status.as_ref() {
-                items.push(status.to_item(now, preferences::PROJECTION_USED_HINT));
+                items.push(status.to_item(now, preferences::PROJECTION_DEFAULTS));
             }
             items.extend(resolved.locations.iter().map(|location| {
                 alfred_core::Item::new(location.clone())
@@ -284,7 +284,7 @@ fn render_preference_status(
         }
         OutputMode::AlfredJson => serialize_feedback(
             status
-                .map(|status| status.to_item(now, preferences::PROJECTION_USED_HINT))
+                .map(|status| status.to_item(now, preferences::PROJECTION_DEFAULTS))
                 .into_iter()
                 .collect(),
         ),

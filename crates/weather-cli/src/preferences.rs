@@ -10,15 +10,15 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use workflow_common::{
-    preference_projection::{ProjectionStatus, load_preference_projection},
+    preference_projection::{ProjectionDefaults, ProjectionStatus, load_preference_projection},
     split_ordered_list,
 };
 
 use crate::geocoding::{coordinate_label, read_cached_city_location};
 
 /// Status-row subtitle when the projection supplied the default locations.
-pub const PROJECTION_USED_HINT: &str =
-    "Default locations from the external preference projection. Type a city to override.";
+pub const PROJECTION_DEFAULTS: ProjectionDefaults =
+    ProjectionDefaults::new("default locations", "a city", "weather");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefaultLocations {
@@ -135,6 +135,19 @@ mod tests {
         });
         fs::write(&path, document.to_string()).expect("write projection");
         path
+    }
+
+    #[test]
+    fn projection_defaults_subtitle_is_plain_wording() {
+        let status = ProjectionStatus::Used {
+            revision: Some(2),
+            generated_at: now(),
+            skipped: 0,
+        };
+        assert_eq!(
+            status.subtitle(PROJECTION_DEFAULTS),
+            "Showing default locations from your preferences. Type a city to see its weather instead."
+        );
     }
 
     #[test]
