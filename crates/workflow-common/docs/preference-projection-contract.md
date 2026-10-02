@@ -129,6 +129,22 @@ non-UTF-8 or malformed JSON, schema or field violations, and future
 timestamps. A projection without a revision is shown as
 `projection (no revision)`.
 
+### Subtitle wording
+
+The `used` subtitle is built by `ProjectionDefaults` in `workflow-common` so
+every workflow words it the same way:
+
+> Showing `<defaults>` from your preferences. Type `<input>` to see its
+> `<result>` instead.
+
+- Market: `Showing favorites from your preferences. Type an expression to see its result instead.`
+- Weather: `Showing default locations from your preferences. Type a city to see its weather instead.`
+
+User-facing wording rule: the projection is read-only, so say plainly what is
+shown and what typing does. Do not use "override", and do not imply that a
+query changes or saves a preference. When entries are skipped, the count is
+appended (for example `2 entries skipped (unsupported).`).
+
 ## Privacy
 
 Status rows and error messages never contain the configured path or any

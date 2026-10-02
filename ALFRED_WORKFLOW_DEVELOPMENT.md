@@ -157,6 +157,14 @@ The four canonical sections are the contract. Two narrow exceptions are explicit
   intentional part of the workflow. Items without `uid` already retain emitted
   order and do not need `skipknowledge`.
 
+### Preference projection status wording
+
+- Status rows for the external preference projection use the shared
+  `ProjectionDefaults` sentence; do not hand-write per-workflow hints.
+- Describe what is shown and what typing does ("Type a city to see its weather
+  instead."). Never say "override" or imply a query changes or saves a
+  preference. See `crates/workflow-common/docs/preference-projection-contract.md`.
+
 ### `alfredfiltersresults` guardrail
 
 - Keep `alfredfiltersresults=false` when Script Filter output is fully controlled by script JSON.

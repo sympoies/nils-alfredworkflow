@@ -7,7 +7,7 @@ use rust_decimal::Decimal;
 use workflow_common::{
     AppError as CliError, EnvelopePayloadKind, OutputMode, build_alfred_error_feedback,
     build_error_details_json, build_error_envelope, build_success_envelope,
-    preference_projection::{ProjectionStatus, load_preference_projection},
+    preference_projection::{ProjectionDefaults, ProjectionStatus, load_preference_projection},
     redact_sensitive,
 };
 
@@ -87,8 +87,8 @@ const FAVORITES_PROMPT_UID: &str = "market-favorites-ordered-prompt-v1";
 const FAVORITES_UID_NAMESPACE: &str = "market-favorite-ordered-v1";
 const FAVORITES_QUOTE_UNAVAILABLE_SUBTITLE: &str =
     "Favorite quote. Type an expression to convert. Quote unavailable.";
-const FAVORITES_PROJECTION_USED_HINT: &str =
-    "Favorites from the external preference projection. Type an expression to override.";
+const FAVORITES_PROJECTION_DEFAULTS: ProjectionDefaults =
+    ProjectionDefaults::new("favorites", "an expression", "result");
 
 impl Cli {
     fn command_name(&self) -> &'static str {
@@ -224,7 +224,7 @@ where
                 .map_err(|error| user_error(ERROR_CODE_USER_INVALID_INPUT, error.to_string()))?;
             let status_item = projection_status
                 .as_ref()
-                .map(|status| status.to_item(now, FAVORITES_PROJECTION_USED_HINT));
+                .map(|status| status.to_item(now, FAVORITES_PROJECTION_DEFAULTS));
             let output_mode = output;
 
             match output_mode {
@@ -1513,7 +1513,9 @@ mod tests {
         );
         assert_eq!(
             items[1].get("subtitle").and_then(Value::as_str),
-            Some(FAVORITES_PROJECTION_USED_HINT)
+            Some(
+                "Showing favorites from your preferences. Type an expression to see its result instead."
+            )
         );
         assert_eq!(items[1].get("valid").and_then(Value::as_bool), Some(false));
         assert!(items[1].get("uid").is_none());
