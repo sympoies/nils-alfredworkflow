@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `1ce99da9617abafa41c239c5f886a63b9e2aa3368bff2ad07e2708018c12d7b6`
+- Data source fingerprint (SHA256): `7a0ccf1694dee127b0f69e2f27537914e4fd9b502a150f88af54af768b413333`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `d2c24c7dc898531fa7cb9a935e9b1d2620bf23716221d123fba69106fc5eecd5` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `e2f22b5cd0a1fddc81b7aae8b1449bc058c268954a312246f2d75d89b6408594` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -276,7 +276,7 @@ Do not edit manually.
 | rust_decimal | 1.43.0 | MIT | <https://github.com/paupino/rust-decimal> |
 | rustc-hash | 2.1.2 | Apache-2.0 OR MIT | <https://github.com/rust-lang/rustc-hash> |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | <https://github.com/bytecodealliance/rustix> |
-| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
 | rustls-native-certs | 0.8.3 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls-native-certs> |
 | rustls-pki-types | 1.14.1 | MIT OR Apache-2.0 | <https://github.com/rustls/pki-types> |
 | rustls-webpki | 0.103.15 | ISC | <https://github.com/rustls/webpki> |
