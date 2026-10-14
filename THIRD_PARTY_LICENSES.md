@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `3b8b674b3f48df53c6f220c60475637069fcdeee0ff976f5cb1e23b27d148ea6`
+- Data source fingerprint (SHA256): `7a0ccf1694dee127b0f69e2f27537914e4fd9b502a150f88af54af768b413333`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `be30e5537d30078a4284b76dd6dd0e42731ba26e365083eb0efb6ae72d68a9eb` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `e2f22b5cd0a1fddc81b7aae8b1449bc058c268954a312246f2d75d89b6408594` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -276,7 +276,7 @@ Do not edit manually.
 | rust_decimal | 1.43.0 | MIT | <https://github.com/paupino/rust-decimal> |
 | rustc-hash | 2.1.2 | Apache-2.0 OR MIT | <https://github.com/rust-lang/rustc-hash> |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | <https://github.com/bytecodealliance/rustix> |
-| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
 | rustls-native-certs | 0.8.3 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls-native-certs> |
 | rustls-pki-types | 1.14.1 | MIT OR Apache-2.0 | <https://github.com/rustls/pki-types> |
 | rustls-webpki | 0.103.15 | ISC | <https://github.com/rustls/webpki> |
@@ -291,7 +291,7 @@ Do not edit manually.
 | serde | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 | <https://github.com/serde-rs/serde> |
-| serde_json | 1.0.151 | MIT OR Apache-2.0 | <https://github.com/serde-rs/json> |
+| serde_json | 1.0.154 | MIT OR Apache-2.0 | <https://github.com/serde-rs/json> |
 | serde_repr | 0.1.20 | MIT OR Apache-2.0 | <https://github.com/dtolnay/serde-repr> |
 | serde_urlencoded | 0.7.1 | MIT/Apache-2.0 | <https://github.com/nox/serde_urlencoded> |
 | serde_with | 3.22.0 | MIT OR Apache-2.0 | <https://github.com/jonasbb/serde_with/> |
@@ -321,7 +321,7 @@ Do not edit manually.
 | tinystr | 0.8.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | tinyvec | 1.11.0 | Zlib OR Apache-2.0 OR MIT | <https://github.com/Lokathor/tinyvec> |
 | tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib | <https://github.com/Soveu/tinyvec_macros> |
-| tokio | 1.53.1 | MIT | <https://github.com/tokio-rs/tokio> |
+| tokio | 1.53.2 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-macros | 2.7.0 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-rustls | 0.26.4 | MIT OR Apache-2.0 | <https://github.com/rustls/tokio-rustls> |
 | tokio-util | 0.7.18 | MIT | <https://github.com/tokio-rs/tokio> |
@@ -345,7 +345,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.27.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.28.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | vcpkg | 0.2.15 | MIT/Apache-2.0 | <https://github.com/mcgoo/vcpkg-rs> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
