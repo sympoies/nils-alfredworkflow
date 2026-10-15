@@ -399,7 +399,7 @@ non-removed workflow directory.
 ### Reference policy
 
 - Active maintainer entry-point documents (`AGENTS.md`, `TROUBLESHOOTING.md`, `DEVELOPMENT.md`,
-  `docs/PACKAGING.md`, `docs/ARCHITECTURE.md`, `AGENT_DOCS.toml`, and
+  `docs/PACKAGING.md`, `docs/ARCHITECTURE.md`, and
   `workflows/<workflow-id>/README.md`) must link to:
   - `ALFRED_WORKFLOW_DEVELOPMENT.md` for global standards.
   - `workflows/<workflow-id>/TROUBLESHOOTING.md` for workflow-specific operations.
@@ -411,11 +411,8 @@ A maintainer should complete the following flow in under three minutes:
 
 1. Open `README.md` and follow troubleshooting navigation to global standards.
 2. Jump from workflow README to local `TROUBLESHOOTING.md`.
-3. Run `agent-docs preflight --intent project-dev --strict`.
-4. Confirm rollback path in the target workflow's `Rollback guidance` section is actionable.
+3. Confirm rollback path in the target workflow's `Rollback guidance` section is actionable.
 
 ## Validation
 
-- `agent-docs audit --target all --strict --format text`
-- `agent-docs preflight --intent project-dev --strict`
 - `rg -n "Troubleshooting|Validation|Rollback guidance" workflows/*/TROUBLESHOOTING.md`

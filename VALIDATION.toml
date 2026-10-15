@@ -1,0 +1,10 @@
+# Finish-line validation contract. agent-hook and the agent-runtime-kit
+# finish-line hooks block a turn that edited files until these commands pass.
+
+# Finish-line validation contract: code edits in this repo must run the local
+# pre-commit gate before a project-dev task is declared done.
+[[validation]]
+context = "project-dev"
+commands = ["bash scripts/local-pre-commit.sh"]
+marker = ".cache/agent-validation/project-dev.ok"
+description = "Run the local pre-commit gate (lint, script-filter policy, scraper tests, workflow tests) before declaring a project-dev task done."

@@ -4,7 +4,7 @@
 /out/
 /node_modules/
 
-# agent-docs finish-line validation markers (see AGENT_DOCS.toml [[validation]])
+# Finish-line validation markers (see VALIDATION.toml)
 .cache/
 
 .DS_Store
