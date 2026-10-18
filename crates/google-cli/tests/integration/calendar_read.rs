@@ -655,6 +655,10 @@ fn calendar_failure_identity_resolves_only_supported_actions() {
             vec!["events", "--unsupported-flag"],
             "google.calendar.events",
         ),
+        (
+            vec!["events", "--unsupported-flag", "create"],
+            "google.calendar.events",
+        ),
         (vec!["events", "unknown-action"], "google.calendar.events"),
         (
             vec!["calendars", "unknown-action"],
