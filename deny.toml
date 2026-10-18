@@ -25,8 +25,9 @@ ignore = [
     # versions: their APIs moved into zbus 6. The locked chain is
     # nils-google-cli -> keyring 4.2.0 -> zbus-secret-service-keyring-store 1.0.0
     # -> secret-service 5.1.0 -> zbus 5.15.0 -> these companion crates.
-    # Revisit and remove all three when keyring/secret-service adopt zbus >= 6
-    # or remove the affected dependencies; do not suppress other advisories.
+    # Review by 2026-11-18, or sooner when keyring/secret-service adopt zbus >= 6
+    # or remove the affected dependencies; remove all three after migration.
+    # Do not suppress other advisories.
     # Removal owner and migration: https://github.com/sympoies/nils-alfredworkflow/issues/277
     "RUSTSEC-2026-0370", # zvariant
     "RUSTSEC-2026-0371", # zbus_names
