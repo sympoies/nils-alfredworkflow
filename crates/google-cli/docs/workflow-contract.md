@@ -119,6 +119,11 @@ Failure envelope:
 Native command identifiers stay scoped to the namespace: `google.auth.<verb>`, `google.gmail.<verb>`,
 `google.drive.<verb>`, `google.calendar.<group>.<verb>`.
 
+Calendar failure envelopes retain the action-specific command identifier once
+a supported action is resolved, including invalid action flags. Unknown actions
+or flags supplied before an action retain the group identifier, such as
+`google.calendar.events` or `google.calendar.calendars`.
+
 ## Reserved error codes
 
 The reserved domain prefix is `NILS_GOOGLE_` (range `001-099`). Per the registry seeds:

@@ -21,8 +21,21 @@ enum CalendarCommand {
 impl CalendarArgs {
     pub fn command_id_hint(&self) -> &str {
         match &self.command {
-            CalendarCommand::Calendars(_) => "google.calendar.calendars",
-            CalendarCommand::Events(_) => "google.calendar.events",
+            CalendarCommand::Calendars(args) => {
+                match args.args.first().and_then(|arg| arg.to_str()) {
+                    Some("list") => "google.calendar.calendars.list",
+                    _ => "google.calendar.calendars",
+                }
+            }
+            CalendarCommand::Events(args) => match args.args.first().and_then(|arg| arg.to_str()) {
+                Some("list") => "google.calendar.events.list",
+                Some("get") => "google.calendar.events.get",
+                Some("create") => "google.calendar.events.create",
+                Some("update") => "google.calendar.events.update",
+                Some("delete") => "google.calendar.events.delete",
+                Some("respond") => "google.calendar.events.respond",
+                _ => "google.calendar.events",
+            },
         }
     }
 
