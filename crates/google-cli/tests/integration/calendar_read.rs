@@ -593,3 +593,78 @@ fn events_respond_refuses_events_the_account_cannot_answer() {
         assert_eq!(error["error"]["code"].as_str(), Some(code), "{arguments:?}");
     }
 }
+
+fn assert_calendar_invalid_input(args: &[&str], command: &str) {
+    let temp = tempdir().expect("tempdir");
+    native_calendar::seed_account(temp.path(), "default@example.com");
+    let fixture = native_calendar::write_fixture(temp.path(), &json!({"events": []}));
+    let (key, value) = native_calendar::fixture_env(&fixture);
+    let mut cli_args = vec!["--output", "json", "calendar"];
+    cli_args.extend_from_slice(args);
+    let output = native_calendar::run(temp.path(), &cli_args, &[(key, value.as_str())]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stderr.is_empty());
+    let payload = native_calendar::json(&output);
+    assert_eq!(payload["schema_version"], "cli-envelope@v1");
+    assert_eq!(payload["ok"], false);
+    assert_eq!(payload["error"]["code"], "NILS_GOOGLE_015");
+    assert_eq!(payload["error"]["details"]["exit_code"], 2);
+    assert_eq!(payload["command"], command, "args: {args:?}");
+}
+
+#[test]
+fn events_create_invalid_flag_retains_action_identity() {
+    assert_calendar_invalid_input(
+        &["events", "create", "--unsupported-flag"],
+        "google.calendar.events.create",
+    );
+}
+
+#[test]
+fn events_update_invalid_flag_retains_action_identity() {
+    assert_calendar_invalid_input(
+        &["events", "update", "event-id", "--unsupported-flag"],
+        "google.calendar.events.update",
+    );
+}
+
+#[test]
+fn calendar_failure_identity_resolves_only_supported_actions() {
+    for (args, command) in [
+        (
+            vec!["events", "list", "--unsupported-flag"],
+            "google.calendar.events.list",
+        ),
+        (
+            vec!["event", "get", "event-id", "--unsupported-flag"],
+            "google.calendar.events.get",
+        ),
+        (
+            vec!["events", "delete", "event-id", "--unsupported-flag"],
+            "google.calendar.events.delete",
+        ),
+        (
+            vec!["events", "respond", "event-id", "--unsupported-flag"],
+            "google.calendar.events.respond",
+        ),
+        (
+            vec!["calendar", "list", "--unsupported-flag"],
+            "google.calendar.calendars.list",
+        ),
+        (
+            vec!["events", "--unsupported-flag"],
+            "google.calendar.events",
+        ),
+        (
+            vec!["events", "--unsupported-flag", "create"],
+            "google.calendar.events",
+        ),
+        (vec!["events", "unknown-action"], "google.calendar.events"),
+        (
+            vec!["calendars", "unknown-action"],
+            "google.calendar.calendars",
+        ),
+    ] {
+        assert_calendar_invalid_input(&args, command);
+    }
+}
