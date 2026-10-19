@@ -4,6 +4,15 @@ Alfred workflows for macOS users.
 
 ![Quote Feed workflow screenshot](workflows/quote-feed/screenshot.png)
 
+## Start here
+
+| I want to... | Go to |
+| --- | --- |
+| Install a workflow | [Install](#install) |
+| Pick a workflow, its keywords, and its settings | [Workflows](#workflows), then the workflow's README |
+| Fix a workflow that shows an error row or no results | [Troubleshooting](#troubleshooting) |
+| Run a workflow that macOS blocks as `Not Opened` | [macOS Gatekeeper standalone script](#macos-gatekeeper-standalone-script) |
+
 ## Install
 
 1. Download a `.alfredworkflow` package from the [Releases](https://github.com/sympoies/nils-alfredworkflow/releases) page.
@@ -16,7 +25,7 @@ Alfred workflows for macOS users.
 
 | Workflow | Keyword(s) | What it does | Requires setup |
 | --- | --- | --- | --- |
-| [Google Search](workflows/google-search/README.md) | `gg`, `google` | Search web results (Brave backend) and open selected links. | Required: `BRAVE_API_KEY`; Optional: `BRAVE_COUNTRY`, `BRAVE_SAFESEARCH` |
+| [Google Search](workflows/google-search/README.md) | `gg`, `google`, `gb` | `gg` runs a two-stage flow (Google suggestions, then Brave web results); `gb` searches Brave directly. Open selected links. | Required: `BRAVE_API_KEY`; Optional: `BRAVE_COUNTRY`, `BRAVE_SAFESEARCH` |
 | [Google Service](workflows/google-service/README.md) | `gs`, `gsa`, `gsd`, `gsm` | `gs` shows account status (optional all-account unread summary + per-account unread rows for accounts with unread mail); `gsa` manages auth login/remove/switch; `gsd` supports Drive home/search/download; `gsm` supports Gmail unread/latest/search list, including `unread --account <email>` override. | Optional: `GOOGLE_CLI_CONFIG_DIR`, `GOOGLE_DRIVE_DOWNLOAD_DIR`, `GOOGLE_GS_SHOW_ALL_ACCOUNTS_UNREAD` |
 | [YouTube Search](workflows/youtube-search/README.md) | `yt`, `youtube` | Search YouTube videos and open selected videos in browser. | Required: `YOUTUBE_API_KEY`; Optional: `YOUTUBE_REGION_CODE`, `YOUTUBE_MAX_RESULTS` |
 | [Netflix Search](workflows/netflix-search/README.md) | `nf`, `netflix` | Search Netflix title pages (`site:netflix.com/title`) and open selected links. | Required: `BRAVE_API_KEY`; Optional: `NETFLIX_CATALOG_REGION`, `BRAVE_COUNTRY` |
@@ -50,5 +59,14 @@ Alfred workflows for macOS users.
 
 ## Troubleshooting
 
-- Quick routing index: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- Workflow-specific runtime failures: `workflows/<workflow-id>/TROUBLESHOOTING.md`
+Every workflow ships a `TROUBLESHOOTING.md` next to its README with the same four sections. Work through them in
+this order:
+
+1. If macOS reports `Not Opened` or `Apple could not verify ...`, run the
+   [Gatekeeper standalone script](#macos-gatekeeper-standalone-script) for that workflow first.
+2. Open the workflow README from the [Workflows](#workflows) table, follow its link to `TROUBLESHOOTING.md`, and
+   match the Alfred row title in **Common failures and actions**.
+3. For workflows with settings, re-check the variables in Alfred's `Configure Workflow...` against the workflow
+   README, then run the runbook's **Quick operator checks**.
+4. If the failure still does not match a row, use the [troubleshooting index](TROUBLESHOOTING.md) for global
+   checks and the curated runbooks.
