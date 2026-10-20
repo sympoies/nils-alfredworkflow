@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `7a0ccf1694dee127b0f69e2f27537914e4fd9b502a150f88af54af768b413333`
+- Data source fingerprint (SHA256): `847d8b37d2e67fc6abcaeefba6b9928afc2cdbcef8c636ad56fc11a0138bdb0f`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `e2f22b5cd0a1fddc81b7aae8b1449bc058c268954a312246f2d75d89b6408594` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `49fa1cbb05ae33b30ec53a25b8d54fec55fbf79d92bae661a8c9da4e12efeb29` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -297,7 +297,7 @@ Do not edit manually.
 | serde_with | 3.22.0 | MIT OR Apache-2.0 | <https://github.com/jonasbb/serde_with/> |
 | serde_with_macros | 3.22.0 | MIT OR Apache-2.0 | <https://github.com/jonasbb/serde_with/> |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/hashes> |
-| sha2 | 0.11.0 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/hashes> |
+| sha2 | 0.11.1 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/hashes> |
 | shlex | 1.3.0 | MIT OR Apache-2.0 | <https://github.com/comex/rust-shlex> |
 | shlex | 2.0.1 | MIT OR Apache-2.0 | <https://github.com/comex/rust-shlex> |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | <https://github.com/vorner/signal-hook> |
@@ -321,7 +321,7 @@ Do not edit manually.
 | tinystr | 0.8.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | tinyvec | 1.11.0 | Zlib OR Apache-2.0 OR MIT | <https://github.com/Lokathor/tinyvec> |
 | tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib | <https://github.com/Soveu/tinyvec_macros> |
-| tokio | 1.53.2 | MIT | <https://github.com/tokio-rs/tokio> |
+| tokio | 1.53.3 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-macros | 2.7.0 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-rustls | 0.26.4 | MIT OR Apache-2.0 | <https://github.com/rustls/tokio-rustls> |
 | tokio-util | 0.7.18 | MIT | <https://github.com/tokio-rs/tokio> |
