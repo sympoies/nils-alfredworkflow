@@ -67,9 +67,9 @@ test_runtime_pin_triggers_gate() {
 
 test_crate_manifest_triggers_gate() {
   local output
-  output="$(run_plan --changed-file crates/memo-workflow-cli/Cargo.toml)"
+  output="$(run_plan --changed-file crates/workflow-cli/Cargo.toml)"
   assert_contains "$output" "THIRD_PARTY_ARTIFACTS_GATE=run" "crate manifest gate" &&
-    assert_contains "$output" "THIRD_PARTY_ARTIFACTS_GATE_TRIGGER=crates/memo-workflow-cli/Cargo.toml" "crate manifest trigger"
+    assert_contains "$output" "THIRD_PARTY_ARTIFACTS_GATE_TRIGGER=crates/workflow-cli/Cargo.toml" "crate manifest trigger"
 }
 
 test_artifact_output_triggers_gate() {

@@ -9,7 +9,6 @@ version=""
 targets_raw=""
 use_all=0
 dry_run=0
-update_lock=0
 list_targets=0
 auto_commit=0
 auto_push=0
@@ -21,25 +20,23 @@ version_check_status="not-run"
 
 declare -a selected_targets=()
 declare -a changed_files=()
-declare -a lock_crates=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  <ENTRYPOINT> --version <x.y.z> [--targets <target[,target...]>|--all] [--dry-run] [--update-lock] [--auto-commit] [--auto-push] [--push-remote <remote>]
+  <ENTRYPOINT> --version <x.y.z> [--targets <target[,target...]>|--all] [--dry-run] [--auto-commit] [--auto-push] [--push-remote <remote>]
   <ENTRYPOINT> --list-targets
   <ENTRYPOINT> --help
 
 Options:
   --version <ver>         Exact version to pin (example: 0.3.7)
-  --targets <list>        Comma-separated target aliases (example: codex-cli,memo)
+  --targets <list>        Comma-separated target aliases (example: codex-cli)
   --all                   Pin all managed targets (default if --targets omitted)
   --dry-run               Print planned changes without writing files
-  --update-lock           Run cargo update --precise for cargo-managed targets
   --auto-commit           Stage touched files and create a semantic commit after pinning
   --auto-push             Push current branch after auto-commit (implies --auto-commit)
   --push-remote <name>    Remote to use with --auto-push (default: origin)
-  (validates codex-cli on GitHub Releases and cargo-managed targets on crates.io before edits)
+  (validates codex-cli on GitHub Releases before edits)
   --list-targets          Print supported targets and aliases
   -h, --help              Show this help
 USAGE
@@ -56,18 +53,9 @@ usage_error() {
   exit 2
 }
 
-target_crate() {
-  case "$1" in
-    codex-cli) printf '%s\n' "nils-codex-cli" ;;
-    memo) printf '%s\n' "nils-memo" ;;
-    *) return 1 ;;
-  esac
-}
-
 canonical_target() {
   case "$1" in
     codex-cli|codex|nils-codex-cli) printf '%s\n' "codex-cli" ;;
-    memo|nils-memo) printf '%s\n' "memo" ;;
     *) return 1 ;;
   esac
 }
@@ -78,10 +66,6 @@ codex-cli
   aliases: codex-cli, codex, nils-codex-cli
   release_source: sympoies/nils-cli GitHub release
   kind: workflow release-bundle runtime pin + docs
-memo
-  aliases: memo, nils-memo
-  published_crate: nils-memo
-  kind: cargo dependency pin + docs
 TARGETS
 }
 
@@ -97,15 +81,6 @@ record_changed_file() {
     [[ "$existing" == "$file" ]] && return 0
   done
   changed_files+=("$file")
-}
-
-record_lock_crate() {
-  local crate="$1"
-  local existing
-  for existing in "${lock_crates[@]:-}"; do
-    [[ "$existing" == "$crate" ]] && return 0
-  done
-  lock_crates+=("$crate")
 }
 
 replace_in_file() {
@@ -204,55 +179,11 @@ pin_codex_cli() {
   fi
 }
 
-pin_memo() {
-  local cargo_file="$repo_root/crates/memo-workflow-cli/Cargo.toml"
-  local crate_readme_file="$repo_root/crates/memo-workflow-cli/README.md"
-  local workflow_readme_file="$repo_root/workflows/memo-add/README.md"
-  local workflow_guide_file="$repo_root/docs/WORKFLOW_GUIDE.md"
-  local workflow_contract_file="$repo_root/crates/memo-workflow-cli/docs/workflow-contract.md"
-
-  replace_in_file \
-    "$cargo_file" \
-    'nils-memo = "=[^"]+"' \
-    "nils-memo = \"=${version}\"" \
-    "memo cargo dependency pin"
-
-  replace_in_file \
-    "$crate_readme_file" \
-    'nils-memo@[0-9A-Za-z.+-]+' \
-    "nils-memo@${version}" \
-    "memo crate readme pin"
-
-  replace_in_file \
-    "$workflow_readme_file" \
-    'nils-memo@[0-9A-Za-z.+-]+' \
-    "nils-memo@${version}" \
-    "memo workflow readme pin"
-
-  if [[ -f "$workflow_guide_file" ]]; then
-    replace_in_file \
-      "$workflow_guide_file" \
-      'nils-memo@[0-9A-Za-z.+-]+' \
-      "nils-memo@${version}" \
-      "memo workflow guide pin"
-  else
-    echo "note: optional file missing, skipped memo workflow guide pin: $workflow_guide_file"
-  fi
-
-  replace_in_file \
-    "$workflow_contract_file" \
-    'nils-memo@[0-9A-Za-z.+-]+' \
-    "nils-memo@${version}" \
-    "memo workflow contract pin"
-
-  record_lock_crate "nils-memo"
-}
-
 resolve_targets() {
   declare -A dedup=()
   local token canonical
   if [[ "$use_all" -eq 1 || -z "$targets_raw" ]]; then
-    selected_targets=("codex-cli" "memo")
+    selected_targets=("codex-cli")
     return 0
   fi
 
@@ -268,51 +199,6 @@ resolve_targets() {
   done
 
   [[ "${#selected_targets[@]}" -gt 0 ]] || usage_error "no valid targets resolved"
-}
-
-check_crate_version_exists() {
-  local crate="$1"
-  local status=0
-  python3 - "$crate" "$version" <<'PY' || status="$?"
-import json
-import os
-import sys
-import urllib.error
-import urllib.request
-
-crate, version = sys.argv[1], sys.argv[2]
-url = f"https://crates.io/api/v1/crates/{crate}/{version}"
-request = urllib.request.Request(
-    url,
-    headers={"User-Agent": "project-pin-crates/1.0"},
-)
-try:
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status != 200:
-            sys.exit(4)
-        data = json.load(response)
-except urllib.error.HTTPError as exc:
-    if exc.code == 404:
-        sys.exit(3)
-    sys.exit(4)
-except Exception:
-    sys.exit(4)
-
-remote_version = (data.get("version") or {}).get("num")
-if remote_version != version:
-    sys.exit(5)
-PY
-  if [[ "$status" -eq 0 ]]; then
-    echo "verified: crates.io has ${crate}@${version}"
-    return 0
-  fi
-
-  case "$status" in
-    3) die "crate version not found on crates.io: ${crate}@${version}" ;;
-    4) die "failed to query crates.io for ${crate}@${version}" ;;
-    5) die "crates.io version mismatch for ${crate}@${version}" ;;
-    *) die "version verification failed for ${crate}@${version}" ;;
-  esac
 }
 
 check_nils_cli_release_exists() {
@@ -402,7 +288,7 @@ PY
 
 verify_target_versions_available() {
   declare -A dedup=()
-  local target crate
+  local target
   for target in "${selected_targets[@]}"; do
     case "$target" in
       codex-cli)
@@ -411,35 +297,10 @@ verify_target_versions_available() {
           check_nils_cli_release_exists
         fi
         ;;
-      *)
-        crate="$(target_crate "$target")" || die "failed to resolve crate for target: $target"
-        if [[ -z "${dedup[$crate]:-}" ]]; then
-          dedup["$crate"]=1
-          check_crate_version_exists "$crate"
-        fi
-        ;;
+      *) die "unsupported target: $target" ;;
     esac
   done
   version_check_status="verified"
-}
-
-run_lock_sync() {
-  local crate
-  [[ "$update_lock" -eq 1 ]] || return 0
-  [[ "${#lock_crates[@]}" -gt 0 ]] || return 0
-
-  if [[ "$dry_run" -eq 1 ]]; then
-    for crate in "${lock_crates[@]}"; do
-      echo "dry-run: cargo update -p ${crate} --precise ${version}"
-    done
-    return 0
-  fi
-
-  command -v cargo >/dev/null 2>&1 || die "cargo is required when --update-lock is enabled"
-  for crate in "${lock_crates[@]}"; do
-    echo "running: cargo update -p ${crate} --precise ${version}"
-    cargo update -p "$crate" --precise "$version"
-  done
 }
 
 build_commit_message() {
@@ -520,7 +381,6 @@ print_summary() {
   echo "summary:"
   echo "  version: ${version}"
   echo "  dry_run: ${dry_run}"
-  echo "  update_lock: ${update_lock}"
   echo "  version_check: ${version_check_status}"
   echo "  auto_commit: ${auto_commit}"
   echo "  auto_push: ${auto_push}"
@@ -531,11 +391,7 @@ print_summary() {
   echo "  push_status: ${push_status}"
   echo "  targets:"
   for target in "${selected_targets[@]}"; do
-    if [[ "$target" == codex-cli ]]; then
-      echo "    - ${target} (release: sympoies/nils-cli)"
-    else
-      echo "    - ${target} (crate: $(target_crate "$target"))"
-    fi
+    echo "    - ${target} (release: sympoies/nils-cli)"
   done
   echo "  files:"
   for target in "${changed_files[@]:-}"; do
@@ -561,10 +417,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       dry_run=1
-      shift
-      ;;
-    --update-lock)
-      update_lock=1
       shift
       ;;
     --auto-commit)
@@ -624,11 +476,9 @@ verify_target_versions_available
 for target in "${selected_targets[@]}"; do
   case "$target" in
     codex-cli) pin_codex_cli ;;
-    memo) pin_memo ;;
     *) usage_error "unsupported target: $target" ;;
   esac
 done
 
-run_lock_sync
 run_auto_commit_and_push
 print_summary

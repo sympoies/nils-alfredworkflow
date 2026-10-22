@@ -8,7 +8,6 @@ nils-cambridge-cli
 nils-epoch-cli
 nils-google-cli
 nils-market-cli
-nils-memo-workflow-cli
 nils-quote-cli
 nils-randomer-cli
 nils-spotify-cli

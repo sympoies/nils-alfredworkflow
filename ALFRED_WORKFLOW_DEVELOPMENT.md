@@ -384,7 +384,6 @@ non-removed workflow directory.
 - `workflows/google-service/TROUBLESHOOTING.md`
 - `workflows/imdb-search/TROUBLESHOOTING.md`
 - `workflows/market-expression/TROUBLESHOOTING.md`
-- `workflows/memo-add/TROUBLESHOOTING.md`
 - `workflows/multi-timezone/TROUBLESHOOTING.md`
 - `workflows/netflix-search/TROUBLESHOOTING.md`
 - `workflows/open-project/TROUBLESHOOTING.md`
