@@ -103,8 +103,6 @@ Excluded from the standalone bundle for now:
 - `spotify-cli`: requires Spotify credentials and is still legacy Alfred JSON-first.
 - `youtube-cli`: requires a YouTube API key and is still legacy Alfred JSON-first.
 - `cambridge-cli`: requires the external Node/Playwright scraper runtime.
-- `memo-workflow-cli`: local memo DB operations currently pull native Turso/simsimd dependencies that are not yet
-  stable across the four standalone release targets.
 
 `google-cli` was previously excluded for the same Turso/simsimd reason, but that no longer describes its dependency
 tree: `cargo tree -p nils-google-cli` has no Turso, simsimd, or libsql edge, and `keyring` 4.x resolves to

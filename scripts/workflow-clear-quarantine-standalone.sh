@@ -44,7 +44,6 @@ epoch-converter
 google-search
 imdb-search
 market-expression
-memo-add
 multi-timezone
 netflix-search
 open-project
@@ -82,9 +81,6 @@ bundle_id_for_workflow_id() {
     ;;
   market-expression)
     printf '%s\n' 'com.sympoies.market-expression'
-    ;;
-  memo-add)
-    printf '%s\n' 'com.sympoies.memo-add'
     ;;
   multi-timezone)
     printf '%s\n' 'com.sympoies.multi-timezone'

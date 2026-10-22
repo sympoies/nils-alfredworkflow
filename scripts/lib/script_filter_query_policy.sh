@@ -21,36 +21,6 @@ sfqp_resolve_query_input() {
   printf '%s' "$query"
 }
 
-sfqp_resolve_query_input_memo() {
-  local query=""
-  local query_provided=0
-  if [[ $# -gt 0 ]]; then
-    query="${1-}"
-    query_provided=1
-  fi
-
-  if [[ "$query" == "(null)" ]]; then
-    query=""
-    query_provided=0
-  fi
-
-  if [[ "$query_provided" -eq 0 && -z "$query" && -n "${alfred_workflow_query:-}" ]]; then
-    query="${alfred_workflow_query}"
-  elif [[ "$query_provided" -eq 0 && -z "$query" && -n "${ALFRED_WORKFLOW_QUERY:-}" ]]; then
-    query="${ALFRED_WORKFLOW_QUERY}"
-  elif [[ "$query_provided" -eq 0 && -z "$query" && ! -t 0 ]]; then
-    query="$(cat)"
-  fi
-
-  printf '%s' "$query"
-}
-
-sfqp_resolve_query_input_memo_trimmed() {
-  local query
-  query="$(sfqp_resolve_query_input_memo "$@")"
-  sfqp_trim "$query"
-}
-
 sfqp_query_length() {
   local query
   query="$(sfqp_trim "${1-}")"

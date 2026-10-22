@@ -776,7 +776,7 @@ beyond the standard contract.
 
 ## Sprint 7: `CLI Crate Docs Batch 3 — Apps and Data`
 
-**Goal**: Realign docs for the remaining CLI crates (timezone, spotify, steam, quote, memo-workflow).
+**Goal**: Realign docs for the remaining CLI crates (timezone, spotify, steam, quote).
 
 **Demo/Validation**:
 
@@ -787,11 +787,10 @@ beyond the standard contract.
 
 **PR grouping intent**: per-sprint
 **Execution Profile**: serial
-**TotalComplexity**: 15
-**CriticalPathComplexity**: 15
+**TotalComplexity**: 12
+**CriticalPathComplexity**: 12
 **MaxBatchWidth**: 1
-**OverlapHotspots**: No file overlap. `memo-workflow-cli` writes to a sqlite store described in workflow
-README; cross-check is the integration risk.
+**OverlapHotspots**: No file overlap.
 
 ### Task 7.1: `Sync timezone-cli docs`
 
@@ -868,25 +867,6 @@ README; cross-check is the integration risk.
   - Status banner present.
 - **Validation**:
   - `cargo run -p nils-quote-cli -- --help` output matches doc.
-  - `bash scripts/cli-standards-audit.sh` passes.
-
-### Task 7.5: `Sync memo-workflow-cli docs`
-
-- **Location**:
-  - `crates/memo-workflow-cli/README.md`
-  - `crates/memo-workflow-cli/docs/README.md`
-  - `crates/memo-workflow-cli/docs/workflow-contract.md`
-- **Description**: Verify env vars (`MEMO_DB_PATH`, `MEMO_REQUIRE_CONFIRM`, `MEMO_SEARCH_MATCH`), sqlite init
-  path, and confirmation flow. Add status banner.
-- **Dependencies**:
-  - Task 7.4
-- **Complexity**: 3
-- **Acceptance criteria**:
-  - Env var list matches live config parser.
-  - Sqlite path / init flow documented.
-  - Status banner present.
-- **Validation**:
-  - `cargo run -p nils-memo-workflow-cli -- --help` output matches doc.
   - `bash scripts/cli-standards-audit.sh` passes.
 
 ## Sprint 8: `Workflow Standards Compliance and Cross-Check Sweep`
@@ -992,7 +972,6 @@ sweep so the sweep can assert compliance.
   - `workflows/google-service/README.md`
   - `workflows/imdb-search/README.md`
   - `workflows/market-expression/README.md`
-  - `workflows/memo-add/README.md`
   - `workflows/multi-timezone/README.md`
   - `workflows/netflix-search/README.md`
   - `workflows/open-project/README.md`

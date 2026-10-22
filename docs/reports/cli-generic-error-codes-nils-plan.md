@@ -38,8 +38,6 @@ flow.
   - Migrating the 12 script-filter CLIs (already done in PR2 #149).
   - Refactoring `ErrorKind` enums to gain finer-grained variants beyond what
     the existing dot-codes already encoded.
-  - Touching `memo-workflow-cli` (uses its own `ResultMode` envelope; no
-    `error.code` contract).
 
 ## Assumptions
 
