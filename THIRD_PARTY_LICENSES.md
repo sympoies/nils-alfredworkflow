@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `847d8b37d2e67fc6abcaeefba6b9928afc2cdbcef8c636ad56fc11a0138bdb0f`
+- Data source fingerprint (SHA256): `6afef0978772265036d1ebba52559db855e2fc70e46de38f63fe1ed2e2768f6e`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `49fa1cbb05ae33b30ec53a25b8d54fec55fbf79d92bae661a8c9da4e12efeb29` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `84a62ec1d584e2e4b910f98b5eca5a5d4761ba9c417ac78a7ee5623209dc634f` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -279,7 +279,7 @@ Do not edit manually.
 | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls> |
 | rustls-native-certs | 0.8.3 | Apache-2.0 OR ISC OR MIT | <https://github.com/rustls/rustls-native-certs> |
 | rustls-pki-types | 1.14.1 | MIT OR Apache-2.0 | <https://github.com/rustls/pki-types> |
-| rustls-webpki | 0.103.15 | ISC | <https://github.com/rustls/webpki> |
+| rustls-webpki | 0.103.16 | ISC | <https://github.com/rustls/webpki> |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 | <https://github.com/dtolnay/ryu> |
 | same-file | 1.0.6 | Unlicense/MIT | <https://github.com/BurntSushi/same-file> |
 | schemars | 0.9.0 | MIT | <https://github.com/GREsau/schemars> |
@@ -350,7 +350,7 @@ Do not edit manually.
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
 | want | 0.3.1 | MIT | <https://github.com/seanmonstar/want> |
-| webpki-roots | 1.0.7 | CDLA-Permissive-2.0 | <https://github.com/rustls/webpki-roots> |
+| webpki-roots | 1.0.10 | CDLA-Permissive-2.0 | <https://github.com/rustls/webpki-roots> |
 | winnow | 1.0.2 | MIT | <https://github.com/winnow-rs/winnow> |
 | wiremock | 0.6.5 | MIT/Apache-2.0 | <https://github.com/LukeMathWalker/wiremock-rs> |
 | writeable | 0.6.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
