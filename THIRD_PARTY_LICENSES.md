@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `c38aa55e08c1955652f28db920a0c06b92f3dd09bd7d4375aa9dee0398f135f9`
+- Data source fingerprint (SHA256): `fbf62df0c5f4476d8e02e76fbd4c1f358b8d9a3aebf220da7f384634107c9631`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `30c85a5ac620b156ef2ae4153bdb43393d2b5a237f8bfb3a855dc91e654764c6` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `207dc090beeab8f92b74008850689c7fb21448ff9c9c1ee2a2c1820aac84a2aa` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -217,7 +217,7 @@ Do not edit manually.
 | num_cpus | 1.17.0 | MIT OR Apache-2.0 | <https://github.com/seanmonstar/num_cpus> |
 | num_threads | 0.1.7 | MIT OR Apache-2.0 | <https://github.com/jhpratt/num_threads> |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | <https://github.com/matklad/once_cell> |
-| open | 5.4.4 | MIT | <https://github.com/Byron/open-rs> |
+| open | 5.4.5 | MIT | <https://github.com/Byron/open-rs> |
 | openssl-probe | 0.2.1 | MIT OR Apache-2.0 | <https://github.com/rustls/openssl-probe> |
 | option-ext | 0.2.0 | MPL-2.0 | <https://github.com/soc/option-ext.git> |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/danieldg/ordered-stream> |
@@ -302,7 +302,7 @@ Do not edit manually.
 | tinystr | 0.8.3 | Unicode-3.0 | <https://github.com/unicode-org/icu4x> |
 | tinyvec | 1.11.0 | Zlib OR Apache-2.0 OR MIT | <https://github.com/Lokathor/tinyvec> |
 | tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib | <https://github.com/Soveu/tinyvec_macros> |
-| tokio | 1.53.3 | MIT | <https://github.com/tokio-rs/tokio> |
+| tokio | 1.54.1 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-macros | 2.7.0 | MIT | <https://github.com/tokio-rs/tokio> |
 | tokio-rustls | 0.26.4 | MIT OR Apache-2.0 | <https://github.com/rustls/tokio-rustls> |
 | tokio-util | 0.7.18 | MIT | <https://github.com/tokio-rs/tokio> |
@@ -324,7 +324,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.28.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.29.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
 | want | 0.3.1 | MIT | <https://github.com/seanmonstar/want> |
