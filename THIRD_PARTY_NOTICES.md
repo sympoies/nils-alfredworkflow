@@ -3,8 +3,8 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `30c85a5ac620b156ef2ae4153bdb43393d2b5a237f8bfb3a855dc91e654764c6`
-- Third-party crates (`source != null`): 296
+- Cargo.lock SHA256: `68fcee351d6a04013bbfea4dc0139901bcfe7b00e8651e4fbac6e63ae8500824`
+- Third-party crates (`source != null`): 298
 
 ## Notice Extraction Policy
 
@@ -653,6 +653,13 @@ This file documents third-party notice-file discovery for Rust crates used by th
 - License file references:
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
+
+### encodify 1.0.2
+
+- License: `Apache-2.0 OR MIT`
+- Source: `crates.io`
+- Notice files: No explicit NOTICE file discovered.
+- License file reference: none declared
 
 ### endi 1.1.1
 
@@ -1312,7 +1319,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-MIT`
   - `LICENSE-ZLIB`
 
-### mail-builder 1.0.0
+### mail-builder 2.0.0
 
 - License: `Apache-2.0 OR MIT`
 - Source: `crates.io`
@@ -2032,6 +2039,15 @@ This file documents third-party notice-file discovery for Rust crates used by th
 - Notice files: No explicit NOTICE file discovered.
 - License file references:
   - `LICENSE-APACHE`
+  - `LICENSE-MIT`
+
+### simdutf8 0.1.5
+
+- License: `MIT OR Apache-2.0`
+- Source: `crates.io`
+- Notice files: No explicit NOTICE file discovered.
+- License file references:
+  - `LICENSE-Apache`
   - `LICENSE-MIT`
 
 ### siphasher 1.0.3
