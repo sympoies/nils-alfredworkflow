@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `fbf62df0c5f4476d8e02e76fbd4c1f358b8d9a3aebf220da7f384634107c9631`
+- Data source fingerprint (SHA256): `f05458df51e67f9760b263a6d20a24a984505b4d60cbf97e9f5b16d9e9fe3c2d`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `207dc090beeab8f92b74008850689c7fb21448ff9c9c1ee2a2c1820aac84a2aa` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `c48707c19e8239854642876913b05a12c4b8b407c0e1534c8feb90d3824de103` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -66,7 +66,7 @@ Do not edit manually.
 | assert-json-diff | 2.0.2 | MIT | <https://github.com/davidpdrsn/assert-json-diff.git> |
 | async-broadcast | 0.7.2 | MIT OR Apache-2.0 | <https://github.com/smol-rs/async-broadcast> |
 | async-channel | 2.5.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-channel> |
-| async-executor | 1.14.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-executor> |
+| async-executor | 1.14.1 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-executor> |
 | async-io | 2.6.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-io> |
 | async-lock | 3.4.2 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-lock> |
 | async-process | 2.5.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/async-process> |
