@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `f05458df51e67f9760b263a6d20a24a984505b4d60cbf97e9f5b16d9e9fe3c2d`
+- Data source fingerprint (SHA256): `cc3f3def9a22a3612996343258bc6888ada77892b8161ad948a27cf66a5999e4`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `c48707c19e8239854642876913b05a12c4b8b407c0e1534c8feb90d3824de103` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `fc9ef22482ca520607b328c8ece68424ff37072629627b0709099a86b3f7009c` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -324,7 +324,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.29.0 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.29.1 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
 | want | 0.3.1 | MIT | <https://github.com/seanmonstar/want> |
