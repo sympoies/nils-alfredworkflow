@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `e93de025364c8cb02cbd1d2f3b813687114e1bf4606441e1311c0cffc0cbb564`
+- Data source fingerprint (SHA256): `6c0ed2672d5890e159c6ed4bccb909e816c55bd87b4528dbb33c720d3ceffe24`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `2275c7bf622e2dd6e665dc1482669927de08ed59679526e09daf1686f35691d4` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `f13362c6a6ca7f4b8106b1214bcc0cd2bd3cefa30cb76d78aab9263b4677a410` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -234,8 +234,8 @@ Do not edit manually.
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 | <https://github.com/cryptocorrosion/cryptocorrosion> |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 | <https://github.com/bkchr/proc-macro-crate> |
 | proc-macro2 | 1.0.106 | MIT OR Apache-2.0 | <https://github.com/dtolnay/proc-macro2> |
-| prost | 0.14.4 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
-| prost-derive | 0.14.4 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
+| prost | 0.14.6 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
+| prost-derive | 0.14.6 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
 | quinn | 0.11.9 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-udp | 0.5.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
@@ -326,7 +326,7 @@ Do not edit manually.
 | url | 2.5.8 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.29.1 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.29.2 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
 | walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
 | want | 0.3.1 | MIT | <https://github.com/seanmonstar/want> |
