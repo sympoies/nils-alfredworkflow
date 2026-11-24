@@ -3,7 +3,7 @@
 This file documents third-party notice-file discovery for Rust crates used by this workspace.
 
 - Data source: `cargo metadata --format-version 1 --locked --filter-platform` union for supported macOS/Linux targets
-- Cargo.lock SHA256: `adf12854305b03dd5a55da7633a31321410744b5310dcacf6cfd4f1ca018d2f0`
+- Cargo.lock SHA256: `c893271b74825683958130e965ffcccae3a26f63cd3489ba01169b88dd314a48`
 - Third-party crates (`source != null`): 298
 
 ## Notice Extraction Policy
@@ -389,7 +389,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap 4.6.7
+### clap 4.6.9
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -407,7 +407,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### clap_derive 4.6.7
+### clap_derive 4.6.9
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1593,7 +1593,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### proc-macro2 1.0.106
+### proc-macro2 1.0.107
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1645,7 +1645,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### quote 1.0.45
+### quote 1.0.47
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -1654,7 +1654,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### rand 0.10.3
+### rand 0.10.4
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2118,7 +2118,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### syn 3.0.3
+### syn 3.0.10
 
 - License: `MIT OR Apache-2.0`
 - Source: `crates.io`
@@ -2413,7 +2413,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### uuid 1.29.2
+### uuid 1.29.3
 
 - License: `Apache-2.0 OR MIT`
 - Source: `crates.io`
@@ -2431,7 +2431,7 @@ This file documents third-party notice-file discovery for Rust crates used by th
   - `LICENSE-APACHE`
   - `LICENSE-MIT`
 
-### walkdir 2.5.0
+### walkdir 2.5.1
 
 - License: `Unlicense/MIT`
 - Source: `crates.io`

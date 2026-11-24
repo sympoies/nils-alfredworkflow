@@ -12,14 +12,14 @@ Do not edit manually.
 
 ## Deterministic Provenance
 
-- Data source fingerprint (SHA256): `548017b1a207c9096345b7cb8966bfe4181433d4911e6d57a018d06b3c43c4d3`
+- Data source fingerprint (SHA256): `b4fce7c2d341b6e62e6496f755c6d2cb38980c3e6a3581b01c442336ed987501`
 - Runtime metadata fingerprint (SHA256): `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833`
 
 ## Data Sources
 
 | Source | Locator | SHA256 | Notes |
 | --- | --- | --- | --- |
-| Cargo lockfile | `Cargo.lock` | `adf12854305b03dd5a55da7633a31321410744b5310dcacf6cfd4f1ca018d2f0` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
+| Cargo lockfile | `Cargo.lock` | `c893271b74825683958130e965ffcccae3a26f63cd3489ba01169b88dd314a48` | `cargo metadata --format-version 1 --locked --filter-platform per supported target` |
 | Node lockfile | `package-lock.json` | `12a1e4ca106103771dc6d17e02a4ad9e289bf1dc1b7fb4b8907bcbdfaab07f55` | `jq package-lock extraction` |
 | Runtime release pin | `scripts/lib/codex_cli_version.sh` | `70709ffcb7f71f25298a4e0c1337b13fd07eaedb8cc435de1a5b633259c59526` | `source for release repository, target, license, and version` |
 | Runtime release metadata | <https://api.github.com/repos/sympoies/nils-cli/releases/tags/v1.21.6> | `39f98848b82ffed0457dac201ea6bd35a2d7d51a7c7707435088f46939a05833` | `curl GitHub Releases API plus jq normalized fields` |
@@ -96,9 +96,9 @@ Do not edit manually.
 | chrono | 0.4.45 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono> |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/chronotope/chrono-tz> |
 | cipher | 0.4.4 | MIT OR Apache-2.0 | <https://github.com/RustCrypto/traits> |
-| clap | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap | 4.6.9 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_builder | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
-| clap_derive | 4.6.7 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
+| clap_derive | 4.6.9 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | clap_lex | 1.1.0 | MIT OR Apache-2.0 | <https://github.com/clap-rs/clap> |
 | colorchoice | 1.0.5 | MIT OR Apache-2.0 | <https://github.com/rust-cli/anstyle.git> |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | <https://github.com/smol-rs/concurrent-queue> |
@@ -233,14 +233,14 @@ Do not edit manually.
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 | <https://github.com/jhpratt/powerfmt> |
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 | <https://github.com/cryptocorrosion/cryptocorrosion> |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 | <https://github.com/bkchr/proc-macro-crate> |
-| proc-macro2 | 1.0.106 | MIT OR Apache-2.0 | <https://github.com/dtolnay/proc-macro2> |
+| proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | <https://github.com/dtolnay/proc-macro2> |
 | prost | 0.14.6 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
 | prost-derive | 0.14.6 | Apache-2.0 | <https://github.com/tokio-rs/prost> |
 | quinn | 0.11.9 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
 | quinn-udp | 0.5.14 | MIT OR Apache-2.0 | <https://github.com/quinn-rs/quinn> |
-| quote | 1.0.45 | MIT OR Apache-2.0 | <https://github.com/dtolnay/quote> |
-| rand | 0.10.3 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
+| quote | 1.0.47 | MIT OR Apache-2.0 | <https://github.com/dtolnay/quote> |
+| rand | 0.10.4 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.8.6 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand | 0.9.5 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 | <https://github.com/rust-random/rand> |
@@ -292,7 +292,7 @@ Do not edit manually.
 | strsim | 0.11.1 | MIT | <https://github.com/rapidfuzz/strsim-rs> |
 | subtle | 2.6.1 | BSD-3-Clause | <https://github.com/dalek-cryptography/subtle> |
 | syn | 2.0.117 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
-| syn | 3.0.3 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
+| syn | 3.0.10 | MIT OR Apache-2.0 | <https://github.com/dtolnay/syn> |
 | sync_wrapper | 1.0.2 | Apache-2.0 | <https://github.com/Actyx/sync_wrapper> |
 | synstructure | 0.13.2 | MIT | <https://github.com/mystor/synstructure> |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | <https://github.com/Stebalien/tempfile> |
@@ -326,9 +326,9 @@ Do not edit manually.
 | url | 2.5.9 | MIT OR Apache-2.0 | <https://github.com/servo/rust-url> |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | <https://github.com/hsivonen/utf8_iter> |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | <https://github.com/alacritty/vte> |
-| uuid | 1.29.2 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
+| uuid | 1.29.3 | Apache-2.0 OR MIT | <https://github.com/uuid-rs/uuid> |
 | version_check | 0.9.5 | MIT/Apache-2.0 | <https://github.com/SergioBenitez/version_check> |
-| walkdir | 2.5.0 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
+| walkdir | 2.5.1 | Unlicense/MIT | <https://github.com/BurntSushi/walkdir> |
 | want | 0.3.1 | MIT | <https://github.com/seanmonstar/want> |
 | webpki-roots | 1.0.10 | CDLA-Permissive-2.0 | <https://github.com/rustls/webpki-roots> |
 | winnow | 1.0.2 | MIT | <https://github.com/winnow-rs/winnow> |
